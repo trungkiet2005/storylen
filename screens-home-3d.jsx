@@ -17,10 +17,24 @@ const HomeV4Hero3D = () => {
 
   const isDark = document.documentElement.dataset.theme === "dark";
 
+  // Very soft edge-only vignette — keeps center (Fuji) fully visible
+  const vignetteBg = isDark
+    ? "radial-gradient(ellipse 90% 70% at center, rgba(14,12,10,0) 55%, rgba(14,12,10,0.35) 95%)"
+    : "radial-gradient(ellipse 90% 70% at center, rgba(245,239,227,0) 55%, rgba(245,239,227,0.35) 95%)";
+
+  // Text glow halo only directly behind title (no card)
+  const textHalo = isDark
+    ? "radial-gradient(ellipse 70% 55% at center, rgba(14,12,10,0.45) 0%, rgba(14,12,10,0) 70%)"
+    : "radial-gradient(ellipse 70% 55% at center, rgba(245,239,227,0.55) 0%, rgba(245,239,227,0) 70%)";
+
+  const strongShadow = isDark
+    ? "0 2px 10px rgba(0,0,0,0.85), 0 0 30px rgba(0,0,0,0.6)"
+    : "0 2px 10px rgba(245,239,227,0.95), 0 0 30px rgba(245,239,227,0.8), 0 1px 0 rgba(245,239,227,1)";
+
   return (
     <div className="paper-grain">
       {/* HERO — full viewport 3D */}
-      <div ref={heroRef} style={{ height: "100vh", minHeight: 700, position: "relative", overflow: "hidden", borderBottom: "2px solid var(--border)" }}>
+      <div ref={heroRef} style={{ height: "100vh", minHeight: 720, position: "relative", overflow: "hidden", borderBottom: "2px solid var(--border)" }}>
         {/* 3D Canvas */}
         <div style={{ position: "absolute", inset: 0, zIndex: 1 }}>
           {window.THREE ? (
@@ -30,34 +44,56 @@ const HomeV4Hero3D = () => {
           )}
         </div>
 
+        {/* Center vignette — fades 3D around the text so copy is always legible */}
+        <div style={{ position: "absolute", inset: 0, zIndex: 2, background: vignetteBg, pointerEvents: "none" }}/>
+
         {/* Halftone corner accents */}
-        <div className="halftone-coarse" style={{ position: "absolute", left: 0, bottom: 0, width: 240, height: 240, zIndex: 2, opacity: 0.45, pointerEvents: "none" }}/>
-        <div className="halftone" style={{ position: "absolute", right: 0, top: 0, width: 300, height: 300, zIndex: 2, opacity: 0.35, pointerEvents: "none" }}/>
+        <div className="halftone-coarse" style={{ position: "absolute", left: 0, bottom: 0, width: 240, height: 240, zIndex: 2, opacity: 0.4, pointerEvents: "none" }}/>
+        <div className="halftone" style={{ position: "absolute", right: 0, top: 0, width: 260, height: 260, zIndex: 2, opacity: 0.3, pointerEvents: "none" }}/>
 
         {/* Vertical tategaki on left */}
-        <div style={{ position: "absolute", left: 36, top: "50%", transform: "translateY(-50%)", zIndex: 3, pointerEvents: "none" }}>
-          <div className="serif" style={{ writingMode: "vertical-rl", textOrientation: "mixed", fontSize: 14, color: "var(--fg-soft)", letterSpacing: "0.3em", opacity: 0.75 }}>
+        <div style={{ position: "absolute", left: 32, top: "50%", transform: "translateY(-50%)", zIndex: 3, pointerEvents: "none" }}>
+          <div className="serif" style={{ writingMode: "vertical-rl", textOrientation: "mixed", fontSize: 13, color: "var(--fg-soft)", letterSpacing: "0.3em", opacity: 0.7 }}>
             第一章 · 物語を読む新しい方法
           </div>
         </div>
 
-        {/* Hero copy — absolutely positioned */}
-        <div style={{ position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)", zIndex: 3, padding: "0 100px", textAlign: "center", pointerEvents: "none" }}>
-          <div className="caps-sm" style={{ color: "var(--accent)", marginBottom: 16, letterSpacing: "0.3em" }}>物語レンズ · ISSUE 01 · SPRING 2026</div>
-          <h1 className="display" style={{ fontSize: "clamp(56px, 8vw, 112px)", margin: 0, lineHeight: 0.95, color: "var(--fg)", textShadow: isDark ? "0 2px 20px rgba(0,0,0,0.6)" : "0 2px 20px rgba(245,239,227,0.8)" }}>
-            Đọc manga <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", color: "var(--accent)" }}>không</span><br/>
-            rào cản ngôn ngữ.
-          </h1>
-          <p className="serif" style={{ fontSize: 18, marginTop: 20, maxWidth: 560, marginLeft: "auto", marginRight: "auto", color: "var(--fg-soft)", lineHeight: 1.5 }}>
-            Di chuột để khám phá bối cảnh · Cuộn xuống để bắt đầu hành trình
-          </p>
-          <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 32, pointerEvents: "auto" }}>
-            <button className="btn btn-primary" data-nav="upload" style={{ padding: "14px 24px", fontSize: 14 }}>
-              <Icon name="upload" size={16}/> Thử ngay
-            </button>
-            <button className="btn" data-nav="reader" style={{ padding: "14px 24px", fontSize: 14 }}>
-              Xem demo <Icon name="arrow-right" size={14}/>
-            </button>
+        {/* Vertical tategaki on right */}
+        <div style={{ position: "absolute", right: 32, top: "50%", transform: "translateY(-50%)", zIndex: 3, pointerEvents: "none" }}>
+          <div className="serif" style={{ writingMode: "vertical-rl", textOrientation: "mixed", fontSize: 12, color: "var(--accent)", letterSpacing: "0.4em", opacity: 0.75 }}>
+            真実を翻訳する · TRANSLATE · 2026
+          </div>
+        </div>
+
+        {/* Soft halo directly behind title — lets Fuji breathe through */}
+        <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: 920, height: 460, zIndex: 2, background: textHalo, pointerEvents: "none", filter: "blur(2px)" }}/>
+
+        {/* Hero copy — NO card, just text with strong shadow over the 3D */}
+        <div style={{ position: "absolute", left: 0, right: 0, top: "50%", transform: "translateY(-50%)", zIndex: 3, padding: "0 24px", display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+          <div style={{ maxWidth: 880, width: "100%", textAlign: "center" }}>
+            <div className="caps-sm" style={{ color: "var(--accent)", marginBottom: 14, letterSpacing: "0.32em", textShadow: strongShadow }}>物語レンズ · ISSUE 01 · SPRING 2026</div>
+            <h1 className="display" style={{
+              fontSize: "clamp(42px, 5.5vw, 78px)",
+              margin: 0,
+              lineHeight: 1.02,
+              color: "var(--fg)",
+              letterSpacing: "-0.02em",
+              textShadow: strongShadow,
+            }}>
+              Đọc manga <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", color: "var(--accent)", fontWeight: 700 }}>không</span><br/>
+              rào cản <span style={{ position: "relative", display: "inline-block" }}>
+                ngôn ngữ
+                <span style={{ position: "absolute", left: 0, right: 0, bottom: "-6px", height: 4, background: "var(--accent)", opacity: 0.55 }}/>
+              </span>.
+            </h1>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 32, pointerEvents: "auto", flexWrap: "wrap" }}>
+              <button className="btn btn-primary" data-nav="upload" style={{ padding: "14px 24px", fontSize: 14 }}>
+                <Icon name="upload" size={16}/> Thử ngay
+              </button>
+              <button className="btn" data-nav="reader" style={{ padding: "14px 24px", fontSize: 14 }}>
+                Xem demo <Icon name="arrow-right" size={14}/>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -71,8 +107,8 @@ const HomeV4Hero3D = () => {
         </div>
 
         {/* Hanko seal top right */}
-        <div style={{ position: "absolute", top: 80, right: 80, zIndex: 3, pointerEvents: "none" }}>
-          <div className="seal seal-circle" style={{ width: 84, height: 84, fontSize: 26 }}>新刊</div>
+        <div style={{ position: "absolute", top: 88, right: 64, zIndex: 3, pointerEvents: "none" }}>
+          <div className="seal seal-circle" style={{ width: 76, height: 76, fontSize: 22 }}>新刊</div>
         </div>
       </div>
 
