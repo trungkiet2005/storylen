@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StoryLens — Manga Reader AI</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<!-- Three.js UMD only — 3D hero is optional; falls back to 2D illustrations -->
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="primitives.jsx"></script>
+<script type="text/babel" src="screens-home.jsx"></script>
+<script type="text/babel" src="screens-upload.jsx"></script>
+<script type="text/babel" src="screens-reader-qa.jsx"></script>
+<script type="text/babel" src="ui-features.jsx"></script>
+<script type="text/babel" src="fuji-3d.jsx"></script>
+<script type="text/babel" src="screens-home-3d.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "light",
+  "homeVariant": "hero3d",
+  "readerMode": "overlay",
+  "qaState": "active",
+  "uploadState": "idle",
+  "audio": false,
+  "grain": true,
+  "cursor": true,
+  "intro": true
+}/*EDITMODE-END*/;
+
+function Prototype() {
+  const { values, setValue } = useTweaks(TWEAK_DEFAULTS);
+  const [screen, setScreen] = React.useState("home");
+  const [cmdOpen, setCmdOpen] = React.useState(false);
+  const [introDone, setIntroDone] = React.useState(!values.intro);
+
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = values.theme;
+  }, [values.theme]);
+
+  React.useEffect(() => {
+    document.documentElement.classList.toggle("cursor-on", !!values.cursor);
+  }, [values.cursor]);
+
+  // Keyboard shortcuts
+  React.useEffect(() => {
+    let gPressed = false;
+    let gTimer = null;
+    const onKey = (e) => {
+      // ⌘K / Ctrl+K
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdOpen(v => !v);
+        return;
+      }
+      // G + letter navigation
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.key.toLowerCase() === "g" && !gPressed) {
+        gPressed = true;
+        clearTimeout(gTimer);
+        gTimer = setTimeout(() => { gPressed = false; }, 800);
+        return;
+      }
+      if (gPressed) {
+        const map = { h: "home", u: "upload", r: "reader", q: "qa", b: "batch", l: "history" };
+        if (map[e.key.toLowerCase()]) { setScreen(map[e.key.toLowerCase()]); gPressed = false; }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const onNavClick = (e) => {
+    const t = e.target.closest("[data-nav]");
+    if (t) { e.preventDefault(); setScreen(t.dataset.nav); }
+  };
+
+  const HomeVariants = {
+    hero3d: <HomeV4Hero3D/>,
+    editorial: <HomeV1Editorial/>,
+    poster: <HomeV2Poster/>,
+    library: <HomeV3Library/>,
+  };
+
+  let body = null;
+  switch (screen) {
+    case "home": body = HomeVariants[values.homeVariant] || HomeVariants.hero3d; break;
+    case "upload": body = <UploadScreen state={values.uploadState}/>; break;
+    case "reader": body = <ReaderScreen mode={values.readerMode}/>; break;
+    case "qa": body = <QAScreen state={values.qaState}/>; break;
+    case "batch": body = <BatchScreen/>; break;
+    case "history": body = <HistoryScreen/>; break;
+    default: body = HomeVariants.hero3d;
+  }
+
+  return (
+    <div onClick={onNavClick} style={{ minHeight: "100vh", background: "var(--bg)" }}>
+      {!introDone && values.intro && <Intro onDone={() => setIntroDone(true)}/>}
+      <TopBar active={screen} onNav={setScreen} theme={values.theme}
+              onToggleTheme={() => setValue("theme", values.theme === "dark" ? "light" : "dark")}/>
+      {body}
+      {screen === "home" && values.homeVariant === "hero3d" && <ScrollProgress chapters={["序章", "読む", "訳す", "問う"]}/>}
+      <CommandPalette
+        open={cmdOpen}
+        onClose={() => setCmdOpen(false)}
+        onNav={setScreen}
+        onSetTweak={setValue}
+        values={values}
+        screen={screen}/>
+      {values.cursor && <CustomCursor/>}
+      {values.grain && <Grain/>}
+      <AudioHost enabled={values.audio}/>
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Giao diện">
+          <TweakRadio label="Chế độ" value={values.theme} onChange={v => setValue("theme", v)}
+                      options={[{value:"light",label:"Light 明"},{value:"dark",label:"Dark 暗"}]}/>
+        </TweakSection>
+        {screen === "home" && (
+          <TweakSection title="Home — variant">
+            <TweakRadio label="Hướng thiết kế" value={values.homeVariant} onChange={v => setValue("homeVariant", v)}
+                        options={[
+                          {value:"hero3d",label:"V4 · 3D Fuji Hero ★"},
+                          {value:"editorial",label:"V1 · Editorial (tạp chí)"},
+                          {value:"poster",label:"V2 · Poster (ấn phẩm)"},
+                          {value:"library",label:"V3 · Library (thư viện)"},
+                        ]}/>
+          </TweakSection>
+        )}
+        {screen === "reader" && (
+          <TweakSection title="Reader — mode">
+            <TweakRadio label="Hiển thị bản dịch" value={values.readerMode} onChange={v => setValue("readerMode", v)}
+                        options={[
+                          {value:"overlay",label:"Overlay (đè lên bubble)"},
+                          {value:"sidebyside",label:"Song ngữ (side-by-side)"},
+                          {value:"tap",label:"Tap-to-reveal"},
+                        ]}/>
+          </TweakSection>
+        )}
+        {screen === "qa" && (
+          <TweakSection title="Q&A — state">
+            <TweakRadio label="Trạng thái" value={values.qaState} onChange={v => setValue("qaState", v)}
+                        options={[
+                          {value:"active",label:"Có câu trả lời"},
+                          {value:"loading",label:"Đang retrieve"},
+                          {value:"empty",label:"Empty (mới vào)"},
+                        ]}/>
+          </TweakSection>
+        )}
+        {screen === "upload" && (
+          <TweakSection title="Upload — state">
+            <TweakRadio label="Trạng thái" value={values.uploadState} onChange={v => setValue("uploadState", v)}
+                        options={[
+                          {value:"idle",label:"Idle (chờ file)"},
+                          {value:"processing",label:"Processing (OCR pipeline)"},
+                          {value:"error",label:"Error (OCR fail)"},
+                        ]}/>
+          </TweakSection>
+        )}
+        <TweakSection title="Immersion · Cảm giác">
+          <TweakToggle label="Film grain overlay" value={values.grain} onChange={v => setValue("grain", v)}/>
+          <TweakToggle label="Custom cursor (ink dot)" value={values.cursor} onChange={v => setValue("cursor", v)}/>
+          <TweakToggle label="Âm thanh (stamp · paper)" value={values.audio} onChange={v => setValue("audio", v)}/>
+          <TweakToggle label="Cinematic intro khi load" value={values.intro} onChange={v => setValue("intro", v)}/>
+        </TweakSection>
+        <TweakSection title="Phím tắt">
+          <div style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)", lineHeight: 1.8 }}>
+            ⌘K · Command palette<br/>
+            G H · Về Home<br/>
+            G U · Upload<br/>
+            G R · Reader<br/>
+            G Q · Q&A<br/>
+            G B · Batch<br/>
+            G L · History
+          </div>
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+// Design canvas view — side by side for report screenshots
+function Canvas() {
+  return (
+    <DesignCanvas>
+      <DCSection id="home" title="Trang chủ · Home — 4 hướng visual (V4 3D là main)">
+        <DCArtboard id="home-hero3d" label="V4 · 3D Fuji Hero (main)" width={1400} height={2000}>
+          <div data-theme="light">
+            <TopBar active="home" theme="light"/>
+            <HomeV4Hero3D/>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="home-editorial" label="V1 · Editorial (tạp chí)" width={1280} height={1400}>
+          <div data-theme="light">
+            <TopBar active="home" theme="light"/>
+            <HomeV1Editorial/>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="home-poster" label="V2 · Poster (ấn phẩm)" width={1280} height={1100}>
+          <div data-theme="light">
+            <TopBar active="home" theme="light"/>
+            <HomeV2Poster/>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="home-library" label="V3 · Library (thư viện)" width={1280} height={1300}>
+          <div data-theme="light">
+            <TopBar active="home" theme="light"/>
+            <HomeV3Library/>
+          </div>
+        </DCArtboard>
+        <DCArtboard id="home-dark" label="V1 · Dark mode" width={1280} height={1400}>
+          <div data-theme="dark">
+            <TopBar active="home" theme="dark"/>
+            <HomeV1Editorial/>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="upload" title="Upload — idle, processing, error">
+        <DCArtboard id="upload-idle" label="Idle · chờ file" width={1280} height={900}>
+          <div data-theme="light"><TopBar active="upload" theme="light"/><UploadScreen state="idle"/></div>
+        </DCArtboard>
+        <DCArtboard id="upload-processing" label="Processing · OCR pipeline" width={1280} height={1000}>
+          <div data-theme="light"><TopBar active="upload" theme="light"/><UploadScreen state="processing"/></div>
+        </DCArtboard>
+        <DCArtboard id="upload-error" label="Error · OCR fail" width={1280} height={900}>
+          <div data-theme="light"><TopBar active="upload" theme="light"/><UploadScreen state="error"/></div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="reader" title="Reader — 3 mode hiển thị bản dịch">
+        <DCArtboard id="reader-overlay" label="Mode 1 · Overlay (đè lên bubble)" width={1400} height={950}>
+          <div data-theme="light"><TopBar active="reader" theme="light"/><ReaderScreen mode="overlay"/></div>
+        </DCArtboard>
+        <DCArtboard id="reader-sidebyside" label="Mode 2 · Song ngữ (side-by-side)" width={1400} height={950}>
+          <div data-theme="light"><TopBar active="reader" theme="light"/><ReaderScreen mode="sidebyside"/></div>
+        </DCArtboard>
+        <DCArtboard id="reader-tap" label="Mode 3 · Tap-to-reveal" width={1400} height={950}>
+          <div data-theme="light"><TopBar active="reader" theme="light"/><ReaderScreen mode="tap"/></div>
+        </DCArtboard>
+        <DCArtboard id="reader-dark" label="Overlay · Dark mode (đọc đêm)" width={1400} height={950}>
+          <div data-theme="dark"><TopBar active="reader" theme="dark"/><ReaderScreen mode="overlay"/></div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="qa" title="Q&A · RAG Chat — 3 state">
+        <DCArtboard id="qa-active" label="Có câu trả lời + nguồn" width={1280} height={900}>
+          <div data-theme="light"><TopBar active="qa" theme="light"/><QAScreen state="active"/></div>
+        </DCArtboard>
+        <DCArtboard id="qa-empty" label="Empty state (vừa vào)" width={1280} height={900}>
+          <div data-theme="light"><TopBar active="qa" theme="light"/><QAScreen state="empty"/></div>
+        </DCArtboard>
+        <DCArtboard id="qa-loading" label="Loading · retrieving chunks" width={1280} height={900}>
+          <div data-theme="light"><TopBar active="qa" theme="light"/><QAScreen state="loading"/></div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="batch-history" title="Batch Upload & History">
+        <DCArtboard id="batch" label="Batch Upload — xử lý tuần tự" width={1280} height={1000}>
+          <div data-theme="light"><TopBar active="batch" theme="light"/><BatchScreen/></div>
+        </DCArtboard>
+        <DCArtboard id="history" label="History · thư viện cá nhân" width={1280} height={1000}>
+          <div data-theme="light"><TopBar active="history" theme="light"/><HistoryScreen/></div>
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+function App() {
+  const [view, setView] = React.useState(() => (location.hash === "#canvas" ? "canvas" : "prototype"));
+  React.useEffect(() => {
+    const onHash = () => setView(location.hash === "#canvas" ? "canvas" : "prototype");
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  return (
+    <>
+      <div style={{ position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)", zIndex: 100, display: "flex", gap: 0, background: "var(--ink)", border: "2px solid var(--ink)", padding: 3, boxShadow: "4px 4px 0 var(--beni)" }}>
+        {[
+          { id: "prototype", label: "Prototype", hash: "" },
+          { id: "canvas", label: "All screens", hash: "#canvas" },
+        ].map(v => (
+          <button key={v.id} onClick={() => location.hash = v.hash}
+                  style={{ padding: "7px 16px", background: view === v.id ? "var(--paper)" : "transparent", color: view === v.id ? "var(--ink)" : "var(--paper)", border: "none", fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", fontFamily: "inherit" }}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+      {view === "canvas" ? <Canvas/> : <Prototype/>}
+    </>
+  );
+}
+
+// Wait for THREE to load before first render (harmless if already ready)
+function boot() {
+  ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+}
+boot();
+</script>
+</body>
+</html>

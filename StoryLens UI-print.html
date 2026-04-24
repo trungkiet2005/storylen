@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StoryLens — Print</title>
+<link rel="stylesheet" href="styles.css"/>
+<style>
+  @page { size: 1400px 950px; margin: 0; }
+  html, body { margin: 0; padding: 0; background: var(--bg); }
+  .print-page {
+    width: 1400px;
+    min-height: 950px;
+    page-break-after: always;
+    break-after: page;
+    break-inside: avoid;
+    overflow: hidden;
+    position: relative;
+    background: var(--bg);
+  }
+  .print-page:last-child { page-break-after: auto; }
+  .page-label {
+    position: absolute; top: 8px; right: 12px; z-index: 50;
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.15em;
+    color: var(--muted); text-transform: uppercase;
+  }
+  @media print {
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    .grain-overlay, .cursor-dot, .cursor-ring { display: none !important; }
+  }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="primitives.jsx"></script>
+<script type="text/babel" src="screens-home.jsx"></script>
+<script type="text/babel" src="screens-upload.jsx"></script>
+<script type="text/babel" src="screens-reader-qa.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const Page = ({ label, theme = "light", children }) => (
+  <div className="print-page" data-theme={theme}>
+    <div className="page-label">{label}</div>
+    {children}
+  </div>
+);
+
+function PrintApp() {
+  return (
+    <>
+      <Page label="01 · Home — Editorial">
+        <TopBar active="home" theme="light"/>
+        <HomeV1Editorial/>
+      </Page>
+      <Page label="02 · Home — Poster">
+        <TopBar active="home" theme="light"/>
+        <HomeV2Poster/>
+      </Page>
+      <Page label="03 · Home — Library">
+        <TopBar active="home" theme="light"/>
+        <HomeV3Library/>
+      </Page>
+      <Page label="04 · Home — Dark mode" theme="dark">
+        <TopBar active="home" theme="dark"/>
+        <HomeV1Editorial/>
+      </Page>
+      <Page label="05 · Upload — Idle">
+        <TopBar active="upload" theme="light"/>
+        <UploadScreen state="idle"/>
+      </Page>
+      <Page label="06 · Upload — Processing (OCR pipeline)">
+        <TopBar active="upload" theme="light"/>
+        <UploadScreen state="processing"/>
+      </Page>
+      <Page label="07 · Upload — Error">
+        <TopBar active="upload" theme="light"/>
+        <UploadScreen state="error"/>
+      </Page>
+      <Page label="08 · Reader — Overlay mode">
+        <TopBar active="reader" theme="light"/>
+        <ReaderScreen mode="overlay"/>
+      </Page>
+      <Page label="09 · Reader — Song ngữ (side-by-side)">
+        <TopBar active="reader" theme="light"/>
+        <ReaderScreen mode="sidebyside"/>
+      </Page>
+      <Page label="10 · Reader — Tap to reveal">
+        <TopBar active="reader" theme="light"/>
+        <ReaderScreen mode="tap"/>
+      </Page>
+      <Page label="11 · Reader — Dark mode (đọc đêm)" theme="dark">
+        <TopBar active="reader" theme="dark"/>
+        <ReaderScreen mode="overlay"/>
+      </Page>
+      <Page label="12 · Q&A — Active (có sources)">
+        <TopBar active="qa" theme="light"/>
+        <QAScreen state="active"/>
+      </Page>
+      <Page label="13 · Q&A — Empty state">
+        <TopBar active="qa" theme="light"/>
+        <QAScreen state="empty"/>
+      </Page>
+      <Page label="14 · Q&A — Loading (retrieving chunks)">
+        <TopBar active="qa" theme="light"/>
+        <QAScreen state="loading"/>
+      </Page>
+      <Page label="15 · Batch Upload">
+        <TopBar active="batch" theme="light"/>
+        <BatchScreen/>
+      </Page>
+      <Page label="16 · History — Thư viện cá nhân">
+        <TopBar active="history" theme="light"/>
+        <HistoryScreen/>
+      </Page>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<PrintApp/>);
+
+// Auto-print after fonts and render ready
+window.addEventListener("load", () => {
+  Promise.all([
+    document.fonts ? document.fonts.ready : Promise.resolve(),
+    new Promise(r => setTimeout(r, 1500)),
+  ]).then(() => {
+    setTimeout(() => window.print(), 500);
+  });
+});
+</script>
+</body>
+</html>
