@@ -290,3 +290,41 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 /* Fuji SVG helpers */
 .fuji-snow { fill: #f3ede0; }
 [data-theme="dark"] .fuji-snow { fill: #e5dbc4; }
+
+/* ---------- Animations ---------- */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Button disabled ---------- */
+button:disabled { opacity: 0.45; cursor: not-allowed !important; }
+button:disabled:hover { transform: none !important; box-shadow: none !important; }
+
+/* ---------- Responsive helpers ---------- */
+@media (max-width: 900px) {
+  /* TopBar collapses nav labels */
+  .nav-label { display: none; }
+}
+
+/* ---------- Scrollbar global ---------- */
+* { scrollbar-width: thin; scrollbar-color: var(--border-soft) transparent; }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 3px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- Selection ---------- */
+::selection { background: var(--accent); color: #fff; }
+[data-theme="dark"] ::selection { background: var(--d-beni); color: #fff; }
+
