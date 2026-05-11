@@ -1,0 +1,43 @@
+# render.yaml — Infrastructure-as-code for Render.com
+# Docs: https://render.com/docs/blueprint-spec
+# Architecture: Render = lightweight API Gateway | HuggingFace Space = AI Worker
+
+services:
+  - type: web
+    name: storylens-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter        # $7/mo — always on, 512 MB RAM, no cold starts
+    region: singapore    # closest to Vietnam
+    branch: main
+    autoDeploy: true
+
+    envVars:
+      # ─── Supabase ──────────────────────────────────────────────────────
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+
+      # ─── Gemini ────────────────────────────────────────────────────────
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # ─── HuggingFace Space AI Worker ───────────────────────────────────
+      - key: HF_SPACE_URL
+        sync: false    # e.g. https://your-username-storylens-ai-worker.hf.space
+      - key: HF_SPACE_TOKEN
+        sync: false    # optional: HF read token if Space is private
+
+      # ─── App ───────────────────────────────────────────────────────────
+      - key: DEBUG
+        value: "false"
+      - key: ALLOWED_ORIGINS
+        value: "https://storylens.vercel.app,http://localhost:3000"
+      - key: GEMINI_MODEL
+        value: "gemini-1.5-flash"
+
+    healthCheckPath: /health
