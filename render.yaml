@@ -38,6 +38,6 @@ services:
       - key: ALLOWED_ORIGINS
         value: "https://storylens.vercel.app,http://localhost:3000"
       - key: GEMINI_MODEL
-        value: "gemini-1.5-flash"
+        value: "gemini-2.5-flash"
 
     healthCheckPath: /health

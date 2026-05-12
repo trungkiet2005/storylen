@@ -52,7 +52,7 @@ cp .env.example .env
 # Edit .env and add your GEMINI_API_KEY, Database URL, etc.
 
 # Run the backend server
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 
 ### 2. Frontend Setup

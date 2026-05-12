@@ -5,7 +5,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { Icon } from '@/components/Icons';
 import { MangaPage } from '@/components/MangaPage';
 import { useToast } from '@/components/Toast';
-import { uploadImages, pollUntilDone, PageStatus, APIError } from '@/lib/api';
+import { uploadImages, pollUntilDone, PageStatus, APIError, healthCheck } from '@/lib/api';
 import Link from 'next/link';
 
 type UploadState = "idle" | "dragging" | "uploading" | "processing" | "done" | "error";
@@ -60,6 +60,7 @@ export default function UploadPage() {
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null); // null = checking
 
   // Cleanup object URLs
   useEffect(() => {
@@ -67,6 +68,17 @@ export default function UploadPage() {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
   }, [previewUrl]);
+
+  // Health check on mount (and every 15s)
+  useEffect(() => {
+    const check = async () => {
+      const online = await healthCheck();
+      setBackendOnline(online);
+    };
+    check();
+    const id = setInterval(check, 15_000);
+    return () => clearInterval(id);
+  }, []);
 
   const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -94,6 +106,32 @@ export default function UploadPage() {
     setSteps(PIPELINE_STEPS.map(s => ({ ...s })));
     setState("uploading");
 
+    // ── OFFLINE DEMO MODE ──────────────────────────────────────────────────
+    if (!backendOnline) {
+      toast("ⓘ Backend offline — chạy demo mô phỏng", "info");
+      await new Promise(r => setTimeout(r, 800));
+      setState("processing");
+      const fakePid = "demo-" + Math.random().toString(36).slice(2, 10);
+      setPageId(fakePid);
+      setBatchId("batch-demo");
+
+      const thresholds = [20, 40, 60, 85, 100];
+      for (const pct of thresholds) {
+        await new Promise(r => setTimeout(r, 900));
+        setProgress(pct);
+        const fakeStatus: PageStatus = {
+          page_id: fakePid,
+          status: pct === 100 ? "completed" : "pending",
+          progress: pct,
+          error: null,
+        };
+        setSteps(deriveStepsFromStatus(fakeStatus));
+      }
+      setState("done");
+      toast("✅ Demo hoàn tất! (backend offline — dữ liệu giả lập)", "success");
+      return;
+    }
+
     try {
       // ── 1. Upload to backend ────────────────────────────────────────────
       const response = await uploadImages([file]);
@@ -117,6 +155,10 @@ export default function UploadPage() {
       setState("done");
       toast("Xử lý hoàn tất! Bản dịch đã sẵn sàng.", "success");
     } catch (err) {
+      // Mark backend as offline if it's a connection error
+      if (err instanceof APIError && err.status === 0) {
+        setBackendOnline(false);
+      }
       const msg =
         err instanceof APIError
           ? err.message
@@ -127,7 +169,7 @@ export default function UploadPage() {
       setState("error");
       toast(msg, "error");
     }
-  }, [toast]);
+  }, [toast, backendOnline]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -486,13 +528,27 @@ export default function UploadPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                 <div style={{
                   width: 8, height: 8, borderRadius: "50%",
-                  background: state === "error" ? "var(--accent)" : "var(--jade)",
-                  boxShadow: `0 0 6px ${state === "error" ? "var(--accent)" : "var(--jade)"}`,
+                  background:
+                    backendOnline === null ? "var(--muted)" :
+                    backendOnline ? "var(--jade)" : "var(--accent)",
+                  boxShadow:
+                    backendOnline === null ? "none" :
+                    backendOnline ? "0 0 6px var(--jade)" : "0 0 6px var(--accent)",
+                  transition: "background 0.3s, box-shadow 0.3s",
                 }}/>
                 <span style={{ color: "var(--fg-soft)" }}>
-                  {state === "error" ? "Mất kết nối" : "Kết nối ổn định"}
+                  {backendOnline === null
+                    ? "Đang kiểm tra…"
+                    : backendOnline
+                    ? "Kết nối ổn định"
+                    : "Backend offline (demo mode)"}
                 </span>
               </div>
+              {!backendOnline && backendOnline !== null && (
+                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6, lineHeight: 1.5 }}>
+                  Mô phỏng pipeline — upload thật khi backend khởi động.
+                </div>
+              )}
               {pageId && (
                 <div className="mono" style={{ fontSize: 10, color: "var(--muted)", marginTop: 8 }}>
                   batch: {batchId?.slice(0, 8)}…
