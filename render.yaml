@@ -1,6 +1,9 @@
 # render.yaml — Infrastructure-as-code for Render.com
 # Docs: https://render.com/docs/blueprint-spec
 # Architecture: Render = lightweight API Gateway | HuggingFace Space = AI Worker
+#
+# FOR LOCAL DEVELOPMENT: Use backend/.env with HF_SPACE_URL=http://localhost:8001
+# and run ai_service/server.py separately.
 
 services:
   - type: web

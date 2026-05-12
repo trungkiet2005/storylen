@@ -2,6 +2,11 @@
 StoryLens Backend - Q&A Router
 POST /qa — accepts a question and optional page_id/series_id,
            runs RAG pipeline and returns a grounded answer.
+
+Fixes:
+- Allow question without page_id/series_id (for general Q&A)
+- More specific error handling
+- Q&A history insert failure doesn't affect the response
 """
 from __future__ import annotations
 
@@ -24,26 +29,26 @@ def ask_question(payload: QARequest):
     """
     Ask a question about a manga page or series.
     Uses RAG (vector search + Gemini) to generate a grounded answer.
+    page_id and series_id are both optional — omit both for general Q&A
+    (will search across all embeddings).
     """
-    if not payload.page_id and not payload.series_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Provide at least one of: page_id or series_id.",
-        )
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
     response = answer_question(
-        question=payload.question,
+        question=question,
         page_id=payload.page_id,
         series_id=payload.series_id,
     )
 
-    # Persist Q&A to history
+    # Persist Q&A to history (non-blocking — failure is logged and swallowed)
     try:
         supabase = get_supabase()
         supabase.table("qa_history").insert({
             "qa_id": str(uuid.uuid4()),
             "page_id": payload.page_id,
-            "user_question": payload.question,
+            "user_question": question,
             "ai_answer": response.answer,
             "asked_at": datetime.now(timezone.utc).isoformat(),
         }).execute()

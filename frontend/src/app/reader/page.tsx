@@ -49,33 +49,49 @@ function BubbleOverlays({
   return (
     <svg
       viewBox={`0 0 ${containerW} ${containerH}`}
-      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible", pointerEvents: "none" }}
     >
       {bubbles.map((b, i) => {
         const [x, y, w, h] = b.bbox;
         const rx = x * scaleX;
         const ry = y * scaleY;
-        const rw = w * scaleX;
-        const rh = h * scaleY;
+        const rwScaled = w * scaleX;
+        const rhScaled = h * scaleY;
+
+        // Detect if bubble spans most of the screen (usually fallback)
+        const isGiant = (w * h) >= (imageW * imageH * 0.8);
 
         if (mode === "overlay") {
           return (
-            <g key={i}>
-              {/* White box overlay */}
-              <rect x={rx} y={ry} width={rw} height={rh} fill="white" stroke="#111" strokeWidth="1.5" rx="4"/>
-              <foreignObject x={rx + 2} y={ry + 2} width={rw - 4} height={rh - 4}>
+            <g key={i} style={{ pointerEvents: "auto" }}>
+              {/* Background overlay - make transparent if giant fallback so it doesn't hide image */}
+              {!isGiant ? (
+                <rect x={rx} y={ry} width={rwScaled} height={rhScaled} fill="white" stroke="#111" strokeWidth="1.5" rx="4" />
+              ) : (
+                <rect x={rx} y={ry} width={rwScaled} height={rhScaled} fill="rgba(255,255,255,0.2)" stroke="rgba(255,0,0,0.5)" strokeWidth="2" strokeDasharray="5 5" rx="4" />
+              )}
+              
+              <foreignObject 
+                x={isGiant ? rx + 20 : rx + 2} 
+                y={isGiant ? ry + 20 : ry + 2} 
+                width={isGiant ? rwScaled - 40 : rwScaled - 4} 
+                height={isGiant ? rhScaled - 40 : rhScaled - 4}
+              >
                 <div
                   style={{
                     width: "100%", height: "100%",
-                    fontSize: Math.max(8, rh * 0.35),
+                    fontSize: isGiant ? 18 : Math.min(32, Math.max(10, rhScaled * 0.35)),
                     fontFamily: "var(--font-serif)",
                     fontWeight: 600,
-                    display: "flex", alignItems: "center", justifyContent: "center",
+                    display: "flex", 
+                    alignItems: isGiant ? "flex-start" : "center", 
+                    justifyContent: isGiant ? "center" : "center",
                     textAlign: "center",
-                    color: "#111",
+                    color: isGiant ? "#d00" : "#111",
                     overflow: "hidden",
-                    lineHeight: 1.2,
-                    padding: "2px",
+                    lineHeight: 1.3,
+                    padding: isGiant ? "10px" : "2px",
+                    textShadow: isGiant ? "0 0 4px #fff, 0 0 4px #fff" : "none",
                   }}
                 >
                   {b.translated_text}
@@ -89,12 +105,12 @@ function BubbleOverlays({
           return (
             <rect
               key={i}
-              x={rx} y={ry} width={rw} height={rh}
+              x={rx} y={ry} width={rwScaled} height={rhScaled}
               fill={selected === i ? "rgba(200,16,46,0.12)" : "transparent"}
               stroke={selected === i ? "var(--beni)" : "rgba(200,16,46,0.4)"}
               strokeWidth="2"
               strokeDasharray="4 3"
-              style={{ cursor: "pointer" }}
+              style={{ cursor: "pointer", pointerEvents: "auto" }}
               onClick={() => onSelect(selected === i ? null : i)}
             />
           );
@@ -146,11 +162,15 @@ function ReaderContent() {
   // Real page data from API
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
+  
+  // Capture actual image dimensions to calculate scaling accurately
+  const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
   // Load page data if page_id provided
   useEffect(() => {
     if (!pageIdParam) return;
     setIsLoadingPage(true);
+    setImgNaturalSize(null); // reset for new page
     getPage(pageIdParam)
       .then(data => {
         setPageData(data);
@@ -186,7 +206,12 @@ function ReaderContent() {
   ];
 
   const CANVAS_W = 520;
-  const CANVAS_H = 740;
+  // Dynamically compute canvas height from image aspect ratio to avoid letterboxing disconnect
+  const computedHeight = imgNaturalSize ? CANVAS_W * (imgNaturalSize.h / imgNaturalSize.w) : 740;
+  
+  // Sidebar side-by-side fixed width
+  const SIDE_W = 360;
+  const computedSideH = imgNaturalSize ? SIDE_W * (imgNaturalSize.h / imgNaturalSize.w) : 520;
 
   return (
     <div style={{ height: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -310,29 +335,38 @@ function ReaderContent() {
                 <div style={{ display: "flex", gap: 20 }}>
                   <div>
                     <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>原文 · Gốc</div>
-                    <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff" }}>
+                    <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: SIDE_W, height: computedSideH, position: "relative" }}>
                       {pageData?.original_image_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={pageData.original_image_url} alt="Ảnh gốc" style={{ width: 360, height: 520, objectFit: "contain", display: "block" }}/>
+                        <img 
+                          src={pageData.original_image_url} 
+                          alt="Ảnh gốc" 
+                          style={{ width: "100%", height: "100%", display: "block" }}
+                          onLoad={(e) => {
+                            if (!imgNaturalSize) {
+                              setImgNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+                            }
+                          }}
+                        />
                       ) : (
-                        <MangaPage w={360} h={520} panels={pageLayouts[page]} showBubbles showOverlay={false}/>
+                        <MangaPage w={SIDE_W} h={computedSideH} panels={pageLayouts[page]} showBubbles showOverlay={false}/>
                       )}
                     </div>
                   </div>
                   <div>
                     <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>訳 · Dịch tiếng Việt</div>
-                    <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", position: "relative" }}>
+                    <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", position: "relative", width: SIDE_W, height: computedSideH }}>
                       {pageData?.original_image_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={pageData.original_image_url} alt="Ảnh với overlay" style={{ width: 360, height: 520, objectFit: "contain", display: "block" }}/>
+                        <img src={pageData.original_image_url} alt="Ảnh với overlay" style={{ width: "100%", height: "100%", display: "block" }}/>
                       ) : (
-                        <MangaPage w={360} h={520} panels={pageLayouts[page]} showBubbles showOverlay overlayLang="vn"/>
+                        <MangaPage w={SIDE_W} h={computedSideH} panels={pageLayouts[page]} showBubbles showOverlay overlayLang="vn"/>
                       )}
-                      {pageData && showOverlay && (
+                      {pageData && showOverlay && imgNaturalSize && (
                         <BubbleOverlays
                           bubbles={pageData.processed_data}
-                          containerW={360} containerH={520}
-                          imageW={1280} imageH={1820}
+                          containerW={SIDE_W} containerH={computedSideH}
+                          imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
                           selected={selected} onSelect={setSelected} mode="overlay"
                         />
                       )}
@@ -341,24 +375,29 @@ function ReaderContent() {
                 </div>
               ) : (
                 <div style={{ position: "relative" }}>
-                  <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: CANVAS_W, height: CANVAS_H, position: "relative" }}>
+                  <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: CANVAS_W, height: computedHeight, position: "relative" }}>
                     {pageData?.original_image_url ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={pageData.original_image_url}
                         alt="Manga page"
-                        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                        style={{ width: "100%", height: "100%", display: "block" }}
+                        onLoad={(e) => {
+                          if (!imgNaturalSize) {
+                            setImgNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+                          }
+                        }}
                       />
                     ) : (
-                      <MangaPage w={CANVAS_W} h={CANVAS_H} panels={pageLayouts[page]} showBubbles showOverlay={mode === "overlay" && showOverlay} overlayLang="vn"/>
+                      <MangaPage w={CANVAS_W} h={computedHeight} panels={pageLayouts[page]} showBubbles showOverlay={mode === "overlay" && showOverlay} overlayLang="vn"/>
                     )}
 
                     {/* Real bubble overlays */}
-                    {pageData && (mode === "overlay" ? showOverlay : true) && (
+                    {pageData && (mode === "overlay" ? showOverlay : true) && imgNaturalSize && (
                       <BubbleOverlays
                         bubbles={pageData.processed_data}
-                        containerW={CANVAS_W} containerH={CANVAS_H}
-                        imageW={1280} imageH={1820}
+                        containerW={CANVAS_W} containerH={computedHeight}
+                        imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
                         selected={selected} onSelect={setSelected} mode={mode}
                       />
                     )}
