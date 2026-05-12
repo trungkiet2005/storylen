@@ -1,11 +1,14 @@
 "use client";
-import React from 'react';
+import React, { useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { TopBar } from '@/components/TopBar';
 import { FujiArt } from '@/components/FujiArt';
 import { Icon } from '@/components/Icons';
 import { KanjiDivider } from '@/components/KanjiDivider';
+import { Footer } from '@/components/Footer';
+import { useToast } from '@/components/Toast';
 
 const FEATURES = [
   {
@@ -56,6 +59,18 @@ const STEPS = [
 ];
 
 export default function Home() {
+  const searchParams = useSearchParams();
+  const { show } = useToast();
+
+  useEffect(() => {
+    if (searchParams.get('demo') === '1') {
+      show('Đăng nhập demo thành công! Chào mừng đến StoryLens 🎌', 'success');
+      // Clean up URL without reload
+      window.history.replaceState({}, '', '/');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="paper-grain" style={{ minHeight: "100vh" }}>
       <TopBar active="home" />
@@ -260,6 +275,8 @@ export default function Home() {
           </div>
         </div>
       </div>
+      {/* ── Footer ── */}
+      <Footer />
     </div>
   );
 }

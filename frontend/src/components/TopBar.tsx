@@ -1,7 +1,10 @@
 "use client";
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Icon } from './Icons';
+import { useAuth, getAvatarInitial } from '@/contexts/AuthContext';
+import { useToast } from './Toast';
 
 export const Logo = ({ size = 22 }: { size?: number }) => (
   <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -17,6 +20,169 @@ export const Logo = ({ size = 22 }: { size?: number }) => (
     </div>
   </Link>
 );
+
+// ─── User Avatar Dropdown ─────────────────────────────────────────────────────
+
+function UserMenu() {
+  const { user, logout } = useAuth();
+  const { show } = useToast();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  if (!user) {
+    return (
+      <div style={{ display: "flex", gap: 8 }}>
+        <Link href="/login">
+          <button className="btn btn-sm btn-ghost" style={{ padding: "7px 14px" }}>
+            Đăng nhập
+          </button>
+        </Link>
+        <Link href="/register">
+          <button className="btn btn-sm btn-primary" style={{ padding: "7px 14px" }}>
+            Đăng ký
+          </button>
+        </Link>
+      </div>
+    );
+  }
+
+  const initial = getAvatarInitial(user);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        aria-label="Tài khoản người dùng"
+        aria-expanded={open}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: "none",
+          border: "2px solid var(--border)",
+          cursor: "pointer",
+          padding: "4px 8px 4px 4px",
+          borderRadius: "var(--radius-sm)",
+          color: "var(--fg)",
+          fontFamily: "var(--font-sans)",
+          transition: "box-shadow 0.1s",
+          boxShadow: open ? "2px 2px 0 0 var(--border)" : "none",
+        }}
+      >
+        {/* Avatar circle */}
+        <div
+          style={{
+            width: 28, height: 28, borderRadius: "50%",
+            background: "var(--accent)", color: "#fff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "var(--font-serif)", fontWeight: 800, fontSize: 13,
+          }}
+        >
+          {initial}
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 600, maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {user.username}
+        </span>
+        <Icon name="arrow-right" size={11} />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            right: 0,
+            minWidth: 200,
+            background: "var(--panel)",
+            border: "2px solid var(--border)",
+            boxShadow: "4px 4px 0 0 var(--border)",
+            zIndex: 200,
+            animation: "fadeIn 0.12s ease",
+          }}
+        >
+          {/* User info header */}
+          <div style={{ padding: "14px 16px", borderBottom: "1.5px solid var(--border-soft)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{user.username}</div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{user.email}</div>
+          </div>
+
+          {/* Menu items */}
+          {[
+            { label: "Hồ sơ cá nhân", icon: "home", href: "/profile" },
+            { label: "Lịch sử dịch", icon: "history", href: "/history" },
+            { label: "Cài đặt", icon: "layers", href: "/settings" },
+          ].map(item => (
+            <Link key={item.href} href={item.href} style={{ textDecoration: "none" }}>
+              <div
+                onClick={() => setOpen(false)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "10px 16px",
+                  fontSize: 13,
+                  color: "var(--fg-soft)",
+                  cursor: "pointer",
+                  transition: "background 0.1s",
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-2)"}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ""}
+              >
+                <Icon name={item.icon} size={13} />
+                {item.label}
+              </div>
+            </Link>
+          ))}
+
+          {/* Divider */}
+          <div style={{ height: 1, background: "var(--border-soft)", margin: "4px 0" }} />
+
+          {/* Logout */}
+          <button
+            onClick={() => {
+              logout();
+              setOpen(false);
+              show("Đã đăng xuất. Hẹn gặp lại! 👋", "info");
+              router.push("/");
+            }}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              width: "100%",
+              padding: "10px 16px",
+              fontSize: 13,
+              color: "var(--accent)",
+              cursor: "pointer",
+              background: "none",
+              border: "none",
+              fontFamily: "var(--font-sans)",
+              fontWeight: 600,
+              textAlign: "left",
+              transition: "background 0.1s",
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(200,16,46,0.06)"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ""}
+          >
+            <Icon name="close" size={13} />
+            Đăng xuất
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── TopBar ───────────────────────────────────────────────────────────────────
 
 export const TopBar = ({ active, compact = false }: { active: string, compact?: boolean }) => {
   const [theme, setTheme] = useState("light");
@@ -71,7 +237,7 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
                 style={{ cursor: 'pointer' }}
               >
                 <Icon name={it.icon} size={14} aria-hidden="true" />
-                <span>{it.label}</span>
+                <span className="nav-label">{it.label}</span>
               </div>
             </Link>
           ))}
@@ -79,30 +245,6 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {/* Search bar */}
-        <div
-          role="search"
-          style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "7px 12px",
-            border: "1.5px solid var(--border-soft)",
-            borderRadius: 2,
-            fontSize: 12,
-            color: "var(--muted)",
-            cursor: "text",
-            minWidth: 220,
-          }}
-        >
-          <Icon name="search" size={13} aria-hidden="true"/>
-          <span style={{ flex: 1 }}>Tìm bộ truyện, nhân vật…</span>
-          <kbd style={{
-            marginLeft: 8, padding: "1px 6px",
-            border: "1px solid var(--border-soft)",
-            fontFamily: "var(--font-mono)", fontSize: 10,
-            borderRadius: 2,
-          }}>⌘K</kbd>
-        </div>
-
         {/* Theme toggle */}
         {mounted && (
           <button
@@ -115,21 +257,8 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
           </button>
         )}
 
-        {/* Avatar */}
-        <div
-          aria-label="Tài khoản"
-          title="Tài khoản người dùng"
-          style={{
-            width: 32, height: 32, borderRadius: "50%",
-            background: "var(--accent)", color: "#fff",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: "var(--font-serif)", fontWeight: 800, fontSize: 14,
-            border: "2px solid var(--border)",
-            cursor: "pointer",
-          }}
-        >
-          K
-        </div>
+        {/* Auth: login buttons or user menu */}
+        {mounted && <UserMenu />}
       </div>
     </header>
   );

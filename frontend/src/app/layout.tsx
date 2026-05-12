@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 export const metadata: Metadata = {
   title: "StoryLens — Đọc Manga Không Rào Cản Ngôn Ngữ",
@@ -25,9 +26,11 @@ export default function RootLayout({
   return (
     <html lang="vi" data-theme="light">
       <body>
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+        <AuthProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </AuthProvider>
         {/* Film grain overlay */}
         <div className="grain-overlay" aria-hidden="true" />
       </body>
