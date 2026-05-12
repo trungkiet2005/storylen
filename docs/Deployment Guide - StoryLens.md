@@ -65,7 +65,7 @@ Tạo file `.env` trong thư mục gốc của dự án và điền các biến 
 
 ```dotenv
 # Backend Configuration
-GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY_1,YOUR_GEMINI_API_KEY_2 # Hỗ trợ nhiều key cách nhau bằng dấu phẩy để tự động xoay vòng khi hết Quota
 DATABASE_URL=sqlite:///./sql_app.db # For local development, or your production DB URL
 # ... other backend specific variables
 
