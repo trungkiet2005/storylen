@@ -1,7 +1,7 @@
-"""Entrypoint for the self-contained AI backend service.
+"""Entrypoint for the self-contained ai_module backend service.
 
-All imports are resolved from this ai_service directory first, so the copied
-backend code in ai_service/server and ai_service/manga_translator is used
+All imports are resolved from this ai_module directory first, so the copied
+backend code in ai_module/server and ai_module/manga_translator is used
 instead of the parent project folders.
 """
 
@@ -26,7 +26,7 @@ app = backend_main.app
 
 @app.get("/health", tags=["system"])
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "ai_service"}
+    return {"status": "ok", "service": "ai_module"}
 
 
 def run() -> None:

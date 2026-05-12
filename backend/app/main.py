@@ -54,7 +54,12 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error("✗ Gemini configuration error: %s", exc)
 
-    # Log HF Space URL
+    # Log AI worker URLs
+    logger.info(
+        "ai_module URL: %s %s",
+        settings.AI_MODULE_URL,
+        "(token set)" if settings.AI_MODULE_TOKEN else "(no token)",
+    )
     logger.info(
         "HF Space URL: %s %s",
         settings.HF_SPACE_URL,

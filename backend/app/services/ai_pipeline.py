@@ -27,7 +27,7 @@ from typing import Any
 from app.config import get_settings
 from app.database import get_supabase
 from app.models.schemas import BubbleResult, ProcessingStatus
-from app.services.hf_client import call_process
+from app.services.ai_module_client import call_translate
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -96,10 +96,10 @@ def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
         _update_status(page_id, ProcessingStatus.OCR_RUNNING, 10)
 
         # ── Step 2: Call HF Space — does all heavy lifting ─────────────────
-        logger.info("Delegating page %s to HF Space…", page_id)
-        raw_bubbles = call_process(page_id, original_image_url)
+        logger.info("Delegating page %s to ai_module", page_id)
+        raw_bubbles = call_translate(page_id, original_image_url)
         logger.info(
-            "HF Space returned %d bubbles for page %s",
+            "ai_module returned %d text regions for page %s",
             len(raw_bubbles),
             page_id,
         )
@@ -135,7 +135,7 @@ def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
                     "bubble_id": bubble_id,
                     "translated_text_vi": translated_text,
                     "translated_at": datetime.now(timezone.utc).isoformat(),
-                    "llm_model_used": settings.GEMINI_MODEL,
+                    "llm_model_used": f"ai_module:{settings.AI_MODULE_TRANSLATOR}",
                 })
 
             embedding = b.get("embedding")

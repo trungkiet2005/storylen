@@ -163,6 +163,14 @@ async def stream_image_form_web(req: Request, image: UploadFile = File(...), con
 async def queue_size() -> int:
     return len(task_queue.queue)
 
+@app.get("/health", tags=["api"])
+async def health():
+    return {
+        "status": "ok",
+        "queue_size": len(task_queue.queue),
+        "result_root": str(RESULT_ROOT),
+    }
+
 
 @app.api_route("/result/{folder_name}/final.png", methods=["GET", "HEAD"], tags=["api", "file"])
 async def get_result_by_folder(folder_name: str):

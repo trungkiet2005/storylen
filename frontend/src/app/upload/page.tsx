@@ -8,7 +8,7 @@ import { useToast } from '@/components/Toast';
 import { uploadImages, pollUntilDone, PageStatus, APIError, healthCheck } from '@/lib/api';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FadeIn, ScaleIn, StaggerContainer, StaggerItem } from '@/components/Animations';
+import { StaggerContainer, StaggerItem } from '@/components/Animations';
 
 type UploadState = "idle" | "dragging" | "uploading" | "processing" | "done" | "error";
 
@@ -20,14 +20,14 @@ interface ProcessingStep {
 }
 
 const PIPELINE_STEPS: ProcessingStep[] = [
-  { step: "Bubble Detection (YOLOv8)", done: false, active: false, time: "—" },
-  { step: "Text Extraction (Manga-OCR)", done: false, active: false, time: "—" },
-  { step: "Context Retrieval (ChromaDB)", done: false, active: false, time: "—" },
-  { step: "Translation (Gemini 1.5 Flash)", done: false, active: false, time: "—" },
-  { step: "Index to Vector DB", done: false, active: false, time: "—" },
+  { step: "Upload image", done: false, active: false, time: "-" },
+  { step: "ai_module text detection", done: false, active: false, time: "-" },
+  { step: "ai_module OCR", done: false, active: false, time: "-" },
+  { step: "ai_module translation to Vietnamese", done: false, active: false, time: "-" },
+  { step: "Save reader data", done: false, active: false, time: "-" },
 ];
 
-const TIMINGS = ["0.8s", "1.4s", "0.6s", "4.2s", "0.4s"];
+const AI_MODULE_TIMINGS = ["done", "running", "running", "running", "done"];
 
 function deriveStepsFromStatus(status: PageStatus): ProcessingStep[] {
   // Map progress percentage to which steps are done/active
@@ -38,7 +38,7 @@ function deriveStepsFromStatus(status: PageStatus): ProcessingStep[] {
     ...s,
     done: progress >= stepThresholds[i],
     active: progress >= (stepThresholds[i - 1] ?? 0) && progress < stepThresholds[i],
-    time: progress >= stepThresholds[i] ? TIMINGS[i] : progress >= (stepThresholds[i - 1] ?? 0) && progress < stepThresholds[i] ? "…" : "—",
+    time: progress >= stepThresholds[i] ? AI_MODULE_TIMINGS[i] : progress >= (stepThresholds[i - 1] ?? 0) && progress < stepThresholds[i] ? "..." : "-",
   }));
 }
 
@@ -204,7 +204,7 @@ export default function UploadPage() {
           kanji="入"
           label="Upload · Tải lên"
           title="Tải trang manga để dịch"
-          subtitle="Hỗ trợ JPG, PNG, WEBP. Tối đa 20MB / ảnh. Xử lý qua YOLOv8 (bubble detection) + Manga-OCR (text extraction) + Gemini (dịch)."
+          subtitle="Hỗ trợ JPG, PNG, WEBP. Tối đa 20MB / ảnh. Xử lý qua ai_module để phát hiện chữ, OCR, dịch và lưu dữ liệu đọc."
           stamp="入稿"
         />
 
@@ -344,7 +344,6 @@ export default function UploadPage() {
                       <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>Ảnh gốc</div>
                       <div className="stroke-ink" style={{ background: "#fff", overflow: "hidden" }}>
                         {previewUrl ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
                           <motion.img initial={{ filter: "blur(4px)" }} animate={{ filter: "blur(0px)" }} src={previewUrl} alt="Ảnh manga gốc" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}/>
                         ) : (
                           <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
@@ -352,7 +351,7 @@ export default function UploadPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>◯ YOLOv8 · phát hiện bubble</div>
+                      <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>◯ ai_module · phát hiện vùng chữ</div>
                       <div className="stroke-ink" style={{ background: "#fff", position: "relative" }}>
                         <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
                         <svg viewBox="0 0 280 200" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
@@ -580,7 +579,7 @@ export default function UploadPage() {
                 <div style={{ fontSize: 12, color: "var(--fg-soft)", lineHeight: 1.6 }}>
                   <strong>Mẹo:</strong> Với chương nhiều trang, dùng{" "}
                   <Link href="/batch" style={{ color: "var(--accent)", fontWeight: 700 }}>Batch Upload</Link>{" "}
-                  để xử lý tuần tự và tiết kiệm quota Gemini.
+                  để xử lý tuần tự với cùng cấu hình ai_module.
                 </div>
               </div>
             </div>

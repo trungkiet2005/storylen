@@ -534,7 +534,7 @@ function ReaderContent() {
                 {[
                   ["Bubbles detected", pageData ? String(pageData.processed_data.length) : "—"],
                   ["OCR confidence", pageData ? `${Math.round((pageData.processed_data.reduce((a, b) => a + b.confidence, 0) / Math.max(1, pageData.processed_data.length)) * 100)}%` : "—"],
-                  ["Translation", "Gemini Flash"],
+                  ["Translation", pageData ? "ai_module" : "—"],
                   ["Chunks indexed", pageData ? String(pageData.processed_data.length) : "—"],
                 ].map(([k, v]) => (
                   <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "3px 0" }}>

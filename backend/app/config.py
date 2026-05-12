@@ -62,7 +62,29 @@ class Settings(BaseSettings):
     HF_SPACE_URL: str = "http://localhost:8001"
     HF_SPACE_TOKEN: str = ""  # HF read token if the Space is set to private
 
-    @field_validator("HF_SPACE_TOKEN", "HF_SPACE_URL", mode="before")
+    # ai_module image translation worker
+    AI_MODULE_URL: str = "http://localhost:8001"
+    AI_MODULE_TOKEN: str = ""
+    AI_MODULE_TRANSLATOR: str = "gemini"
+    AI_MODULE_TARGET_LANG: str = "VIN"
+    AI_MODULE_DETECTOR: str = "default"
+    AI_MODULE_OCR: str = "48px"
+    AI_MODULE_INPAINTER: str = "lama_large"
+    AI_MODULE_RENDERER: str = "default"
+
+    @field_validator(
+        "HF_SPACE_TOKEN",
+        "HF_SPACE_URL",
+        "AI_MODULE_URL",
+        "AI_MODULE_TOKEN",
+        "AI_MODULE_TRANSLATOR",
+        "AI_MODULE_TARGET_LANG",
+        "AI_MODULE_DETECTOR",
+        "AI_MODULE_OCR",
+        "AI_MODULE_INPAINTER",
+        "AI_MODULE_RENDERER",
+        mode="before",
+    )
     @classmethod
     def strip_whitespace_str(cls, v: Any) -> str:
         if isinstance(v, str):
