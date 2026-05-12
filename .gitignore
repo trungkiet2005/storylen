@@ -76,6 +76,19 @@ venv.bak/
 logs/
 *.log
 
+# AI model artifacts
+ai_module/models/
+ai_module/**/*.ckpt
+ai_module/**/*.pt
+ai_module/**/*.pth
+ai_module/**/*.bin
+ai_module/**/*.safetensors
+ai_module/**/*.onnx
+ai_module/**/*.gguf
+ai_module/**/*.ggml
+ai_module/**/*.tflite
+ai_module/**/*.pb
+
 # Pytest / Coverage
 .tox/
 .nox/

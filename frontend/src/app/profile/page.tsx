@@ -9,7 +9,7 @@ import { Icon } from "@/components/Icons";
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
-  const { show } = useToast();
+  const { toast } = useToast();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"profile" | "settings" | "security">("profile");
 
@@ -43,7 +43,7 @@ export default function ProfilePage() {
 
   function handleLogout() {
     logout();
-    show("Đã đăng xuất. Hẹn gặp lại! 👋", "info");
+    toast("Đã đăng xuất. Hẹn gặp lại! 👋", "info");
     router.push("/");
   }
 
@@ -188,7 +188,7 @@ export default function ProfilePage() {
                   <button
                     className="btn btn-primary"
                     style={{ alignSelf: "flex-start", padding: "10px 20px" }}
-                    onClick={() => show("Tính năng cập nhật hồ sơ sẽ sớm khả dụng!", "info")}
+                    onClick={() => toast("Tính năng cập nhật hồ sơ sẽ sớm khả dụng!", "info")}
                   >
                     Lưu thay đổi
                   </button>
@@ -230,7 +230,7 @@ export default function ProfilePage() {
                       </div>
                       <button
                         className="btn btn-sm"
-                        onClick={() => show("Cài đặt sẽ khả dụng sớm!", "info")}
+                        onClick={() => toast("Cài đặt sẽ khả dụng sớm!", "info")}
                       >
                         {setting.value}
                       </button>
@@ -256,14 +256,14 @@ export default function ProfilePage() {
                     </label>
                     <input type="password" placeholder="Tối thiểu 8 ký tự..." style={{ width: "100%", padding: "10px 14px", border: "2px solid var(--border)", background: "var(--bg-2)", color: "var(--fg)", fontSize: 14, fontFamily: "var(--font-sans)", borderRadius: "var(--radius-sm)", boxSizing: "border-box" }} />
                   </div>
-                  <button className="btn btn-primary" style={{ alignSelf: "flex-start", padding: "10px 20px" }} onClick={() => show("Đổi mật khẩu sẽ khả dụng sớm!", "info")}>
+                  <button className="btn btn-primary" style={{ alignSelf: "flex-start", padding: "10px 20px" }} onClick={() => toast("Đổi mật khẩu sẽ khả dụng sớm!", "info")}>
                     Đổi mật khẩu
                   </button>
 
                   <div style={{ marginTop: 8, padding: "16px", background: "rgba(200,16,46,0.06)", border: "2px solid rgba(200,16,46,0.3)" }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: "var(--accent)", marginBottom: 8 }}>Vùng nguy hiểm</div>
                     <div style={{ fontSize: 13, color: "var(--fg-soft)", marginBottom: 12 }}>Xóa tài khoản là hành động không thể hoàn tác. Tất cả dữ liệu của bạn sẽ bị xóa vĩnh viễn.</div>
-                    <button className="btn btn-sm" style={{ borderColor: "var(--accent)", color: "var(--accent)" }} onClick={() => show("Tính năng xóa tài khoản cần xác nhận email. Sẽ được hỗ trợ sớm.", "error")}>
+                    <button className="btn btn-sm" style={{ borderColor: "var(--accent)", color: "var(--accent)" }} onClick={() => toast("Tính năng xóa tài khoản cần xác nhận email. Sẽ được hỗ trợ sớm.", "error")}>
                       Xóa tài khoản
                     </button>
                   </div>

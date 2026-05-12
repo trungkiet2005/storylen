@@ -7,6 +7,8 @@ import { MangaPage } from '@/components/MangaPage';
 import { useToast } from '@/components/Toast';
 import { uploadImages, pollUntilDone, PageStatus, APIError, healthCheck } from '@/lib/api';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FadeIn, ScaleIn, StaggerContainer, StaggerItem } from '@/components/Animations';
 
 type UploadState = "idle" | "dragging" | "uploading" | "processing" | "done" | "error";
 
@@ -208,7 +210,8 @@ export default function UploadPage() {
 
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 24 }}>
           {/* ── Left: Dropzone ── */}
-          <div
+          <motion.div
+            layout
             className={`stroke-ink-thick ${state === "dragging" ? "panel-shadow-lg" : "panel-shadow"}`}
             style={{
               background: state === "dragging" ? "var(--bg-2)" : "var(--panel)",
@@ -231,205 +234,265 @@ export default function UploadPage() {
               aria-label="Chọn file ảnh manga"
             />
 
-            {/* ── IDLE / DRAGGING STATE ── */}
-            {(state === "idle" || state === "dragging") && (
-              <div style={{
-                padding: 56, textAlign: "center",
-                display: "flex", flexDirection: "column",
-                alignItems: "center", justifyContent: "center",
-                minHeight: 520, position: "relative",
-              }}>
-                <div className="halftone" style={{ position: "absolute", inset: 20, border: `2px dashed var(--${state === "dragging" ? "accent" : "border"})`, pointerEvents: "none", transition: "border-color 0.15s" }}/>
-                <div style={{ position: "relative" }}>
-                  <div style={{
-                    width: 96, height: 96,
-                    background: state === "dragging" ? "var(--accent)" : "var(--bg-2)",
-                    color: state === "dragging" ? "var(--paper)" : "var(--fg)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    margin: "0 auto 20px",
-                    border: "3px solid var(--border)",
-                    boxShadow: "4px 4px 0 var(--border)",
-                    transition: "background 0.15s, color 0.15s",
-                  }}>
-                    <Icon name="upload" size={42} stroke={2.5}/>
-                  </div>
-                  <div className="display" style={{ fontSize: 26 }}>
-                    {state === "dragging" ? "Thả file vào đây" : "Kéo thả trang manga vào đây"}
-                  </div>
-                  <div style={{ color: "var(--fg-soft)", marginTop: 8, marginBottom: 24 }}>hoặc</div>
-                  <button
-                    className="btn btn-primary"
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{ padding: "14px 28px", fontSize: 14 }}
-                  >
-                    <Icon name="folder" size={14}/> Chọn file từ máy
-                  </button>
-                  <div style={{ marginTop: 20, fontSize: 12, color: "var(--muted)" }}>
-                    JPG · PNG · WEBP — tối đa 20MB mỗi file
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ── UPLOADING STATE ── */}
-            {isUploading && (
-              <div style={{ padding: 56, minHeight: 520, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 20 }}>
-                <div style={{
-                  width: 80, height: 80,
-                  border: "4px solid var(--border-soft)",
-                  borderTopColor: "var(--accent)",
-                  borderRadius: "50%",
-                  animation: "spin 0.8s linear infinite",
-                }}/>
-                <div className="display" style={{ fontSize: 22 }}>Đang tải lên…</div>
-                <div style={{ fontSize: 13, color: "var(--muted)" }}>{fileName}</div>
-              </div>
-            )}
-
-            {/* ── PROCESSING STATE ── */}
-            {isProcessing && (
-              <div style={{ padding: 36, minHeight: 520 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                  <div>
-                    <div className="caps-sm" style={{ color: "var(--accent)" }}>Đang xử lý · Processing</div>
-                    <div className="display" style={{ fontSize: 20, marginTop: 4 }}>{fileName}</div>
-                  </div>
-                  <div className="chip chip-accent">{fileSize}</div>
-                </div>
-
-                {/* Progress bar */}
-                <div style={{ height: 8, background: "var(--bg-2)", border: "1px solid var(--border)", marginBottom: 16 }}>
-                  <div style={{
-                    width: `${progress}%`, height: "100%",
-                    background: "var(--accent)",
-                    transition: "width 0.4s ease",
-                  }}/>
-                </div>
-
-                {/* Preview side by side */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                  <div>
-                    <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>Ảnh gốc</div>
-                    <div className="stroke-ink" style={{ background: "#fff", overflow: "hidden" }}>
-                      {previewUrl ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={previewUrl} alt="Ảnh manga gốc" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}/>
-                      ) : (
-                        <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>◯ YOLOv8 · phát hiện bubble</div>
-                    <div className="stroke-ink" style={{ background: "#fff", position: "relative" }}>
-                      <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
-                      <svg viewBox="0 0 280 200" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-                        <rect x="18" y="18" width="90" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
-                        <rect x="18" y="135" width="90" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
-                        <rect x="148" y="135" width="80" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
-                        <text x="112" y="16" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.96</text>
-                        <text x="112" y="133" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.91</text>
-                        <text x="232" y="133" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.88</text>
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pipeline steps */}
-                <div style={{ marginTop: 24, borderTop: "2px solid var(--border-soft)", paddingTop: 16 }}>
-                  {steps.map((s, i) => (
-                    <div key={i} style={{
-                      display: "flex", alignItems: "center", gap: 12,
-                      padding: "8px 0",
-                      borderBottom: i < steps.length - 1 ? "1px dashed var(--border-soft)" : "none",
-                    }}>
-                      <div style={{
-                        width: 22, height: 22, borderRadius: "50%",
-                        border: "2px solid var(--border)",
-                        background: s.done ? "var(--accent)" : "transparent",
-                        color: "#fff",
+            <AnimatePresence mode="wait">
+              {/* ── IDLE / DRAGGING STATE ── */}
+              {(state === "idle" || state === "dragging") && (
+                <motion.div
+                  key="idle"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.2 }}
+                  style={{
+                    padding: 56, textAlign: "center",
+                    display: "flex", flexDirection: "column",
+                    alignItems: "center", justifyContent: "center",
+                    minHeight: 520, position: "relative",
+                  }}
+                >
+                  <div className="halftone" style={{ position: "absolute", inset: 20, border: `2px dashed var(--${state === "dragging" ? "accent" : "border"})`, pointerEvents: "none", transition: "border-color 0.15s" }}/>
+                  <div style={{ position: "relative" }}>
+                    <motion.div 
+                      animate={state === "dragging" ? { scale: 1.1 } : { scale: 1 }}
+                      style={{
+                        width: 96, height: 96,
+                        background: state === "dragging" ? "var(--accent)" : "var(--bg-2)",
+                        color: state === "dragging" ? "var(--paper)" : "var(--fg)",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0,
-                      }}>
-                        {s.done && <Icon name="check" size={11} stroke={3}/>}
-                        {s.active && (
-                          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", animation: "pulse 1s ease-in-out infinite" }}/>
+                        margin: "0 auto 20px",
+                        border: "3px solid var(--border)",
+                        boxShadow: "4px 4px 0 var(--border)",
+                        transition: "background 0.15s, color 0.15s",
+                      }}
+                    >
+                      <Icon name="upload" size={42} stroke={2.5}/>
+                    </motion.div>
+                    <div className="display" style={{ fontSize: 26 }}>
+                      {state === "dragging" ? "Thả file vào đây" : "Kéo thả trang manga vào đây"}
+                    </div>
+                    <div style={{ color: "var(--fg-soft)", marginTop: 8, marginBottom: 24 }}>hoặc</div>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="btn btn-primary"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{ padding: "14px 28px", fontSize: 14 }}
+                    >
+                      <Icon name="folder" size={14}/> Chọn file từ máy
+                    </motion.button>
+                    <div style={{ marginTop: 20, fontSize: 12, color: "var(--muted)" }}>
+                      JPG · PNG · WEBP — tối đa 20MB mỗi file
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ── UPLOADING STATE ── */}
+              {isUploading && (
+                <motion.div
+                  key="uploading"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  style={{ padding: 56, minHeight: 520, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 20 }}
+                >
+                  <div style={{
+                    width: 80, height: 80,
+                    border: "4px solid var(--border-soft)",
+                    borderTopColor: "var(--accent)",
+                    borderRadius: "50%",
+                    animation: "spin 0.8s linear infinite",
+                  }}/>
+                  <div className="display" style={{ fontSize: 22 }}>Đang tải lên…</div>
+                  <div style={{ fontSize: 13, color: "var(--muted)" }}>{fileName}</div>
+                </motion.div>
+              )}
+
+              {/* ── PROCESSING STATE ── */}
+              {isProcessing && (
+                <motion.div
+                  key="processing"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  style={{ padding: 36, minHeight: 520 }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                    <div>
+                      <div className="caps-sm" style={{ color: "var(--accent)" }}>Đang xử lý · Processing</div>
+                      <div className="display" style={{ fontSize: 20, marginTop: 4 }}>{fileName}</div>
+                    </div>
+                    <div className="chip chip-accent">{fileSize}</div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div style={{ height: 8, background: "var(--bg-2)", border: "1px solid var(--border)", marginBottom: 16, overflow: "hidden" }}>
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.5 }}
+                      style={{
+                        height: "100%",
+                        background: "var(--accent)",
+                      }}
+                    />
+                  </div>
+
+                  {/* Preview side by side */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div>
+                      <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>Ảnh gốc</div>
+                      <div className="stroke-ink" style={{ background: "#fff", overflow: "hidden" }}>
+                        {previewUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <motion.img initial={{ filter: "blur(4px)" }} animate={{ filter: "blur(0px)" }} src={previewUrl} alt="Ảnh manga gốc" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}/>
+                        ) : (
+                          <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
                         )}
                       </div>
-                      <span style={{ flex: 1, fontSize: 13, fontWeight: s.active ? 700 : 500, color: s.done ? "var(--muted)" : "var(--fg)" }}>
-                        {s.step}
-                      </span>
-                      <span className="mono" style={{ fontSize: 11, color: s.done ? "var(--accent)" : "var(--muted)" }}>{s.time}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── DONE STATE ── */}
-            {state === "done" && (
-              <div style={{ padding: 40, minHeight: 520, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-                <div style={{
-                  width: 80, height: 80,
-                  background: "var(--jade)", color: "#fff",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  border: "3px solid var(--border)", marginBottom: 20,
-                  boxShadow: "4px 4px 0 var(--border)",
-                }}>
-                  <Icon name="check" size={40} stroke={3}/>
-                </div>
-                <div className="display" style={{ fontSize: 28 }}>Xử lý hoàn tất!</div>
-                <div style={{ color: "var(--fg-soft)", marginTop: 8 }}>{fileName}</div>
-                {pageId && (
-                  <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>
-                    page_id: {pageId}
+                    <div>
+                      <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>◯ YOLOv8 · phát hiện bubble</div>
+                      <div className="stroke-ink" style={{ background: "#fff", position: "relative" }}>
+                        <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
+                        <svg viewBox="0 0 280 200" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+                          <motion.rect initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: progress > 20 ? 1 : 0, opacity: progress > 20 ? 1 : 0 }} transition={{ duration: 0.4 }} x="18" y="18" width="90" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
+                          <motion.rect initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: progress > 20 ? 1 : 0, opacity: progress > 20 ? 1 : 0 }} transition={{ duration: 0.4, delay: 0.1 }} x="18" y="135" width="90" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
+                          <motion.rect initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: progress > 20 ? 1 : 0, opacity: progress > 20 ? 1 : 0 }} transition={{ duration: 0.4, delay: 0.2 }} x="148" y="135" width="80" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
+                          {progress > 20 && (
+                            <>
+                              <text x="112" y="16" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.96</text>
+                              <text x="112" y="133" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.91</text>
+                              <text x="232" y="133" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.88</text>
+                            </>
+                          )}
+                        </svg>
+                      </div>
+                    </div>
                   </div>
-                )}
-                <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
-                  <Link href={pageId ? `/reader?page=${pageId}` : "/reader"}>
-                    <button className="btn btn-primary" style={{ padding: "14px 28px" }}>
-                      <Icon name="book" size={14}/> Đọc bản dịch
-                    </button>
-                  </Link>
-                  <Link href={pageId ? `/qa?page=${pageId}` : "/qa"}>
-                    <button className="btn" style={{ padding: "14px 28px" }}>
-                      <Icon name="sparkle" size={14}/> Hỏi AI
-                    </button>
-                  </Link>
-                  <button className="btn" onClick={resetUpload}>
-                    <Icon name="upload" size={14}/> Tải file khác
-                  </button>
-                </div>
-              </div>
-            )}
 
-            {/* ── ERROR STATE ── */}
-            {state === "error" && (
-              <div style={{ padding: 56, textAlign: "center", minHeight: 520, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                <div style={{
-                  width: 80, height: 80,
-                  background: "var(--accent)", color: "var(--paper)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  border: "3px solid var(--border)", marginBottom: 20,
-                  boxShadow: "4px 4px 0 var(--border)",
-                }}>
-                  <Icon name="alert" size={38}/>
-                </div>
-                <div className="display" style={{ fontSize: 24, color: "var(--accent)" }}>Không thể xử lý</div>
-                <div style={{ color: "var(--fg-soft)", marginTop: 8, maxWidth: 400 }}>
-                  {errorMsg || "File không hợp lệ hoặc xảy ra lỗi trong quá trình xử lý."}
-                </div>
-                <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-                  <button className="btn" onClick={resetUpload}>
-                    <Icon name="refresh" size={14}/> Thử lại
-                  </button>
-                  <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>
-                    <Icon name="folder" size={14}/> Chọn file khác
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+                  {/* Pipeline steps */}
+                  <StaggerContainer staggerDelay={0.05} className="mt-6" style={{ marginTop: 24, borderTop: "2px solid var(--border-soft)", paddingTop: 16 }}>
+                    {steps.map((s, i) => (
+                      <StaggerItem key={i}>
+                        <div style={{
+                          display: "flex", alignItems: "center", gap: 12,
+                          padding: "8px 0",
+                          borderBottom: i < steps.length - 1 ? "1px dashed var(--border-soft)" : "none",
+                        }}>
+                          <motion.div 
+                            animate={{ 
+                              scale: s.active ? [1, 1.1, 1] : 1,
+                              backgroundColor: s.done ? "var(--accent)" : "rgba(0,0,0,0)"
+                            }}
+                            transition={s.active ? { repeat: Infinity, duration: 1.5 } : { duration: 0.2 }}
+                            style={{
+                              width: 22, height: 22, borderRadius: "50%",
+                              border: "2px solid var(--border)",
+                              color: "#fff",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {s.done && <Icon name="check" size={11} stroke={3}/>}
+                          </motion.div>
+                          <span style={{ flex: 1, fontSize: 13, fontWeight: s.active ? 700 : 500, color: s.done ? "var(--muted)" : "var(--fg)", transition: "color 0.2s" }}>
+                            {s.step}
+                          </span>
+                          <span className="mono" style={{ fontSize: 11, color: s.done ? "var(--accent)" : "var(--muted)" }}>{s.time}</span>
+                        </div>
+                      </StaggerItem>
+                    ))}
+                  </StaggerContainer>
+                </motion.div>
+              )}
+
+              {/* ── DONE STATE ── */}
+              {state === "done" && (
+                <motion.div
+                  key="done"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: "spring", bounce: 0.3 }}
+                  style={{ padding: 40, minHeight: 520, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}
+                >
+                  <motion.div 
+                    initial={{ rotate: -180, scale: 0 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ delay: 0.2, type: "spring" }}
+                    style={{
+                      width: 80, height: 80,
+                      background: "var(--jade)", color: "#fff",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "3px solid var(--border)", marginBottom: 20,
+                      boxShadow: "4px 4px 0 var(--border)",
+                    }}
+                  >
+                    <Icon name="check" size={40} stroke={3}/>
+                  </motion.div>
+                  <div className="display" style={{ fontSize: 28 }}>Xử lý hoàn tất!</div>
+                  <div style={{ color: "var(--fg-soft)", marginTop: 8 }}>{fileName}</div>
+                  {pageId && (
+                    <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>
+                      page_id: {pageId}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
+                    <Link href={pageId ? `/reader?page=${pageId}` : "/reader"}>
+                      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-primary" style={{ padding: "14px 28px" }}>
+                        <Icon name="book" size={14}/> Đọc bản dịch
+                      </motion.button>
+                    </Link>
+                    <Link href={pageId ? `/qa?page=${pageId}` : "/qa"}>
+                      <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn" style={{ padding: "14px 28px" }}>
+                        <Icon name="sparkle" size={14}/> Hỏi AI
+                      </motion.button>
+                    </Link>
+                    <button className="btn btn-ghost" onClick={resetUpload}>
+                      <Icon name="upload" size={14}/> Tải thêm
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ── ERROR STATE ── */}
+              {state === "error" && (
+                <motion.div
+                  key="error"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  style={{ padding: 56, textAlign: "center", minHeight: 520, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}
+                >
+                  <motion.div 
+                    animate={{ rotate: [0, -10, 10, -10, 0] }}
+                    transition={{ duration: 0.5 }}
+                    style={{
+                      width: 80, height: 80,
+                      background: "var(--accent)", color: "var(--paper)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "3px solid var(--border)", marginBottom: 20,
+                      boxShadow: "4px 4px 0 var(--border)",
+                    }}
+                  >
+                    <Icon name="alert" size={38}/>
+                  </motion.div>
+                  <div className="display" style={{ fontSize: 24, color: "var(--accent)" }}>Không thể xử lý</div>
+                  <div style={{ color: "var(--fg-soft)", marginTop: 8, maxWidth: 400 }}>
+                    {errorMsg || "File không hợp lệ hoặc xảy ra lỗi trong quá trình xử lý."}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+                    <button className="btn" onClick={resetUpload}>
+                      <Icon name="refresh" size={14}/> Thử lại
+                    </button>
+                    <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>
+                      <Icon name="folder" size={14}/> Chọn file khác
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
 
           {/* ── Right: Settings panel ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

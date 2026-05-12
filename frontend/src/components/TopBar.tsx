@@ -25,7 +25,7 @@ export const Logo = ({ size = 22 }: { size?: number }) => (
 
 function UserMenu() {
   const { user, logout } = useAuth();
-  const { show } = useToast();
+  const { toast } = useToast();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -153,7 +153,7 @@ function UserMenu() {
             onClick={() => {
               logout();
               setOpen(false);
-              show("Đã đăng xuất. Hẹn gặp lại! 👋", "info");
+              toast("Đã đăng xuất. Hẹn gặp lại! 👋", "info");
               router.push("/");
             }}
             style={{

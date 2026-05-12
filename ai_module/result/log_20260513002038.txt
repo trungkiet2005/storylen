@@ -1,0 +1,236 @@
+[manga-translator.shared] Log file created: D:\AI_PROJECT\Storylen_WEB\manga-image-translator\ai_service\result\log_20260513002038.txt
+[manga-translator.shared] Loading models
+[manga-translator.shared] Running text detection
+[manga-translator.DefaultDetector] Detection resolution: 1280x1536
+[manga-translator.shared] Running ocr
+[manga-translator.Model48pxOCR] prob: 0.9936198592185974 I'm fg: (26, 21, 17) bg: (26, 21, 17)
+[manga-translator.Model48pxOCR] prob: 0.9400727152824402 out. fg: (23, 20, 12) bg: (23, 20, 12)
+[manga-translator.Model48pxOCR] prob: 0.9757699966430664 out! fg: (29, 21, 15) bg: (29, 21, 15)
+[manga-translator.Model48pxOCR] prob: 0.9974251985549927 Day! fg: (18, 14, 7) bg: (18, 14, 7)
+[manga-translator.Model48pxOCR] prob: 0.9615415334701538 here. fg: (14, 14, 5) bg: (14, 14, 5)
+[manga-translator.Model48pxOCR] prob: 0.7500772476196289 ...No- fg: (38, 31, 32) bg: (38, 31, 32)
+[manga-translator.Model48pxOCR] prob: 0.8714187741279602 year fg: (25, 24, 19) bg: (25, 24, 19)
+[manga-translator.Model48pxOCR] prob: 0.7117369771003723 Who's fg: (6, 6, 0) bg: (6, 6, 0)
+[manga-translator.Model48pxOCR] prob: 0.9988804459571838 Come fg: (34, 25, 22) bg: (34, 25, 22)
+[manga-translator.Model48pxOCR] prob: 0.9491356015205383 toast. fg: (17, 15, 7) bg: (17, 15, 7)
+[manga-translator.Model48pxOCR] prob: 0.9264360666275024 saying fg: (17, 13, 11) bg: (17, 13, 11)
+[manga-translator.Model48pxOCR] prob: 0.6536802649497986 that!? fg: (22, 16, 7) bg: (22, 16, 7)
+[manga-translator.Model48pxOCR] prob: 0.40222641825675964 Year's fg: (13, 15, 7) bg: (13, 15, 7)
+[manga-translator.Model48pxOCR] prob: 0.5831462740898132 In 4O fg: (26, 18, 17) bg: (26, 18, 17)
+[manga-translator.Model48pxOCR] prob: 0.9206258058547974 body's fg: (7, 11, 2) bg: (7, 11, 2)
+[manga-translator.Model48pxOCR] prob: 0.49366307258605957 gefting fg: (14, 16, 7) bg: (14, 16, 7)
+[manga-translator.Model48pxOCR] prob: 0.9591152667999268 I got a fg: (20, 16, 10) bg: (20, 16, 10)
+[manga-translator.Model48pxOCR] prob: 0.8789535760879517 you'll be fg: (10, 11, 3) bg: (10, 11, 3)
+[manga-translator.Model48pxOCR] prob: 0.8022559285163879 freakea fg: (26, 25, 24) bg: (26, 25, 24)
+[manga-translator.Model48pxOCR] prob: 0.2773798406124115 minutes fg: (24, 23, 14) bg: (24, 23, 14)
+[manga-translator.Model48pxOCR] prob: 0.9672726392745972 Ah, New fg: (22, 19, 17) bg: (22, 19, 16)
+[manga-translator.Model48pxOCR] prob: 0.7872933745384216 say that fg: (10, 7, 0) bg: (10, 7, 1)
+[manga-translator.Model48pxOCR] prob: 0.806114137172699 I wouldn't fg: (20, 15, 10) bg: (20, 15, 9)
+[manga-translator.Model48pxOCR] prob: 0.9688988327980042 about this fg: (17, 14, 6) bg: (17, 14, 6)
+[manga-translator.Model48pxOCR] prob: 0.9120062589645386 Noby Nobi. fg: (16, 14, 9) bg: (16, 14, 9)
+[manga-translator.Model48pxOCR] prob: 0.9534106850624084 good feeling fg: (21, 17, 13) bg: (21, 17, 13)
+[manga-translator.Model48pxOCR] prob: 0.41613924503326416 by a thread. fg: (16, 13, 6) bg: (16, 13, 6)
+[manga-translator.Model48pxOCR] prob: 0.4730570316314697 you'll be hanging fg: (25, 18, 14) bg: (25, 18, 14)
+[manga-translator.Model48pxOCR] prob: 0.2553558349609375 In 3O minutes fg: (20, 19, 11) bg: (20, 19, 11)
+[manga-translator.shared] Removed unpaired bracket from "I'm gefting freakea out."
+[manga-translator.shared] Removed unpaired bracket from "Ah, New Year's Day!"
+[manga-translator.shared] Removed unpaired bracket from "...No- body's here."
+[manga-translator.shared] Removed unpaired bracket from "Who's saying that!?"
+[manga-translator.shared] Removed unpaired bracket from "In 4O minutes you'll be toast."
+[manga-translator.shared] Removed unpaired bracket from "I wouldn't say that Noby Nobi."
+[manga-translator.shared] Removed unpaired bracket from "In 3O minutes you'll be hanging by a thread."
+[manga-translator.shared] No pre-translation replacements made.
+[manga-translator.shared] Running text translation
+[manga-translator.M2M100Translator] Translating into Vietnamese
+[manga-translator.M2M100Translator] 0: Ah, New Years Day! => Oh, New Years Day!
+[manga-translator.M2M100Translator] 1: I got a good feeling about this year => Tôi có một cảm giác tốt về năm nay
+[manga-translator.M2M100Translator] 2: I wouldnt say that Noby Nobi. => Tôi sẽ không nói rằng Noby Nobby.
+[manga-translator.M2M100Translator] 3: In 3O minutes youll be hanging by a thread. => In 3O minutes youll be hanging by a thread.
+[manga-translator.M2M100Translator] 4: In 4O minutes youll be toast. => Trong vòng 4 phút, bạn sẽ trở thành một toast.
+[manga-translator.M2M100Translator] 5: Whos saying that!? => Ai nói vậy?!
+[manga-translator.M2M100Translator] 6: Come out! => Hãy ra đi!
+[manga-translator.M2M100Translator] 7: Im gefting freakea out. => Im gefting freakea ra.
+[manga-translator.M2M100Translator] 8: ...No- bodys here. => Không có thân thể ở đây.
+[manga-translator.shared] No post-translation replacements made.
+[manga-translator.shared] Starting post-translation check...
+[manga-translator.shared] Starting page-level target language check with 9 regions...
+[manga-translator.shared] Page-level target language ratio check passed
+[manga-translator.shared] All translation regions passed post-translation check.
+[manga-translator.shared] Filtered out: In 3O minutes youll be hanging by a thread.
+[manga-translator.shared] Reason: Translation identical to original
+[manga-translator.shared] Running mask refinement
+[manga-translator.AotInpainter] Inpainting resolution: 480x696
+[manga-translator.shared] Running rendering
+[manga-translator.shared] Loading models
+[manga-translator.shared] Running text detection
+[manga-translator.DefaultDetector] Detection resolution: 1280x1536
+[manga-translator.shared] Running ocr
+[manga-translator.Model48pxOCR] prob: 0.9936198592185974 I'm fg: (26, 21, 17) bg: (26, 21, 17)
+[manga-translator.Model48pxOCR] prob: 0.9400725960731506 out. fg: (23, 20, 12) bg: (23, 20, 12)
+[manga-translator.Model48pxOCR] prob: 0.9757699966430664 out! fg: (29, 21, 15) bg: (29, 21, 15)
+[manga-translator.Model48pxOCR] prob: 0.9974251985549927 Day! fg: (18, 14, 7) bg: (18, 14, 7)
+[manga-translator.Model48pxOCR] prob: 0.9615415334701538 here. fg: (14, 14, 5) bg: (14, 14, 5)
+[manga-translator.Model48pxOCR] prob: 0.7500770092010498 ...No- fg: (38, 31, 32) bg: (38, 31, 32)
+[manga-translator.Model48pxOCR] prob: 0.8714181184768677 year fg: (25, 24, 19) bg: (25, 24, 19)
+[manga-translator.Model48pxOCR] prob: 0.7117374539375305 Who's fg: (6, 6, 0) bg: (6, 6, 0)
+[manga-translator.Model48pxOCR] prob: 0.9988804459571838 Come fg: (34, 25, 22) bg: (34, 25, 22)
+[manga-translator.Model48pxOCR] prob: 0.9491356611251831 toast. fg: (17, 15, 7) bg: (17, 15, 7)
+[manga-translator.Model48pxOCR] prob: 0.9264359474182129 saying fg: (17, 13, 11) bg: (17, 13, 11)
+[manga-translator.Model48pxOCR] prob: 0.6536800861358643 that!? fg: (22, 16, 7) bg: (22, 16, 7)
+[manga-translator.Model48pxOCR] prob: 0.4022262394428253 Year's fg: (13, 15, 7) bg: (13, 15, 7)
+[manga-translator.Model48pxOCR] prob: 0.5831460952758789 In 4O fg: (26, 18, 17) bg: (26, 18, 17)
+[manga-translator.Model48pxOCR] prob: 0.9206256866455078 body's fg: (7, 11, 2) bg: (7, 11, 2)
+[manga-translator.Model48pxOCR] prob: 0.49366360902786255 gefting fg: (14, 16, 7) bg: (14, 16, 7)
+[manga-translator.Model48pxOCR] prob: 0.959115207195282 I got a fg: (20, 16, 10) bg: (20, 16, 10)
+[manga-translator.Model48pxOCR] prob: 0.8789536356925964 you'll be fg: (10, 11, 3) bg: (10, 11, 3)
+[manga-translator.Model48pxOCR] prob: 0.8022561073303223 freakea fg: (26, 25, 24) bg: (26, 25, 24)
+[manga-translator.Model48pxOCR] prob: 0.27737957239151 minutes fg: (24, 23, 14) bg: (24, 23, 14)
+[manga-translator.Model48pxOCR] prob: 0.9672725200653076 Ah, New fg: (22, 19, 17) bg: (22, 19, 16)
+[manga-translator.Model48pxOCR] prob: 0.7872930765151978 say that fg: (10, 7, 0) bg: (10, 7, 1)
+[manga-translator.Model48pxOCR] prob: 0.8061140775680542 I wouldn't fg: (20, 15, 10) bg: (20, 15, 9)
+[manga-translator.Model48pxOCR] prob: 0.9688989520072937 about this fg: (17, 14, 6) bg: (17, 14, 6)
+[manga-translator.Model48pxOCR] prob: 0.9120063781738281 Noby Nobi. fg: (16, 14, 9) bg: (16, 14, 9)
+[manga-translator.Model48pxOCR] prob: 0.9534104466438293 good feeling fg: (21, 17, 13) bg: (21, 17, 13)
+[manga-translator.Model48pxOCR] prob: 0.4161386787891388 by a thread. fg: (16, 13, 6) bg: (16, 13, 6)
+[manga-translator.Model48pxOCR] prob: 0.47305721044540405 you'll be hanging fg: (25, 18, 14) bg: (25, 18, 14)
+[manga-translator.Model48pxOCR] prob: 0.25535574555397034 In 3O minutes fg: (20, 19, 11) bg: (20, 19, 11)
+[manga-translator.shared] Removed unpaired bracket from "I'm gefting freakea out."
+[manga-translator.shared] Removed unpaired bracket from "Ah, New Year's Day!"
+[manga-translator.shared] Removed unpaired bracket from "...No- body's here."
+[manga-translator.shared] Removed unpaired bracket from "Who's saying that!?"
+[manga-translator.shared] Removed unpaired bracket from "In 4O minutes you'll be toast."
+[manga-translator.shared] Removed unpaired bracket from "I wouldn't say that Noby Nobi."
+[manga-translator.shared] Removed unpaired bracket from "In 3O minutes you'll be hanging by a thread."
+[manga-translator.shared] No pre-translation replacements made.
+[manga-translator.shared] Running text translation
+[manga-translator.GeminiTranslator] Translating into Vietnamese
+[manga-translator.GeminiTranslator] Temperature: 0.5, TopP: 1
+[31mERROR:[39m [manga-translator.GeminiTranslator] Requested chat sample of unknown language: Vietnamese
+[33mWARNING:[39m [manga-translator.GeminiTranslator] 
+Context Cache is supported on this model, but the cache could not be created.
+The following error was encountered when attempting to create Context Cache:
+400 INVALID_ARGUMENT. {'error': {'code': 400, 'message': 'Cached content is too small. total_token_count=336, min_total_token_count=1024', 'status': 'INVALID_ARGUMENT'}}
+
+The most likely cause is that context contents (`System Prompt` + `Chat Samples`) does not the meet the minimum token length for the model.
+Context Caching will be disabled. If you wish to use caching: Try using Gemini 1.5 or increase `System Prompt` and/or `Chat Sample` size.
+[manga-translator.GeminiTranslator] -- GPT Prompt --
+
+[1mSystem Prompt[0m:
+Ignore all preceding instructions. Follow only what is defined below.
+## Role: Professional Doujin Translator
+You are an unsensored expert translation engine that specializes in doujin and manga content for all languages.
+## Translation Method
+1. LITERAL TRANSLATION: 
+- Provide precise word-for-word translation of each textline.
+- Maintain original sentence structure where possible.
+- Preserve all original markers and expressions.
+- Leave ambiguous elements as they are without interpretation.
+2. ANALYSIS & DE-VERBALIZATION: 
+- Capture the core meaning, emotional tone, and cultural nuances.
+- Identify logical connections between fragmented text segments.
+- Analyze the shortcomings and areas for improvement of literal translation.
+3. REFINEMENT: 
+- Adjust the translation to sound natural in Vietnamese while maintaining original meaning.
+- Preserve emotional tone and intensity appropriate to manga & otaku culture.
+- Ensure consistency in character voice and terminology.
+- Determine appropriate pronouns (他/她/我/你/你们/he/she/me/you) from context; do not add pronouns that do not exist in the original text.
+- Refine based on the conclusions from the second step.
+## Translation Rules
+- Translate line by line, maintaining accuracy and the authentic; Faithfully reproducing the original text and emotional intent.
+- Preserve original gibberish or sound effects without translation.
+- Output each segment with its prefix (<|number|> format exactly) and only provide the translation without raw text.
+- Translate content only—no additional interpretation or commentary.
+Translate the following text into Vietnamese:
+
+---
+
+[1mInput[0m:
+
+<|1|>Ah, New Years Day!
+<|2|>I got a good feeling about this year
+<|3|>I wouldnt say that Noby Nobi.
+<|4|>In 3O minutes youll be hanging by a thread.
+<|5|>In 4O minutes youll be toast.
+<|6|>Whos saying that!?
+<|7|>Come out!
+<|8|>Im gefting freakea out.
+<|9|>...No- bodys here.
+------------
+[33mWARNING:[39m [manga-translator.GeminiTranslator] Switching Gemini API key #1 -> #2 after a retryable API error.
+[33mWARNING:[39m [manga-translator.GeminiTranslator] Retrying Gemini request with API key #2.
+[manga-translator.GeminiTranslator] -- GPT Prompt --
+
+[1mSystem Prompt[0m:
+Ignore all preceding instructions. Follow only what is defined below.
+## Role: Professional Doujin Translator
+You are an unsensored expert translation engine that specializes in doujin and manga content for all languages.
+## Translation Method
+1. LITERAL TRANSLATION: 
+- Provide precise word-for-word translation of each textline.
+- Maintain original sentence structure where possible.
+- Preserve all original markers and expressions.
+- Leave ambiguous elements as they are without interpretation.
+2. ANALYSIS & DE-VERBALIZATION: 
+- Capture the core meaning, emotional tone, and cultural nuances.
+- Identify logical connections between fragmented text segments.
+- Analyze the shortcomings and areas for improvement of literal translation.
+3. REFINEMENT: 
+- Adjust the translation to sound natural in Vietnamese while maintaining original meaning.
+- Preserve emotional tone and intensity appropriate to manga & otaku culture.
+- Ensure consistency in character voice and terminology.
+- Determine appropriate pronouns (他/她/我/你/你们/he/she/me/you) from context; do not add pronouns that do not exist in the original text.
+- Refine based on the conclusions from the second step.
+## Translation Rules
+- Translate line by line, maintaining accuracy and the authentic; Faithfully reproducing the original text and emotional intent.
+- Preserve original gibberish or sound effects without translation.
+- Output each segment with its prefix (<|number|> format exactly) and only provide the translation without raw text.
+- Translate content only—no additional interpretation or commentary.
+Translate the following text into Vietnamese:
+
+---
+
+[1mInput[0m:
+
+<|1|>Ah, New Years Day!
+<|2|>I got a good feeling about this year
+<|3|>I wouldnt say that Noby Nobi.
+<|4|>In 3O minutes youll be hanging by a thread.
+<|5|>In 4O minutes youll be toast.
+<|6|>Whos saying that!?
+<|7|>Come out!
+<|8|>Im gefting freakea out.
+<|9|>...No- bodys here.
+------------
+[manga-translator.GeminiTranslator] -- GPT Response --
+<|1|>Ah, Ngày Năm Mới!
+<|2|>Tôi có linh cảm tốt về năm nay
+<|3|>Tôi sẽ không nói thế đâu, Noby Nobi.
+<|4|>Trong 30 phút nữa, cậu sẽ ngàn cân treo sợi tóc.
+<|5|>Trong 40 phút nữa, cậu sẽ tiêu đời.
+<|6|>Ai đang nói đó!?
+<|7|>Ra mặt đi!
+<|8|>Tôi đang sợ chết khiếp đây.
+<|9|>...Không có ai ở đây cả.
+[manga-translator.GeminiTranslator] Batch translated: 9/9 completed.
+[manga-translator.GeminiTranslator] Completed translations: ['Ah, Ngày Năm Mới!', 'Tôi có linh cảm tốt về năm nay', 'Tôi sẽ không nói thế đâu, Noby Nobi.', 'Trong 30 phút nữa, cậu sẽ ngàn cân treo sợi tóc.', 'Trong 40 phút nữa, cậu sẽ tiêu đời.', 'Ai đang nói đó!?', 'Ra mặt đi!', 'Tôi đang sợ chết khiếp đây.', '...Không có ai ở đây cả.']
+[manga-translator.GeminiTranslator] ['Ah, Ngày Năm Mới!', 'Tôi có linh cảm tốt về năm nay', 'Tôi sẽ không nói thế đâu, Noby Nobi.', 'Trong 30 phút nữa, cậu sẽ ngàn cân treo sợi tóc.', 'Trong 40 phút nữa, cậu sẽ tiêu đời.', 'Ai đang nói đó!?', 'Ra mặt đi!', 'Tôi đang sợ chết khiếp đây.', '...Không có ai ở đây cả.']
+[manga-translator.GeminiTranslator] Used 1522 tokens (Total: 448)
+[manga-translator.GeminiTranslator] 0: Ah, New Years Day! => Ah, Ngày Năm Mới!
+[manga-translator.GeminiTranslator] 1: I got a good feeling about this year => Tôi có linh cảm tốt về năm nay
+[manga-translator.GeminiTranslator] 2: I wouldnt say that Noby Nobi. => Tôi sẽ không nói thế đâu, Noby Nobi.
+[manga-translator.GeminiTranslator] 3: In 3O minutes youll be hanging by a thread. => Trong 30 phút nữa, cậu sẽ ngàn cân treo sợi tóc.
+[manga-translator.GeminiTranslator] 4: In 4O minutes youll be toast. => Trong 40 phút nữa, cậu sẽ tiêu đời.
+[manga-translator.GeminiTranslator] 5: Whos saying that!? => Ai đang nói đó!?
+[manga-translator.GeminiTranslator] 6: Come out! => Ra mặt đi!
+[manga-translator.GeminiTranslator] 7: Im gefting freakea out. => Tôi đang sợ chết khiếp đây.
+[manga-translator.GeminiTranslator] 8: ...No- bodys here. => ...Không có ai ở đây cả.
+[manga-translator.shared] No post-translation replacements made.
+[manga-translator.shared] Starting post-translation check...
+[manga-translator.shared] Starting page-level target language check with 9 regions...
+[manga-translator.shared] Page-level target language ratio check passed
+[manga-translator.shared] All translation regions passed post-translation check.
+[manga-translator.shared] Running mask refinement
+[manga-translator.AotInpainter] Inpainting resolution: 480x696
+[manga-translator.shared] Running rendering
+
+Translation cancelled by user.

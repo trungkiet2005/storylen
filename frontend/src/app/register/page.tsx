@@ -10,7 +10,7 @@ import { Logo } from "@/components/TopBar";
 export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
-  const { show } = useToast();
+  const { toast } = useToast();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -41,12 +41,12 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(username.trim(), email.trim(), password);
-      show("Tạo tài khoản thành công! Chào mừng đến StoryLens 🎌", "success");
+      toast("Tạo tài khoản thành công! Chào mừng đến StoryLens 🎌", "success");
       router.push("/");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Đăng ký thất bại";
       setError(msg);
-      show(msg, "error");
+      toast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -337,7 +337,7 @@ export default function RegisterPage() {
             className="btn"
             style={{ width: "100%", justifyContent: "center", gap: 10 }}
             type="button"
-            onClick={() => show("Google OAuth sẽ được tích hợp sớm!", "info")}
+            onClick={() => toast("Google OAuth sẽ được tích hợp sớm!", "info")}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>

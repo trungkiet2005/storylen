@@ -5,6 +5,8 @@ import { TopBar } from '@/components/TopBar';
 import { Icon } from '@/components/Icons';
 import { useToast } from '@/components/Toast';
 import { askQuestion, APIError } from '@/lib/api';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatedPage, StaggerContainer, StaggerItem } from '@/components/Animations';
 
 interface Message {
   id: number;
@@ -199,6 +201,7 @@ function QAContent() {
   };
 
   return (
+    <AnimatedPage>
     <div className="paper-grain" style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <TopBar active="qa" compact />
 
@@ -312,33 +315,41 @@ function QAContent() {
                     ? "AI sẽ chỉ trả lời dựa trên nội dung đã được index vào vector DB."
                     : "Demo mode: AI mô phỏng câu trả lời. Upload manga để dùng RAG thật."}
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 28, maxWidth: 540 }}>
+                <StaggerContainer style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 28, maxWidth: 540 }}>
                   {SUGGESTIONS.map(q => (
-                    <div
-                      key={q}
-                      className="stroke-ink"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => sendMessage(q)}
-                      onKeyDown={e => e.key === "Enter" && sendMessage(q)}
-                      style={{
-                        background: "var(--panel)", padding: "10px 14px",
-                        fontSize: 13, textAlign: "left", cursor: "pointer",
-                        transition: "background 0.1s",
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {q}
-                    </div>
+                    <StaggerItem key={q} direction="up" distance={10}>
+                      <motion.div
+                        whileHover={{ scale: 1.03, y: -2 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="stroke-ink"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => sendMessage(q)}
+                        onKeyDown={e => e.key === "Enter" && sendMessage(q)}
+                        style={{
+                          background: "var(--panel)", padding: "10px 14px",
+                          fontSize: 13, textAlign: "left", cursor: "pointer",
+                          transition: "background 0.1s",
+                          lineHeight: 1.4,
+                          height: "100%"
+                        }}
+                      >
+                        {q}
+                      </motion.div>
+                    </StaggerItem>
                   ))}
-                </div>
+                </StaggerContainer>
               </div>
             )}
 
             {/* Message list */}
+            <AnimatePresence initial={false}>
             {activeSession?.messages.map(msg => (
-              <div
+              <motion.div
                 key={msg.id}
+                initial={{ opacity: 0, y: 20, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 style={{
                   display: "flex",
                   justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
@@ -381,12 +392,17 @@ function QAContent() {
                     </div>
                   )}
                 </div>
-              </div>
+              </motion.div>
             ))}
+            </AnimatePresence>
 
             {/* Loading indicator */}
             {isLoading && (
-              <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{ display: "flex", gap: 12, alignItems: "flex-start" }}
+              >
                 <div style={{
                   width: 36, height: 36, background: "var(--ink)", color: "var(--paper)",
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -405,7 +421,7 @@ function QAContent() {
                     {useRealAPI ? "Đang tìm kiếm chunks · tổng hợp…" : "Đang mô phỏng câu trả lời…"}
                   </span>
                 </div>
-              </div>
+              </motion.div>
             )}
             <div ref={messagesEndRef}/>
           </div>
@@ -450,6 +466,7 @@ function QAContent() {
         </div>
       </div>
     </div>
+    </AnimatedPage>
   );
 }
 
