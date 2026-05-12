@@ -1,8 +1,11 @@
 "use client";
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { TopBar } from '@/components/TopBar';
 import { Icon } from '@/components/Icons';
 import { MangaPage } from '@/components/MangaPage';
+import { useToast } from '@/components/Toast';
+import { getPage, PageData, BubbleData, APIError } from '@/lib/api';
 import Link from 'next/link';
 
 type ViewMode = "overlay" | "sidebyside" | "tap";
@@ -20,14 +23,145 @@ const GLOSSARY = [
   { jp: "逆刃刀", vn: "Sakabatou", note: "Kiếm lưỡi ngược — biểu tượng lời thề không sát sinh" },
 ];
 
-export default function ReaderPage() {
+// ── Overlay bubble renderer using real bbox data ────────────────────────────
+function BubbleOverlays({
+  bubbles,
+  containerW,
+  containerH,
+  imageW,
+  imageH,
+  selected,
+  onSelect,
+  mode,
+}: {
+  bubbles: BubbleData[];
+  containerW: number;
+  containerH: number;
+  imageW: number;
+  imageH: number;
+  selected: number | null;
+  onSelect: (i: number | null) => void;
+  mode: ViewMode;
+}) {
+  const scaleX = containerW / imageW;
+  const scaleY = containerH / imageH;
+
+  return (
+    <svg
+      viewBox={`0 0 ${containerW} ${containerH}`}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", overflow: "visible" }}
+    >
+      {bubbles.map((b, i) => {
+        const [x, y, w, h] = b.bbox;
+        const rx = x * scaleX;
+        const ry = y * scaleY;
+        const rw = w * scaleX;
+        const rh = h * scaleY;
+
+        if (mode === "overlay") {
+          return (
+            <g key={i}>
+              {/* White box overlay */}
+              <rect x={rx} y={ry} width={rw} height={rh} fill="white" stroke="#111" strokeWidth="1.5" rx="4"/>
+              <foreignObject x={rx + 2} y={ry + 2} width={rw - 4} height={rh - 4}>
+                <div
+                  style={{
+                    width: "100%", height: "100%",
+                    fontSize: Math.max(8, rh * 0.35),
+                    fontFamily: "var(--font-serif)",
+                    fontWeight: 600,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    textAlign: "center",
+                    color: "#111",
+                    overflow: "hidden",
+                    lineHeight: 1.2,
+                    padding: "2px",
+                  }}
+                >
+                  {b.translated_text}
+                </div>
+              </foreignObject>
+            </g>
+          );
+        }
+
+        if (mode === "tap") {
+          return (
+            <rect
+              key={i}
+              x={rx} y={ry} width={rw} height={rh}
+              fill={selected === i ? "rgba(200,16,46,0.12)" : "transparent"}
+              stroke={selected === i ? "var(--beni)" : "rgba(200,16,46,0.4)"}
+              strokeWidth="2"
+              strokeDasharray="4 3"
+              style={{ cursor: "pointer" }}
+              onClick={() => onSelect(selected === i ? null : i)}
+            />
+          );
+        }
+
+        return null;
+      })}
+
+      {/* Tap mode: selected bubble tooltip */}
+      {mode === "tap" && selected !== null && bubbles[selected] && (() => {
+        const b = bubbles[selected];
+        const [x, y, , h] = b.bbox;
+        const rx = x * scaleX;
+        const ry = (y + h) * scaleY + 4;
+        return (
+          <foreignObject x={rx} y={ry} width={240} height={80}>
+            <div style={{
+              background: "#fffde8",
+              border: "2px solid #111",
+              borderRadius: 8,
+              padding: "8px 12px",
+              fontSize: 12,
+              boxShadow: "3px 3px 0 #111",
+            }}>
+              <div style={{ fontSize: 10, color: "#888", marginBottom: 3 }}>JA → VI</div>
+              <div style={{ fontFamily: "var(--font-serif)", lineHeight: 1.4 }}>{b.translated_text}</div>
+            </div>
+          </foreignObject>
+        );
+      })()}
+    </svg>
+  );
+}
+
+// ── Actual reader content, needs search params ─────────────────────────────
+function ReaderContent() {
+  const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const pageIdParam = searchParams.get("page");
+
   const [mode, setMode] = useState<ViewMode>("overlay");
-  const [page, setPage] = useState(2); // 0-indexed
+  const [page, setPage] = useState(2); // 0-indexed local pages
   const [selected, setSelected] = useState<number | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [zoom, setZoom] = useState(1.0);
   const [showContext, setShowContext] = useState(true);
   const mainRef = useRef<HTMLDivElement>(null);
+
+  // Real page data from API
+  const [pageData, setPageData] = useState<PageData | null>(null);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+
+  // Load page data if page_id provided
+  useEffect(() => {
+    if (!pageIdParam) return;
+    setIsLoadingPage(true);
+    getPage(pageIdParam)
+      .then(data => {
+        setPageData(data);
+        toast("Đã tải dữ liệu trang", "success");
+      })
+      .catch(err => {
+        const msg = err instanceof APIError ? err.message : "Không thể tải dữ liệu trang.";
+        toast(msg, "error");
+      })
+      .finally(() => setIsLoadingPage(false));
+  }, [pageIdParam, toast]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -45,12 +179,14 @@ export default function ReaderPage() {
     return () => window.removeEventListener("keydown", handleKey);
   }, []);
 
-  // Reset tap selection on page change
   useEffect(() => setSelected(null), [page]);
 
   const pageLayouts: ("default" | "action" | "dialogue")[] = [
     "default", "action", "dialogue", "default", "action", "dialogue", "default", "action"
   ];
+
+  const CANVAS_W = 520;
+  const CANVAS_H = 740;
 
   return (
     <div style={{ height: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -101,7 +237,7 @@ export default function ReaderPage() {
             style={{ background: "var(--panel)", padding: "8px 14px", display: "flex", gap: 6, alignItems: "center", width: "100%", maxWidth: 840, flexWrap: "wrap" }}
           >
             <span className="caps-xs" style={{ color: "var(--accent)", marginRight: 6 }}>
-              月影の剣 · Ch. 12 · P.{String(page + 1).padStart(2, "0")}
+              {pageData ? `Trang đã dịch · ${pageData.page_id.slice(0, 8)}…` : `月影の剣 · Ch. 12 · P.${String(page + 1).padStart(2, "0")}`}
             </span>
             <div style={{ flex: 1 }}/>
 
@@ -159,72 +295,78 @@ export default function ReaderPage() {
             </button>
           </div>
 
-          {/* Page Display */}
-          <div style={{ transform: `scale(${zoom})`, transformOrigin: "top center", transition: "transform 0.15s" }}>
-            {mode === "sidebyside" ? (
-              <div style={{ display: "flex", gap: 20 }}>
-                <div>
-                  <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>原文 · Gốc</div>
-                  <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff" }}>
-                    <MangaPage w={360} h={520} panels={pageLayouts[page]} showBubbles showOverlay={false}/>
-                  </div>
-                </div>
-                <div>
-                  <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>訳 · Dịch tiếng Việt</div>
-                  <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff" }}>
-                    <MangaPage w={360} h={520} panels={pageLayouts[page]} showBubbles showOverlay overlayLang="vn"/>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div style={{ position: "relative" }}>
-                <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff" }}>
-                  <MangaPage w={520} h={740} panels={pageLayouts[page]} showBubbles showOverlay={mode === "overlay" && showOverlay} overlayLang="vn"/>
-                </div>
+          {/* Loading state */}
+          {isLoadingPage && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: 40 }}>
+              <div style={{ width: 40, height: 40, border: "3px solid var(--border-soft)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }}/>
+              <span style={{ fontSize: 13, color: "var(--muted)" }}>Đang tải dữ liệu trang…</span>
+            </div>
+          )}
 
-                {/* Tap mode hotspots */}
-                {mode === "tap" && (
-                  <>
-                    {[
-                      { top: 22, left: 20, w: 110, h: 38 },
-                      { top: 248, left: 20, w: 110, h: 38 },
-                      { top: 248, left: 194, w: 100, h: 38 },
-                    ].map((spot, i) => (
-                      <div
-                        key={i}
-                        onClick={() => setSelected(selected === i ? null : i)}
-                        role="button"
-                        aria-label={`Bubble ${i + 1}`}
-                        style={{
-                          position: "absolute",
-                          top: spot.top, left: spot.left,
-                          width: spot.w, height: spot.h,
-                          border: `2px dashed ${selected === i ? "var(--accent)" : "rgba(200,16,46,0.5)"}`,
-                          cursor: "pointer",
-                          background: selected === i ? "rgba(200,16,46,0.1)" : "transparent",
-                          transition: "background 0.1s, border-color 0.1s",
-                        }}
+          {/* Page Display */}
+          {!isLoadingPage && (
+            <div style={{ transform: `scale(${zoom})`, transformOrigin: "top center", transition: "transform 0.15s" }}>
+              {mode === "sidebyside" ? (
+                <div style={{ display: "flex", gap: 20 }}>
+                  <div>
+                    <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>原文 · Gốc</div>
+                    <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff" }}>
+                      {pageData?.original_image_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={pageData.original_image_url} alt="Ảnh gốc" style={{ width: 360, height: 520, objectFit: "contain", display: "block" }}/>
+                      ) : (
+                        <MangaPage w={360} h={520} panels={pageLayouts[page]} showBubbles showOverlay={false}/>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>訳 · Dịch tiếng Việt</div>
+                    <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", position: "relative" }}>
+                      {pageData?.original_image_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={pageData.original_image_url} alt="Ảnh với overlay" style={{ width: 360, height: 520, objectFit: "contain", display: "block" }}/>
+                      ) : (
+                        <MangaPage w={360} h={520} panels={pageLayouts[page]} showBubbles showOverlay overlayLang="vn"/>
+                      )}
+                      {pageData && showOverlay && (
+                        <BubbleOverlays
+                          bubbles={pageData.processed_data}
+                          containerW={360} containerH={520}
+                          imageW={1280} imageH={1820}
+                          selected={selected} onSelect={setSelected} mode="overlay"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ position: "relative" }}>
+                  <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: CANVAS_W, height: CANVAS_H, position: "relative" }}>
+                    {pageData?.original_image_url ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={pageData.original_image_url}
+                        alt="Manga page"
+                        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
                       />
-                    ))}
-                    {selected !== null && (
-                      <div className="bubble" style={{
-                        position: "absolute",
-                        top: selected === 0 ? 72 : 298,
-                        left: selected === 2 ? 224 : 140,
-                        maxWidth: 220, background: "#fffde8", zIndex: 10,
-                        animation: "fadeIn 0.15s ease",
-                      }}>
-                        <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>JA → VI · dịch có ngữ cảnh</div>
-                        <div className="serif" style={{ fontSize: 13, lineHeight: 1.45 }}>
-                          {["Khoan đã… không lẽ đây là định mệnh?", "Mình… không thể quay lại nữa đâu.", "Đừng chạy trốn!"][selected]}
-                        </div>
-                      </div>
+                    ) : (
+                      <MangaPage w={CANVAS_W} h={CANVAS_H} panels={pageLayouts[page]} showBubbles showOverlay={mode === "overlay" && showOverlay} overlayLang="vn"/>
                     )}
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+
+                    {/* Real bubble overlays */}
+                    {pageData && (mode === "overlay" ? showOverlay : true) && (
+                      <BubbleOverlays
+                        bubbles={pageData.processed_data}
+                        containerW={CANVAS_W} containerH={CANVAS_H}
+                        imageW={1280} imageH={1820}
+                        selected={selected} onSelect={setSelected} mode={mode}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Page navigation */}
           <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
@@ -299,14 +441,14 @@ export default function ReaderPage() {
               ))}
             </div>
 
-            {/* Chapter info */}
+            {/* Real bubble data stats */}
             <div className="stroke-ink" style={{ background: "var(--panel)", padding: 12, marginBottom: 16 }}>
               <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>Thống kê trang</div>
               {[
-                ["Bubbles detected", "12"],
-                ["OCR confidence", "94.3%"],
+                ["Bubbles detected", pageData ? String(pageData.processed_data.length) : "—"],
+                ["OCR confidence", pageData ? `${Math.round((pageData.processed_data.reduce((a, b) => a + b.confidence, 0) / Math.max(1, pageData.processed_data.length)) * 100)}%` : "—"],
                 ["Translation", "Gemini Flash"],
-                ["Chunks indexed", "3"],
+                ["Chunks indexed", pageData ? String(pageData.processed_data.length) : "—"],
               ].map(([k, v]) => (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "3px 0" }}>
                   <span style={{ color: "var(--muted)" }}>{k}</span>
@@ -316,7 +458,7 @@ export default function ReaderPage() {
             </div>
 
             {/* Q&A CTA */}
-            <Link href="/qa" style={{ textDecoration: "none" }}>
+            <Link href={pageIdParam ? `/qa?page=${pageIdParam}` : "/qa"} style={{ textDecoration: "none" }}>
               <button className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }}>
                 <Icon name="sparkle" size={14}/> Hỏi AI về trang này
               </button>
@@ -325,5 +467,21 @@ export default function ReaderPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Wrap with Suspense for useSearchParams
+export default function ReaderPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg)" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: 48, height: 48, border: "3px solid var(--border-soft)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }}/>
+          <div style={{ color: "var(--muted)", fontSize: 13 }}>Đang tải reader…</div>
+        </div>
+      </div>
+    }>
+      <ReaderContent />
+    </Suspense>
   );
 }

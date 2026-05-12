@@ -4,9 +4,11 @@ import { TopBar } from '@/components/TopBar';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Icon } from '@/components/Icons';
 import { MangaPage } from '@/components/MangaPage';
+import { useToast } from '@/components/Toast';
+import { uploadImages, pollUntilDone, PageStatus, APIError } from '@/lib/api';
 import Link from 'next/link';
 
-type UploadState = "idle" | "dragging" | "processing" | "done" | "error";
+type UploadState = "idle" | "dragging" | "uploading" | "processing" | "done" | "error";
 
 interface ProcessingStep {
   step: string;
@@ -25,47 +27,31 @@ const PIPELINE_STEPS: ProcessingStep[] = [
 
 const TIMINGS = ["0.8s", "1.4s", "0.6s", "4.2s", "0.4s"];
 
-function useProcessingSimulation(isProcessing: boolean) {
-  const [steps, setSteps] = useState<ProcessingStep[]>(PIPELINE_STEPS.map(s => ({ ...s })));
-  const [currentStep, setCurrentStep] = useState(0);
+function deriveStepsFromStatus(status: PageStatus): ProcessingStep[] {
+  // Map progress percentage to which steps are done/active
+  const progress = status.progress ?? 0;
+  const stepThresholds = [20, 40, 60, 85, 100]; // each step completes at %
 
-  useEffect(() => {
-    if (!isProcessing) {
-      setSteps(PIPELINE_STEPS.map(s => ({ ...s })));
-      setCurrentStep(0);
-      return;
-    }
-    let step = 0;
-    const delays = [1000, 1800, 800, 4500, 600];
-    let timeout: ReturnType<typeof setTimeout>;
-
-    const advance = () => {
-      if (step >= PIPELINE_STEPS.length) return;
-      setSteps(prev => prev.map((s, i) => ({
-        ...s,
-        done: i < step,
-        active: i === step,
-        time: i < step ? TIMINGS[i] : i === step ? "…" : "—",
-      })));
-      setCurrentStep(step);
-      timeout = setTimeout(() => {
-        step++;
-        advance();
-      }, delays[step] || 800);
-    };
-    advance();
-    return () => clearTimeout(timeout);
-  }, [isProcessing]);
-
-  return { steps, currentStep, allDone: steps.every(s => s.done) };
+  return PIPELINE_STEPS.map((s, i) => ({
+    ...s,
+    done: progress >= stepThresholds[i],
+    active: progress >= (stepThresholds[i - 1] ?? 0) && progress < stepThresholds[i],
+    time: progress >= stepThresholds[i] ? TIMINGS[i] : progress >= (stepThresholds[i - 1] ?? 0) && progress < stepThresholds[i] ? "…" : "—",
+  }));
 }
 
 export default function UploadPage() {
+  const { toast } = useToast();
   const [state, setState] = useState<UploadState>("idle");
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedSeries, setSelectedSeries] = useState(0);
+  const [pageId, setPageId] = useState<string | null>(null);
+  const [batchId, setBatchId] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [steps, setSteps] = useState<ProcessingStep[]>(PIPELINE_STEPS.map(s => ({ ...s })));
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [options, setOptions] = useState({
     glossary: true,
     onyomi: true,
@@ -74,37 +60,6 @@ export default function UploadPage() {
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { steps, allDone } = useProcessingSimulation(state === "processing");
-
-  // Handle file selection
-  const handleFiles = useCallback((files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    // Validate type
-    const validTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!validTypes.includes(file.type)) {
-      setState("error");
-      return;
-    }
-    // Validate size (20MB)
-    if (file.size > 20 * 1024 * 1024) {
-      setState("error");
-      return;
-    }
-    setFileName(file.name);
-    setFileSize((file.size / (1024 * 1024)).toFixed(1) + " MB");
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    setState("processing");
-  }, []);
-
-  // Auto-transition to done after all steps
-  useEffect(() => {
-    if (allDone && state === "processing") {
-      const t = setTimeout(() => setState("done"), 600);
-      return () => clearTimeout(t);
-    }
-  }, [allDone, state]);
 
   // Cleanup object URLs
   useEffect(() => {
@@ -113,13 +68,89 @@ export default function UploadPage() {
     };
   }, [previewUrl]);
 
+  const handleFiles = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    // Validate type
+    const validTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!validTypes.includes(file.type)) {
+      setErrorMsg("File không hợp lệ — chỉ chấp nhận JPG, PNG, WEBP.");
+      setState("error");
+      return;
+    }
+    // Validate size (20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      setErrorMsg("File vượt quá giới hạn 20 MB.");
+      setState("error");
+      return;
+    }
+
+    setFileName(file.name);
+    setFileSize((file.size / (1024 * 1024)).toFixed(1) + " MB");
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    setProgress(0);
+    setSteps(PIPELINE_STEPS.map(s => ({ ...s })));
+    setState("uploading");
+
+    try {
+      // ── 1. Upload to backend ────────────────────────────────────────────
+      const response = await uploadImages([file]);
+      const pid = response.page_ids[0];
+      setPageId(pid);
+      setBatchId(response.batch_id);
+      setState("processing");
+      toast(`Đã tải lên thành công — đang xử lý…`, "info");
+
+      // ── 2. Poll for completion ──────────────────────────────────────────
+      await pollUntilDone(
+        pid,
+        (status: PageStatus) => {
+          setProgress(status.progress);
+          setSteps(deriveStepsFromStatus(status));
+        },
+        2000, // poll every 2s
+        90,   // max 3 min
+      );
+
+      setState("done");
+      toast("Xử lý hoàn tất! Bản dịch đã sẵn sàng.", "success");
+    } catch (err) {
+      const msg =
+        err instanceof APIError
+          ? err.message
+          : err instanceof Error
+          ? err.message
+          : "Đã xảy ra lỗi không xác định.";
+      setErrorMsg(msg);
+      setState("error");
+      toast(msg, "error");
+    }
+  }, [toast]);
+
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    setState("idle"); // reset dragging state first
+    setState("idle");
     handleFiles(e.dataTransfer.files);
   }, [handleFiles]);
 
+  const resetUpload = useCallback(() => {
+    setState("idle");
+    setFileName(null);
+    setFileSize(null);
+    setPreviewUrl(null);
+    setPageId(null);
+    setBatchId(null);
+    setProgress(0);
+    setErrorMsg(null);
+    setSteps(PIPELINE_STEPS.map(s => ({ ...s })));
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
   const series = ["月影の剣", "春の足音", "+ Tạo mới"];
+  const isUploading = state === "uploading";
+  const isProcessing = state === "processing";
 
   return (
     <div className="paper-grain" style={{ minHeight: "100vh" }}>
@@ -158,7 +189,7 @@ export default function UploadPage() {
               aria-label="Chọn file ảnh manga"
             />
 
-            {/* ── IDLE STATE ── */}
+            {/* ── IDLE / DRAGGING STATE ── */}
             {(state === "idle" || state === "dragging") && (
               <div style={{
                 padding: 56, textAlign: "center",
@@ -198,15 +229,39 @@ export default function UploadPage() {
               </div>
             )}
 
+            {/* ── UPLOADING STATE ── */}
+            {isUploading && (
+              <div style={{ padding: 56, minHeight: 520, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", gap: 20 }}>
+                <div style={{
+                  width: 80, height: 80,
+                  border: "4px solid var(--border-soft)",
+                  borderTopColor: "var(--accent)",
+                  borderRadius: "50%",
+                  animation: "spin 0.8s linear infinite",
+                }}/>
+                <div className="display" style={{ fontSize: 22 }}>Đang tải lên…</div>
+                <div style={{ fontSize: 13, color: "var(--muted)" }}>{fileName}</div>
+              </div>
+            )}
+
             {/* ── PROCESSING STATE ── */}
-            {state === "processing" && (
+            {isProcessing && (
               <div style={{ padding: 36, minHeight: 520 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
                   <div>
                     <div className="caps-sm" style={{ color: "var(--accent)" }}>Đang xử lý · Processing</div>
-                    <div className="display" style={{ fontSize: 20, marginTop: 4 }}>{fileName || "page_04_chapter12.jpg"}</div>
+                    <div className="display" style={{ fontSize: 20, marginTop: 4 }}>{fileName}</div>
                   </div>
-                  <div className="chip chip-accent">{fileSize || "3.2 MB"}</div>
+                  <div className="chip chip-accent">{fileSize}</div>
+                </div>
+
+                {/* Progress bar */}
+                <div style={{ height: 8, background: "var(--bg-2)", border: "1px solid var(--border)", marginBottom: 16 }}>
+                  <div style={{
+                    width: `${progress}%`, height: "100%",
+                    background: "var(--accent)",
+                    transition: "width 0.4s ease",
+                  }}/>
                 </div>
 
                 {/* Preview side by side */}
@@ -216,21 +271,20 @@ export default function UploadPage() {
                     <div className="stroke-ink" style={{ background: "#fff", overflow: "hidden" }}>
                       {previewUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={previewUrl} alt="Ảnh manga gốc" style={{ width: "100%", height: 280, objectFit: "cover", display: "block" }}/>
+                        <img src={previewUrl} alt="Ảnh manga gốc" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}/>
                       ) : (
-                        <MangaPage w={280} h={280} panels="default" showBubbles={true} showOverlay={false}/>
+                        <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
                       )}
                     </div>
                   </div>
                   <div>
                     <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>◯ YOLOv8 · phát hiện bubble</div>
                     <div className="stroke-ink" style={{ background: "#fff", position: "relative" }}>
-                      <MangaPage w={280} h={280} panels="default" showBubbles={true} showOverlay={false}/>
-                      <svg viewBox="0 0 280 280" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+                      <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
+                      <svg viewBox="0 0 280 200" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
                         <rect x="18" y="18" width="90" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
                         <rect x="18" y="135" width="90" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
                         <rect x="148" y="135" width="80" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
-                        {/* confidence labels */}
                         <text x="112" y="16" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.96</text>
                         <text x="112" y="133" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.91</text>
                         <text x="232" y="133" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.88</text>
@@ -250,7 +304,7 @@ export default function UploadPage() {
                       <div style={{
                         width: 22, height: 22, borderRadius: "50%",
                         border: "2px solid var(--border)",
-                        background: s.done ? "var(--accent)" : s.active ? "transparent" : "transparent",
+                        background: s.done ? "var(--accent)" : "transparent",
                         color: "#fff",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         flexShrink: 0,
@@ -283,14 +337,24 @@ export default function UploadPage() {
                   <Icon name="check" size={40} stroke={3}/>
                 </div>
                 <div className="display" style={{ fontSize: 28 }}>Xử lý hoàn tất!</div>
-                <div style={{ color: "var(--fg-soft)", marginTop: 8 }}>{fileName} · 3 bubbles dịch thành công</div>
+                <div style={{ color: "var(--fg-soft)", marginTop: 8 }}>{fileName}</div>
+                {pageId && (
+                  <div className="mono" style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>
+                    page_id: {pageId}
+                  </div>
+                )}
                 <div style={{ display: "flex", gap: 12, marginTop: 28 }}>
-                  <Link href="/reader">
+                  <Link href={pageId ? `/reader?page=${pageId}` : "/reader"}>
                     <button className="btn btn-primary" style={{ padding: "14px 28px" }}>
                       <Icon name="book" size={14}/> Đọc bản dịch
                     </button>
                   </Link>
-                  <button className="btn" onClick={() => { setState("idle"); setFileName(null); setFileSize(null); setPreviewUrl(null); }}>
+                  <Link href={pageId ? `/qa?page=${pageId}` : "/qa"}>
+                    <button className="btn" style={{ padding: "14px 28px" }}>
+                      <Icon name="sparkle" size={14}/> Hỏi AI
+                    </button>
+                  </Link>
+                  <button className="btn" onClick={resetUpload}>
                     <Icon name="upload" size={14}/> Tải file khác
                   </button>
                 </div>
@@ -309,12 +373,12 @@ export default function UploadPage() {
                 }}>
                   <Icon name="alert" size={38}/>
                 </div>
-                <div className="display" style={{ fontSize: 24, color: "var(--accent)" }}>Không thể xử lý file</div>
+                <div className="display" style={{ fontSize: 24, color: "var(--accent)" }}>Không thể xử lý</div>
                 <div style={{ color: "var(--fg-soft)", marginTop: 8, maxWidth: 400 }}>
-                  File không hợp lệ (cần JPG/PNG/WEBP, tối đa 20MB) hoặc Manga-OCR không nhận diện được text.
+                  {errorMsg || "File không hợp lệ hoặc xảy ra lỗi trong quá trình xử lý."}
                 </div>
                 <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-                  <button className="btn" onClick={() => setState("idle")}>
+                  <button className="btn" onClick={resetUpload}>
                     <Icon name="refresh" size={14}/> Thử lại
                   </button>
                   <button className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>
@@ -405,8 +469,9 @@ export default function UploadPage() {
 
             {/* Tip box */}
             <div className="stroke-ink" style={{ background: "var(--bg-2)", padding: 16 }}>
-              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                <Icon name="sparkle" size={16} style={{ flexShrink: 0, marginTop: 1 } as React.CSSProperties}/>
+                <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ flexShrink: 0, marginTop: 1 }}><Icon name="sparkle" size={16}/></div>
+
                 <div style={{ fontSize: 12, color: "var(--fg-soft)", lineHeight: 1.6 }}>
                   <strong>Mẹo:</strong> Với chương nhiều trang, dùng{" "}
                   <Link href="/batch" style={{ color: "var(--accent)", fontWeight: 700 }}>Batch Upload</Link>{" "}
@@ -415,16 +480,24 @@ export default function UploadPage() {
               </div>
             </div>
 
-            {/* Quota indicator */}
+            {/* API Status indicator */}
             <div className="stroke-ink" style={{ background: "var(--panel)", padding: 16 }}>
-              <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 8 }}>Gemini API Quota</div>
-              <div style={{ height: 8, background: "var(--bg-2)", border: "1px solid var(--border)", marginBottom: 6 }}>
-                <div style={{ width: "34%", height: "100%", background: "var(--jade)" }}/>
+              <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 8 }}>Kết nối API</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: state === "error" ? "var(--accent)" : "var(--jade)",
+                  boxShadow: `0 0 6px ${state === "error" ? "var(--accent)" : "var(--jade)"}`,
+                }}/>
+                <span style={{ color: "var(--fg-soft)" }}>
+                  {state === "error" ? "Mất kết nối" : "Kết nối ổn định"}
+                </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
-                <span>158 / 500 RPD used</span>
-                <span style={{ color: "var(--jade)", fontWeight: 700 }}>OK</span>
-              </div>
+              {pageId && (
+                <div className="mono" style={{ fontSize: 10, color: "var(--muted)", marginTop: 8 }}>
+                  batch: {batchId?.slice(0, 8)}…
+                </div>
+              )}
             </div>
           </div>
         </div>
