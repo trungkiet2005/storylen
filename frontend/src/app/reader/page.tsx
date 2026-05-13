@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { TopBar } from '@/components/TopBar';
 import { Icon } from '@/components/Icons';
@@ -10,6 +10,7 @@ import {
   getBatchStatus,
   getTranslationHistory,
   updateBubbleTranslation,
+  askQuestion,
   PageData,
   PageStatus,
   BubbleData,
@@ -22,7 +23,13 @@ import { AnimatedPage } from '@/components/Animations';
 
 type ViewMode = "overlay" | "sidebyside" | "tap";
 
-
+interface ChatMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  sources?: { ch: number; p: number; score: number }[];
+  isError?: boolean;
+}
 
 // ── Overlay bubble renderer using real bbox data ────────────────────────────
 function BubbleOverlays({
@@ -60,35 +67,33 @@ function BubbleOverlays({
           const rwScaled = w * scaleX;
           const rhScaled = h * scaleY;
 
-          // Detect if bubble spans most of the screen (usually fallback)
           const isGiant = (w * h) >= (imageW * imageH * 0.8);
 
           if (mode === "overlay") {
             return (
-              <motion.g 
-                key={`${i}-overlay`} 
+              <motion.g
+                key={`${i}-overlay`}
                 style={{ pointerEvents: "auto", transformOrigin: `${rx + rwScaled/2}px ${ry + rhScaled/2}px` }}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 260, 
+                transition={{
+                  type: "spring",
+                  stiffness: 260,
                   damping: 20,
-                  delay: i * 0.05 // Slight sequential cascade
+                  delay: i * 0.05
                 }}
               >
-                {/* Background overlay - make transparent if giant fallback so it doesn't hide image */}
                 {!isGiant ? (
                   <rect x={rx} y={ry} width={rwScaled} height={rhScaled} fill="white" stroke="#111" strokeWidth="1.5" rx="4" />
                 ) : (
                   <rect x={rx} y={ry} width={rwScaled} height={rhScaled} fill="rgba(255,255,255,0.2)" stroke="rgba(255,0,0,0.5)" strokeWidth="2" strokeDasharray="5 5" rx="4" />
                 )}
-                
-                <foreignObject 
-                  x={isGiant ? rx + 20 : rx + 2} 
-                  y={isGiant ? ry + 20 : ry + 2} 
-                  width={isGiant ? rwScaled - 40 : rwScaled - 4} 
+
+                <foreignObject
+                  x={isGiant ? rx + 20 : rx + 2}
+                  y={isGiant ? ry + 20 : ry + 2}
+                  width={isGiant ? rwScaled - 40 : rwScaled - 4}
                   height={isGiant ? rhScaled - 40 : rhScaled - 4}
                 >
                   <div
@@ -97,8 +102,8 @@ function BubbleOverlays({
                       fontSize: isGiant ? 18 : Math.min(32, Math.max(10, rhScaled * 0.35)),
                       fontFamily: "var(--font-serif)",
                       fontWeight: 600,
-                      display: "flex", 
-                      alignItems: isGiant ? "flex-start" : "center", 
+                      display: "flex",
+                      alignItems: isGiant ? "flex-start" : "center",
                       justifyContent: isGiant ? "center" : "center",
                       textAlign: "center",
                       color: isGiant ? "#d00" : "#111",
@@ -136,14 +141,13 @@ function BubbleOverlays({
           return null;
         })}
 
-        {/* Tap mode: selected bubble tooltip */}
         {mode === "tap" && selected !== null && bubbles[selected] && (() => {
           const b = bubbles[selected];
           const [x, y, , h] = b.bbox;
           const rx = x * scaleX;
           const ry = (y + h) * scaleY + 4;
           return (
-            <motion.foreignObject 
+            <motion.foreignObject
               key="tooltip"
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -178,11 +182,11 @@ function ReaderContent() {
   const pageIdParam = searchParams.get("page");
 
   const [mode, setMode] = useState<ViewMode>("overlay");
-
   const [selected, setSelected] = useState<number | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [zoom, setZoom] = useState(1.0);
   const [showContext, setShowContext] = useState(true);
+  const [contextTab, setContextTab] = useState<"info" | "chat">("chat");
   const mainRef = useRef<HTMLDivElement>(null);
 
   // Real page data from API
@@ -193,13 +197,18 @@ function ReaderContent() {
   const [openHistoryBubbleId, setOpenHistoryBubbleId] = useState<string | null>(null);
   const [historyByBubble, setHistoryByBubble] = useState<Record<string, TranslationHistoryItem[]>>({});
   const [historyLoadingBubbleId, setHistoryLoadingBubbleId] = useState<string | null>(null);
-  
-  // Capture actual image dimensions to calculate scaling accurately
+
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
-  // Batch processing support for multiple pages
+  // Batch processing support
   const [batchPages, setBatchPages] = useState<PageStatus[]>([]);
   const batchId = pageData?.metadata?.batch_id;
+
+  // AI Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!batchId) {
@@ -224,7 +233,7 @@ function ReaderContent() {
   useEffect(() => {
     if (!pageIdParam) return;
     setIsLoadingPage(true);
-    setImgNaturalSize(null); // reset for new page
+    setImgNaturalSize(null);
     getPage(pageIdParam)
       .then(data => {
         setPageData(data);
@@ -243,6 +252,17 @@ function ReaderContent() {
       })
       .finally(() => setIsLoadingPage(false));
   }, [pageIdParam, toast]);
+
+  // Reset chat when navigating to a new page
+  useEffect(() => {
+    setChatMessages([]);
+    setChatInput("");
+  }, [pageIdParam]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages.length, isChatLoading]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -269,10 +289,8 @@ function ReaderContent() {
   useEffect(() => setSelected(null), [pageIdParam]);
 
   const CANVAS_W = 520;
-  // Dynamically compute canvas height from image aspect ratio to avoid letterboxing disconnect
   const computedHeight = imgNaturalSize ? CANVAS_W * (imgNaturalSize.h / imgNaturalSize.w) : 740;
-  
-  // Sidebar side-by-side fixed width
+
   const SIDE_W = 360;
   const computedSideH = imgNaturalSize ? SIDE_W * (imgNaturalSize.h / imgNaturalSize.w) : 520;
   const translatedImageUrl = pageData?.translated_image_url || null;
@@ -343,6 +361,44 @@ function ReaderContent() {
     }
   };
 
+  const sendChat = useCallback(async (text?: string) => {
+    const q = (text ?? chatInput).trim();
+    if (!q || isChatLoading) return;
+
+    setChatInput("");
+    setIsChatLoading(true);
+    setChatMessages(prev => [...prev, { id: Date.now(), role: "user", content: q }]);
+
+    try {
+      const response = await askQuestion({
+        question: q,
+        page_id: pageIdParam ?? undefined,
+      });
+
+      const sources = (response.source_chunks ?? []).map((chunk: string) => {
+        const match = chunk.match(/ch(\d+).*p(\d+)/i);
+        return match ? { ch: parseInt(match[1]), p: parseInt(match[2]), score: 0.9 } : null;
+      }).filter(Boolean) as { ch: number; p: number; score: number }[];
+
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        role: "assistant",
+        content: response.answer,
+        sources,
+      }]);
+    } catch (err) {
+      const msg = err instanceof APIError ? err.message : "Đã xảy ra lỗi khi trả lời.";
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 2,
+        role: "assistant",
+        content: msg,
+        isError: true,
+      }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  }, [chatInput, isChatLoading, pageIdParam]);
+
   return (
     <AnimatedPage>
     <div style={{ height: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -352,14 +408,14 @@ function ReaderContent() {
 
         {/* ── Left Rail: Dynamic Thumbnails ── */}
         {hasMultiplePages && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="scroll"
-            style={{ 
-              width: 72, background: "var(--panel)", 
-              borderRight: "2.5px solid var(--border)", 
-              display: "flex", flexDirection: "column", 
+            style={{
+              width: 72, background: "var(--panel)",
+              borderRight: "2.5px solid var(--border)",
+              display: "flex", flexDirection: "column",
               alignItems: "center", gap: 12, padding: "20px 0",
               overflowY: "auto"
             }}
@@ -368,11 +424,11 @@ function ReaderContent() {
               const isCurrent = p.page_id === pageIdParam;
               return (
                 <Link key={p.page_id} href={`/reader?page=${p.page_id}`}>
-                  <motion.div 
+                  <motion.div
                     whileHover={{ scale: 1.08, rotate: isCurrent ? 0 : -1 }}
                     whileTap={{ scale: 0.95 }}
-                    style={{ 
-                      position: "relative", width: 48, height: 68, 
+                    style={{
+                      position: "relative", width: 48, height: 68,
                       border: isCurrent ? "3px solid var(--accent)" : "2px solid var(--border)",
                       background: "#fff", cursor: "pointer", overflow: "hidden",
                       boxShadow: isCurrent ? "4px 4px 0 var(--accent)" : "2px 2px 0 var(--border)",
@@ -477,7 +533,7 @@ function ReaderContent() {
           {/* Loading state */}
           <AnimatePresence mode="wait">
             {isLoadingPage ? (
-              <motion.div 
+              <motion.div
                 key="loading"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -488,7 +544,7 @@ function ReaderContent() {
                 <span style={{ fontSize: 13, color: "var(--muted)" }}>Đang tải dữ liệu trang…</span>
               </motion.div>
             ) : (
-              <motion.div 
+              <motion.div
                 key={pageIdParam || "no-page"}
                 initial={{ opacity: 0, y: 15, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -503,9 +559,9 @@ function ReaderContent() {
                         <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: SIDE_W, height: computedSideH, position: "relative" }}>
                           {pageData?.original_image_url ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
-                            <img 
-                              src={pageData.original_image_url} 
-                              alt="Ảnh gốc" 
+                            <img
+                              src={pageData.original_image_url}
+                              alt="Ảnh gốc"
                               style={{ width: "100%", height: "100%", display: "block" }}
                               onLoad={(e) => {
                                 if (!imgNaturalSize) {
@@ -557,7 +613,6 @@ function ReaderContent() {
                           <MangaPage w={CANVAS_W} h={computedHeight} panels="default" showBubbles showOverlay={mode === "overlay" && showOverlay} overlayLang="vn"/>
                         )}
 
-                        {/* Real bubble overlays */}
                         {pageData && imgNaturalSize && (mode === "tap" || (mode === "overlay" && showOverlay && !translatedImageUrl)) && (
                           <BubbleOverlays
                             bubbles={pageData.processed_data}
@@ -576,7 +631,7 @@ function ReaderContent() {
 
           {/* ── Bottom Navigation (conditional) ── */}
           {hasMultiplePages && currentPageIdx !== -1 && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
@@ -613,7 +668,7 @@ function ReaderContent() {
           )}
 
           {/* Keyboard hint */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -628,142 +683,295 @@ function ReaderContent() {
         {/* ── Context Panel ── */}
         <AnimatePresence>
           {showContext && (
-            <motion.div 
-              className="scroll" 
+            <motion.div
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 30 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              style={{ 
-                background: "var(--bg-2)", 
-                borderLeft: "2px solid var(--border)", 
-                padding: 20, 
-                overflowY: "auto",
-                minWidth: 320
+              style={{
+                background: "var(--bg-2)",
+                borderLeft: "2px solid var(--border)",
+                minWidth: 320,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                <span className="caps-sm" style={{ color: "var(--accent)" }}>Ngữ cảnh · Context</span>
-                <button className="btn btn-sm btn-ghost" style={{ padding: 4 }} onClick={() => setShowContext(false)} aria-label="Đóng panel ngữ cảnh">
-                  <Icon name="x" size={13}/>
-                </button>
-              </div>
+              {/* Panel header + tabs */}
+              <div style={{ padding: "20px 20px 0", flexShrink: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span className="caps-sm" style={{ color: "var(--accent)" }}>Ngữ cảnh · Context</span>
+                  <button className="btn btn-sm btn-ghost" style={{ padding: 4 }} onClick={() => setShowContext(false)} aria-label="Đóng panel ngữ cảnh">
+                    <Icon name="x" size={13}/>
+                  </button>
+                </div>
 
-
-
-              {/* Real bubble data stats */}
-              <div className="stroke-ink" style={{ background: "var(--panel)", padding: 12, marginBottom: 16 }}>
-                <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>Thống kê trang</div>
-                {[
-                  ["Bubbles detected", pageData ? String(pageData.processed_data.length) : "—"],
-                  ["OCR confidence", pageData ? `${Math.round((pageData.processed_data.reduce((a, b) => a + b.confidence, 0) / Math.max(1, pageData.processed_data.length)) * 100)}%` : "—"],
-                  ["Translation", pageData ? "ai_module" : "—"],
-                  ["Chunks indexed", pageData ? String(pageData.processed_data.length) : "—"],
-                ].map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "3px 0" }}>
-                    <span style={{ color: "var(--muted)" }}>{k}</span>
-                    <span className="mono" style={{ fontWeight: 700 }}>{v}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Translation edits */}
-              <div style={{ marginBottom: 16 }}>
-                <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 8 }}>Sửa bản dịch</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {(pageData?.processed_data || []).map((bubble, index) => {
-                    const history = historyByBubble[bubble.bubble_id] || [];
-                    const isHistoryOpen = openHistoryBubbleId === bubble.bubble_id;
-                    const isSaving = savingBubbleId === bubble.bubble_id;
-                    const isHistoryLoading = historyLoadingBubbleId === bubble.bubble_id;
-
-                    return (
-                      <div key={bubble.bubble_id} className="stroke-ink" style={{ background: "var(--panel)", padding: 10 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-                          <span className="mono" style={{ fontSize: 11, fontWeight: 800 }}>#{index + 1}</span>
-                          <button
-                            className="btn btn-sm btn-ghost"
-                            style={{ padding: "3px 6px", fontSize: 11 }}
-                            onClick={() => toggleTranslationHistory(bubble)}
-                            aria-label="Xem lịch sử sửa dịch"
-                          >
-                            <Icon name="history" size={12}/> {isHistoryOpen ? "Ẩn" : "Lịch sử"}
-                          </button>
-                        </div>
-
-                        <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, marginBottom: 8 }}>
-                          {bubble.original_text || "Không có OCR gốc"}
-                        </div>
-
-                        <textarea
-                          value={editTexts[bubble.bubble_id] ?? bubble.translated_text}
-                          onChange={(event) => setEditTexts((current) => ({
-                            ...current,
-                            [bubble.bubble_id]: event.target.value,
-                          }))}
-                          rows={3}
-                          style={{
-                            width: "100%",
-                            resize: "vertical",
-                            border: "1.5px solid var(--border)",
-                            background: "#fff",
-                            color: "var(--fg)",
-                            padding: 8,
-                            fontSize: 12,
-                            lineHeight: 1.4,
-                            fontFamily: "var(--font-serif)",
-                            boxSizing: "border-box",
-                          }}
-                        />
-
-                        <button
-                          className="btn btn-sm btn-primary"
-                          style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
-                          disabled={isSaving}
-                          onClick={() => saveTranslation(bubble)}
-                        >
-                          <Icon name="check" size={13}/> {isSaving ? "Đang lưu..." : "Lưu bản sửa"}
-                        </button>
-
-                        {isHistoryOpen && (
-                          <div style={{ borderTop: "1px solid var(--border-soft)", marginTop: 10, paddingTop: 8 }}>
-                            {isHistoryLoading ? (
-                              <div style={{ fontSize: 11, color: "var(--muted)" }}>Đang tải lịch sử...</div>
-                            ) : history.length ? (
-                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                {history.map((item) => (
-                                  <div key={item.translation_id} style={{ fontSize: 11, lineHeight: 1.45 }}>
-                                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, color: "var(--muted)", marginBottom: 2 }}>
-                                      <span>{item.username || (item.llm_model_used === "user_edit" ? "User" : "AI")}</span>
-                                      <span className="mono">{new Date(item.translated_at).toLocaleString("vi-VN")}</span>
-                                    </div>
-                                    <div style={{ background: "var(--bg)", border: "1px solid var(--border-soft)", padding: 6 }}>
-                                      {item.translated_text}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div style={{ fontSize: 11, color: "var(--muted)" }}>Chưa có lịch sử sửa dịch.</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                {/* Tab switcher */}
+                <div style={{ display: "flex", border: "1.5px solid var(--border)", marginBottom: 14 }}>
+                  {([
+                    { id: "info", label: "Ngữ cảnh", icon: null },
+                    { id: "chat", label: "Hỏi AI", icon: "sparkle" },
+                  ] as { id: "info" | "chat"; label: string; icon: string | null }[]).map((tab, i) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setContextTab(tab.id)}
+                      style={{
+                        flex: 1,
+                        padding: "7px 10px",
+                        background: contextTab === tab.id ? "var(--accent)" : "transparent",
+                        color: contextTab === tab.id ? "#fff" : "var(--fg)",
+                        border: "none",
+                        borderLeft: i > 0 ? "1.5px solid var(--border)" : "none",
+                        fontSize: 11, fontWeight: 700, cursor: "pointer",
+                        transition: "background 0.15s, color 0.15s",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                      }}
+                    >
+                      {tab.icon && <Icon name={tab.icon} size={11}/>}
+                      {tab.label}
+                      {tab.id === "chat" && chatMessages.length > 0 && (
+                        <span style={{
+                          background: contextTab === "chat" ? "rgba(255,255,255,0.3)" : "var(--accent)",
+                          color: contextTab === "chat" ? "#fff" : "#fff",
+                          borderRadius: 999, fontSize: 9, fontWeight: 800,
+                          padding: "1px 5px", lineHeight: 1.4,
+                        }}>
+                          {chatMessages.filter(m => m.role === "assistant").length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Q&A CTA */}
-              <Link href={pageIdParam ? `/qa?page=${pageIdParam}` : "/qa"} style={{ textDecoration: "none" }}>
-                <motion.button 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="btn btn-primary" style={{ width: "100%", justifyContent: "center" }}
-                >
-                  <Icon name="sparkle" size={14}/> Hỏi AI về trang này
-                </motion.button>
-              </Link>
+              {/* Info tab */}
+              {contextTab === "info" ? (
+                <div className="scroll" style={{ flex: 1, overflowY: "auto", padding: "0 20px 20px" }}>
+                  {/* Bubble stats */}
+                  <div className="stroke-ink" style={{ background: "var(--panel)", padding: 12, marginBottom: 16 }}>
+                    <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>Thống kê trang</div>
+                    {[
+                      ["Bubbles detected", pageData ? String(pageData.processed_data.length) : "—"],
+                      ["OCR confidence", pageData ? `${Math.round((pageData.processed_data.reduce((a, b) => a + b.confidence, 0) / Math.max(1, pageData.processed_data.length)) * 100)}%` : "—"],
+                      ["Translation", pageData ? "ai_module" : "—"],
+                      ["Chunks indexed", pageData ? String(pageData.processed_data.length) : "—"],
+                    ].map(([k, v]) => (
+                      <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "3px 0" }}>
+                        <span style={{ color: "var(--muted)" }}>{k}</span>
+                        <span className="mono" style={{ fontWeight: 700 }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Translation edits */}
+                  <div>
+                    <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 8 }}>Sửa bản dịch</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {(pageData?.processed_data || []).map((bubble, index) => {
+                        const history = historyByBubble[bubble.bubble_id] || [];
+                        const isHistoryOpen = openHistoryBubbleId === bubble.bubble_id;
+                        const isSaving = savingBubbleId === bubble.bubble_id;
+                        const isHistoryLoading = historyLoadingBubbleId === bubble.bubble_id;
+
+                        return (
+                          <div key={bubble.bubble_id} className="stroke-ink" style={{ background: "var(--panel)", padding: 10 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                              <span className="mono" style={{ fontSize: 11, fontWeight: 800 }}>#{index + 1}</span>
+                              <button
+                                className="btn btn-sm btn-ghost"
+                                style={{ padding: "3px 6px", fontSize: 11 }}
+                                onClick={() => toggleTranslationHistory(bubble)}
+                                aria-label="Xem lịch sử sửa dịch"
+                              >
+                                <Icon name="history" size={12}/> {isHistoryOpen ? "Ẩn" : "Lịch sử"}
+                              </button>
+                            </div>
+
+                            <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, marginBottom: 8 }}>
+                              {bubble.original_text || "Không có OCR gốc"}
+                            </div>
+
+                            <textarea
+                              value={editTexts[bubble.bubble_id] ?? bubble.translated_text}
+                              onChange={(event) => setEditTexts((current) => ({
+                                ...current,
+                                [bubble.bubble_id]: event.target.value,
+                              }))}
+                              rows={3}
+                              style={{
+                                width: "100%",
+                                resize: "vertical",
+                                border: "1.5px solid var(--border)",
+                                background: "#fff",
+                                color: "var(--fg)",
+                                padding: 8,
+                                fontSize: 12,
+                                lineHeight: 1.4,
+                                fontFamily: "var(--font-serif)",
+                                boxSizing: "border-box",
+                              }}
+                            />
+
+                            <button
+                              className="btn btn-sm btn-primary"
+                              style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
+                              disabled={isSaving}
+                              onClick={() => saveTranslation(bubble)}
+                            >
+                              <Icon name="check" size={13}/> {isSaving ? "Đang lưu..." : "Lưu bản sửa"}
+                            </button>
+
+                            {isHistoryOpen && (
+                              <div style={{ borderTop: "1px solid var(--border-soft)", marginTop: 10, paddingTop: 8 }}>
+                                {isHistoryLoading ? (
+                                  <div style={{ fontSize: 11, color: "var(--muted)" }}>Đang tải lịch sử...</div>
+                                ) : history.length ? (
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                    {history.map((item) => (
+                                      <div key={item.translation_id} style={{ fontSize: 11, lineHeight: 1.45 }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, color: "var(--muted)", marginBottom: 2 }}>
+                                          <span>{item.username || (item.llm_model_used === "user_edit" ? "User" : "AI")}</span>
+                                          <span className="mono">{new Date(item.translated_at).toLocaleString("vi-VN")}</span>
+                                        </div>
+                                        <div style={{ background: "var(--bg)", border: "1px solid var(--border-soft)", padding: 6 }}>
+                                          {item.translated_text}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontSize: 11, color: "var(--muted)" }}>Chưa có lịch sử sửa dịch.</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ── Chat tab ── */
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", padding: "0 20px 16px" }}>
+                  {/* Messages */}
+                  <div className="scroll" style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: 8 }}>
+                    {chatMessages.length === 0 && !isChatLoading && (
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, textAlign: "center", padding: "28px 12px", color: "var(--muted)" }}>
+                        <div style={{ width: 48, height: 48, background: "var(--accent)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", border: "2.5px solid var(--border)", boxShadow: "3px 3px 0 var(--border)", fontFamily: "var(--font-serif)", fontSize: 26, fontWeight: 800, marginBottom: 12 }}>
+                          Q
+                        </div>
+                        <div style={{ fontSize: 13, fontFamily: "var(--font-serif)", color: "var(--fg)", marginBottom: 6 }}>Hỏi AI về trang này</div>
+                        <div style={{ fontSize: 11 }}>AI trả lời dựa trên nội dung đã index</div>
+                      </div>
+                    )}
+
+                    {/* Suggestion chips (empty state) */}
+                    {chatMessages.length === 0 && !isChatLoading && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                        {["Tóm tắt nội dung trang này", "Nhân vật nào xuất hiện trong trang?", "Ý nghĩa đoạn hội thoại này?"].map(q => (
+                          <motion.button
+                            key={q}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.97 }}
+                            onClick={() => sendChat(q)}
+                            style={{
+                              background: "var(--panel)", border: "1.5px solid var(--border-soft)",
+                              padding: "7px 10px", fontSize: 11, textAlign: "left",
+                              cursor: "pointer", color: "var(--fg)", lineHeight: 1.4,
+                              transition: "background 0.1s",
+                            }}
+                          >
+                            {q}
+                          </motion.button>
+                        ))}
+                      </div>
+                    )}
+
+                    <AnimatePresence initial={false}>
+                      {chatMessages.map(msg => (
+                        <motion.div
+                          key={msg.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                          style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "user" ? "flex-end" : "flex-start", gap: 4 }}
+                        >
+                          <div style={{
+                            background: msg.role === "user" ? "var(--accent)" : msg.isError ? "rgba(200,16,46,0.06)" : "#fff",
+                            color: msg.role === "user" ? "#fff" : "var(--fg)",
+                            border: "2px solid var(--border)",
+                            padding: "8px 12px",
+                            fontSize: 12, lineHeight: 1.6,
+                            maxWidth: "92%",
+                            boxShadow: "2px 2px 0 var(--border)",
+                          }}>
+                            {msg.content}
+                          </div>
+                          {msg.sources && msg.sources.length > 0 && (
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {msg.sources.map(src => (
+                                <div key={`${src.ch}-${src.p}`} className="chip" style={{ fontSize: 9, padding: "2px 6px" }}>
+                                  Ch.{src.ch} · P.{src.p}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+
+                    {isChatLoading && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        style={{ display: "flex", gap: 5, padding: "8px 12px", background: "#fff", border: "2px solid var(--border)", width: "fit-content", boxShadow: "2px 2px 0 var(--border)" }}
+                      >
+                        {[0, 0.2, 0.4].map(d => (
+                          <div key={d} style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", animation: `pulse 1.2s ease-in-out ${d}s infinite` }}/>
+                        ))}
+                      </motion.div>
+                    )}
+                    <div ref={chatEndRef}/>
+                  </div>
+
+                  {/* Input composer */}
+                  <div style={{ flexShrink: 0, marginTop: 10 }}>
+                    <div className="stroke-ink-thick" style={{ background: "#fff", padding: "8px 10px", display: "flex", gap: 8, alignItems: "flex-end" }}>
+                      <textarea
+                        value={chatInput}
+                        onChange={e => setChatInput(e.target.value)}
+                        onKeyDown={e => {
+                          if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                            e.preventDefault();
+                            sendChat();
+                          }
+                        }}
+                        placeholder="Hỏi về cốt truyện, nhân vật…"
+                        rows={2}
+                        style={{
+                          flex: 1, border: "none", outline: "none",
+                          resize: "none", fontSize: 12,
+                          fontFamily: "inherit", background: "transparent",
+                          color: "var(--fg)", lineHeight: 1.5,
+                        }}
+                        disabled={isChatLoading}
+                      />
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => sendChat()}
+                        disabled={!chatInput.trim() || isChatLoading}
+                        aria-label="Gửi câu hỏi"
+                        style={{ opacity: (!chatInput.trim() || isChatLoading) ? 0.5 : 1, flexShrink: 0 }}
+                      >
+                        <Icon name="send" size={12}/>
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--muted)", textAlign: "right", marginTop: 4, fontFamily: "var(--font-mono)" }}>
+                      Ctrl+Enter · {pageIdParam ? "RAG thật" : "Demo"}
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

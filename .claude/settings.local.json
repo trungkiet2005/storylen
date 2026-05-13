@@ -11,7 +11,8 @@
       "PowerShell(Set-Location frontend; npx tsc --noEmit 2>&1 | Select-Object -Last 40; \"EXIT=$LASTEXITCODE\")",
       "PowerShell(Get-Location; npx tsc --noEmit 2>&1 | Select-Object -Last 50; \"EXIT=$LASTEXITCODE\")",
       "PowerShell(Set-Location ..\\\\backend; python -m py_compile app/routers/history.py; \"EXIT=$LASTEXITCODE\")",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(grep -E \"\\\\.tsx$\")"
     ]
   }
 }
