@@ -9,7 +9,7 @@ import json
 from functools import lru_cache
 from typing import Any
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -141,7 +141,15 @@ class Settings(BaseSettings):
 
     # ─── Upload constraints ───────────────────────────────────────────────────
     MAX_FILE_SIZE_MB: int = 20
+    # Cap for the whole HTTP request body (covers multi-file uploads).
+    MAX_REQUEST_SIZE_MB: int = 200
     ALLOWED_EXTENSIONS: list[str] | str = ["jpg", "jpeg", "png", "webp"]
+
+    # ─── Rate limits (slowapi syntax: "<count>/<period>") ─────────────────────
+    RATE_LIMIT_LOGIN: str = "10/minute"
+    RATE_LIMIT_REGISTER: str = "5/minute"
+    RATE_LIMIT_UPLOAD: str = "30/minute"
+    RATE_LIMIT_QA: str = "30/minute"
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod
