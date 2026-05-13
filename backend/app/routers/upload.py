@@ -17,10 +17,11 @@ from __future__ import annotations
 import logging
 import json
 import uuid
+from threading import Thread
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.config import get_settings
 from app.database import get_supabase
@@ -85,11 +86,11 @@ def _parse_ai_config(raw: str | None) -> dict[str, str] | None:
     return parsed or None
 
 
-async def _pipeline_task(
+def _pipeline_task(
     page_id: str,
     original_image_url: str,
     ai_config: dict[str, str] | None = None,
-):
+) -> None:
     """
     Background task: calls HF Space AI worker with the Supabase Storage URL.
     HF Space downloads the image directly — no raw bytes transferred.
@@ -100,15 +101,28 @@ async def _pipeline_task(
         logger.exception("Background pipeline error for page %s", page_id)
 
 
+def _start_pipeline_task(
+    page_id: str,
+    original_image_url: str,
+    ai_config: dict[str, str] | None = None,
+) -> None:
+    worker = Thread(
+        target=_pipeline_task,
+        args=(page_id, original_image_url, ai_config),
+        name=f"storylens-pipeline-{page_id[:8]}",
+        daemon=True,
+    )
+    worker.start()
+
+
 @router.post("", response_model=UploadResponse, status_code=202)
 async def upload_manga_images(
-    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
     ai_config: str | None = Form(default=None),
     user: AuthUser = Depends(get_current_user),
 ):
     """
-    Upload one or more manga images (JPG / PNG / WebP, max 10 MB each).
+    Upload one or more manga images (JPG / PNG / WebP).
     Returns page_ids for polling /status/{page_id}.
     """
     if not files:
@@ -190,7 +204,10 @@ async def upload_manga_images(
         page_ids.append(page_id)
 
         # ── Kick off background pipeline (calls HF Space) ─────────────────
-        background_tasks.add_task(_pipeline_task, page_id, original_url, ai_config_data)
+        # Start AI processing outside the request lifecycle. The call can take
+        # minutes, and hosting proxies may keep the upload request open when
+        # Starlette BackgroundTasks are used for long-running work.
+        _start_pipeline_task(page_id, original_url, ai_config_data)
 
     return UploadResponse(
         message=(

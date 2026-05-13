@@ -128,7 +128,7 @@ class Settings(BaseSettings):
         return v
 
     # ─── Upload constraints ───────────────────────────────────────────────────
-    MAX_FILE_SIZE_MB: int = 10
+    MAX_FILE_SIZE_MB: int = 20
     ALLOWED_EXTENSIONS: Annotated[list[str], NoDecode] = ["jpg", "jpeg", "png", "webp"]
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")

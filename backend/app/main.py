@@ -119,3 +119,22 @@ def health():
 @app.get("/", tags=["meta"])
 def root():
     return {"message": f"Welcome to {settings.APP_NAME} {settings.APP_VERSION}"}
+
+
+@app.get(API_PREFIX, tags=["meta"])
+def api_root():
+    return {
+        "message": f"Welcome to {settings.APP_NAME} {settings.APP_VERSION}",
+        "prefix": API_PREFIX,
+        "health": "/health",
+        "docs": "/docs",
+        "endpoints": [
+            f"{API_PREFIX}/upload",
+            f"{API_PREFIX}/status/batch/{{batch_id}}",
+            f"{API_PREFIX}/status/{{page_id}}",
+            f"{API_PREFIX}/page/{{page_id}}",
+            f"{API_PREFIX}/qa",
+            f"{API_PREFIX}/history",
+            f"{API_PREFIX}/auth/me",
+        ],
+    }
