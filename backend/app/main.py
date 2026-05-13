@@ -46,12 +46,37 @@ async def lifespan(app: FastAPI):
     """Validate critical configuration at startup. Fail-fast in production."""
     logger.info("=== %s v%s starting up ===", settings.APP_NAME, settings.APP_VERSION)
 
+    if settings.DEBUG and settings.AUTH_COOKIE_SAMESITE == "none":
+        logger.warning(
+            "AUTH_COOKIE_SAMESITE=none is set while DEBUG=True. "
+            "Ensure AUTH_COOKIE_SECURE=True before deploying to production."
+        )
+
     # Validate Supabase connectivity
     try:
         from app.database import get_supabase
         sb = get_supabase()
         sb.table("manga_pages").select("page_id").limit(1).execute()
         logger.info("Supabase connection OK")
+
+        # Pages left in a mid-pipeline state from the previous container run will
+        # never progress — the daemon threads that drove them are gone. Mark them
+        # failed immediately so the frontend doesn't wait forever.
+        stale_statuses = ["pending", "ocr_running", "translating"]
+        result = (
+            sb.table("manga_pages")
+            .update({
+                "status": "failed",
+                "error": "Tiến trình bị gián đoạn khi server khởi động lại.",
+                "progress": 0,
+            })
+            .in_("status", stale_statuses)
+            .execute()
+        )
+        stale_count = len(result.data) if result.data else 0
+        if stale_count:
+            logger.warning("Marked %d stale in-progress page(s) as failed on startup.", stale_count)
+
     except Exception as exc:
         logger.error("Supabase connection FAILED: %s", exc)
         if not settings.DEBUG:

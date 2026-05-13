@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import json
 import uuid
-from threading import Thread
+from threading import BoundedSemaphore, Thread
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -52,6 +52,10 @@ _EXT_TO_MIME = {
 }
 
 MAX_BYTES = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+
+# Semaphore caps concurrent background translation threads so a burst of uploads
+# cannot spawn unbounded threads and saturate the ai_module / OOM the process.
+_pipeline_semaphore = BoundedSemaphore(settings.MAX_PIPELINE_CONCURRENCY)
 
 
 def _resolve_content_type(upload: UploadFile) -> str | None:
@@ -108,9 +112,30 @@ def _start_pipeline_task(
     original_image_url: str,
     ai_config: dict[str, str] | None = None,
 ) -> None:
+    def _guarded() -> None:
+        # Block until a slot is free (timeout prevents thread leaking if semaphore
+        # is permanently exhausted, e.g. during a stuck-thread incident).
+        acquired = _pipeline_semaphore.acquire(blocking=True, timeout=300)
+        if not acquired:
+            logger.error(
+                "Pipeline semaphore timeout for page %s — too many concurrent jobs", page_id
+            )
+            from app.models.schemas import ProcessingStatus
+            from app.services.ai_pipeline import _update_status
+            _update_status(
+                page_id,
+                ProcessingStatus.FAILED,
+                0,
+                error="Server đang quá tải. Vui lòng thử lại sau.",
+            )
+            return
+        try:
+            _pipeline_task(page_id, original_image_url, ai_config)
+        finally:
+            _pipeline_semaphore.release()
+
     worker = Thread(
-        target=_pipeline_task,
-        args=(page_id, original_image_url, ai_config),
+        target=_guarded,
         name=f"storylens-pipeline-{page_id[:8]}",
         daemon=True,
     )

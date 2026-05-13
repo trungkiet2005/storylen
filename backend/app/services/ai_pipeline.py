@@ -95,6 +95,18 @@ def process_page(
         List of BubbleResult for the processed page.
     """
     supabase = get_supabase()
+
+    # Guard: the user may have deleted the page (or their account) while this
+    # thread was waiting in the semaphore queue. Skip silently to avoid writing
+    # orphaned bubble_data / translation_history rows.
+    try:
+        check = supabase.table("manga_pages").select("page_id").eq("page_id", page_id).execute()
+        if not check.data:
+            logger.info("Page %s no longer exists — skipping pipeline", page_id)
+            return []
+    except Exception as exc:
+        logger.warning("Could not verify existence of page %s: %s", page_id, exc)
+
     translator_name = (
         ai_config.get("translator")
         if isinstance(ai_config, dict) and isinstance(ai_config.get("translator"), str)

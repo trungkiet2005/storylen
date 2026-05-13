@@ -149,6 +149,11 @@ class Settings(BaseSettings):
     MAX_REQUEST_SIZE_MB: int = 200
     ALLOWED_EXTENSIONS: list[str] | str = ["jpg", "jpeg", "png", "webp"]
 
+    # ─── Pipeline concurrency ─────────────────────────────────────────────────
+    # Max background translation threads running simultaneously.
+    # Prevents self-DDoS when many files are uploaded at once.
+    MAX_PIPELINE_CONCURRENCY: int = 10
+
     # ─── Rate limits (slowapi syntax: "<count>/<period>") ─────────────────────
     RATE_LIMIT_LOGIN: str = "10/minute"
     RATE_LIMIT_REGISTER: str = "5/minute"

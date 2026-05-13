@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import logging
 import base64
+import threading
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -21,6 +23,49 @@ _HTTP_TIMEOUT = httpx.Timeout(connect=15.0, read=600.0, write=30.0, pool=5.0)
 _OPTIONS_TIMEOUT = httpx.Timeout(connect=2.0, read=4.0, write=2.0, pool=2.0)
 _MAX_RETRIES = 2
 _RETRY_DELAY_SEC = 3.0
+
+# ─── Simple circuit breaker ───────────────────────────────────────────────────
+# After _CB_THRESHOLD consecutive terminal failures the breaker opens and fast-
+# fails all callers for _CB_COOLDOWN_SEC seconds. This prevents a down ai_module
+# from pinning every upload thread for up to 20 minutes each.
+_CB_THRESHOLD = 5
+_CB_COOLDOWN_SEC = 120
+
+_cb_lock = threading.Lock()
+_cb_failures = 0
+_cb_open_until: datetime | None = None
+
+
+def _cb_check() -> None:
+    """Raise immediately if the circuit is open."""
+    with _cb_lock:
+        if _cb_open_until and datetime.now(timezone.utc) < _cb_open_until:
+            raise RuntimeError(
+                f"ai_module circuit breaker is open until {_cb_open_until.isoformat()} "
+                f"(too many consecutive failures). Retry later."
+            )
+
+
+def _cb_record_failure() -> None:
+    global _cb_failures, _cb_open_until
+    with _cb_lock:
+        _cb_failures += 1
+        if _cb_failures >= _CB_THRESHOLD:
+            _cb_open_until = datetime.now(timezone.utc) + timedelta(seconds=_CB_COOLDOWN_SEC)
+            logger.warning(
+                "ai_module circuit breaker OPEN for %ds after %d consecutive failures.",
+                _CB_COOLDOWN_SEC,
+                _cb_failures,
+            )
+
+
+def _cb_record_success() -> None:
+    global _cb_failures, _cb_open_until
+    with _cb_lock:
+        if _cb_failures or _cb_open_until:
+            logger.info("ai_module circuit breaker CLOSED (success after failures).")
+        _cb_failures = 0
+        _cb_open_until = None
 
 _FALLBACK_TRANSLATORS = [
     "google",
@@ -180,6 +225,8 @@ def call_translate(
       "rendered_image_bytes": PNG bytes returned directly by ai_module.
     }
     """
+    _cb_check()  # fail-fast if circuit is open
+
     payload = {
         "image": image_url,
         "config": _translation_config(config_override),
@@ -225,6 +272,7 @@ def call_translate(
                         "confidence": item.get("confidence") or 0.0,
                     })
 
+                _cb_record_success()
                 return {
                     "bubbles": bubbles,
                     "rendered_image_url": None,
@@ -243,6 +291,7 @@ def call_translate(
                         headers=headers,
                     )
                 image_resp.raise_for_status()
+                _cb_record_success()
                 return {
                     "bubbles": [],
                     "rendered_image_url": None,
@@ -283,6 +332,7 @@ def call_translate(
                 page_id,
                 exc.response.text[:500],
             )
+            _cb_record_failure()
             raise RuntimeError(
                 f"ai_module returned HTTP {exc.response.status_code}"
             ) from exc
@@ -290,6 +340,7 @@ def call_translate(
         if attempt < _MAX_RETRIES:
             time.sleep(_RETRY_DELAY_SEC)
 
+    _cb_record_failure()
     raise RuntimeError(
         f"ai_module /translate/image failed after {_MAX_RETRIES} attempts: {last_exc}"
     ) from last_exc

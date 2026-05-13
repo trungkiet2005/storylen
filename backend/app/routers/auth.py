@@ -196,8 +196,6 @@ def _supabase_auth_url(settings: Settings, path: str) -> str:
 
 def _friendly_auth_error(payload: dict[str, Any], fallback: str) -> str:
     code = payload.get("error_code") or payload.get("code") or payload.get("error")
-    raw_message = payload.get("msg") or payload.get("message") or payload.get("error_description")
-
     messages = {
         "invalid_credentials": "Email hoặc mật khẩu không đúng.",
         "email_not_confirmed": "Email chưa được xác thực. Vui lòng kiểm tra hộp thư trước khi đăng nhập.",
@@ -208,7 +206,9 @@ def _friendly_auth_error(payload: dict[str, Any], fallback: str) -> str:
         "over_email_send_rate_limit": "Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút.",
         "over_request_rate_limit": "Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút.",
     }
-    return messages.get(str(code), str(raw_message or fallback))
+    # Never forward raw Supabase messages — they may contain PII (email addresses,
+    # internal error descriptions). Fall back to the caller-supplied generic message.
+    return messages.get(str(code), fallback)
 
 
 def _raise_auth_error(exc: httpx.HTTPStatusError, fallback: str) -> None:

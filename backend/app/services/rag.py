@@ -88,8 +88,29 @@ class _GeminiPool:
         self._ensure_initialized()
         return len(self._clients)
 
+    def reload(self) -> int:
+        """Re-read GEMINI_API_KEY from the environment and rebuild the client pool.
+        Useful when keys are rotated without a full service restart."""
+        import os
+        with self._lock:
+            raw = os.environ.get("GEMINI_API_KEY", "")
+            if not raw:
+                # Fall back to cached settings value
+                raw = settings.GEMINI_API_KEY
+            keys = [k.strip() for k in raw.split(",") if k.strip()]
+            self._clients = [genai.Client(api_key=k) for k in keys]
+            self._iterator = itertools.cycle(self._clients) if self._clients else None
+            self._initialized = bool(self._clients)
+            logger.info("Gemini pool reloaded: %d key(s).", len(self._clients))
+            return len(self._clients)
+
 
 _pool = _GeminiPool()
+
+
+def reload_gemini_pool() -> int:
+    """Public helper called by the admin endpoint."""
+    return _pool.reload()
 
 
 def _is_retryable_gemini_key_error(exc: Exception) -> bool:

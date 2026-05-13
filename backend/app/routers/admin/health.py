@@ -80,3 +80,20 @@ def get_admin_health(_admin: AuthUser = Depends(get_current_admin)) -> AdminHeal
         services=services,
         checked_at=datetime.now(timezone.utc).isoformat(),
     )
+
+
+class GeminiReloadResponse(BaseModel):
+    keys_loaded: int
+    message: str
+
+
+@router.post("/gemini/reload", response_model=GeminiReloadResponse)
+def reload_gemini_keys(_admin: AuthUser = Depends(get_current_admin)) -> GeminiReloadResponse:
+    """Re-read GEMINI_API_KEY from env and rebuild the Gemini client pool.
+    Call this after rotating API keys without restarting the service."""
+    from app.services.rag import reload_gemini_pool
+    count = reload_gemini_pool()
+    return GeminiReloadResponse(
+        keys_loaded=count,
+        message=f"Gemini pool reloaded with {count} key(s).",
+    )
