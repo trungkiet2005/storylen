@@ -264,134 +264,136 @@ function MangaPipelineShowcase() {
 
 function FloatingMangaStack() {
   return (
-    <motion.div 
-      className="hero-mockup-wrapper"
-      initial={{ opacity: 0, x: 30 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 1, delay: 0.5 }}
-    >
-      <motion.div
-        animate={{ 
-          y: [0, -12, 0],
-        }}
-        transition={{
-          duration: 6,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    <div className="hero-mockup-wrapper">
+      <motion.div 
+        initial={{ opacity: 0, x: 30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 1, delay: 0.5 }}
+        style={{ width: '100%', height: '100%' }}
       >
-        {/* Decorative Circle Seal Behind */}
         <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ repeat: Infinity, duration: 30, ease: "linear" }}
-          style={{
-            position: "absolute",
-            width: 200, height: 200,
-            border: "1.5px dashed var(--border-soft)",
-            borderRadius: "50%",
-            opacity: 0.4,
-            top: 30, right: 30,
-            zIndex: 1
+          animate={{ 
+            y: [0, -12, 0],
           }}
-        />
-
-        {/* Back Page (Raw Manga) */}
-        <motion.div
-          initial={{ opacity: 0, rotate: -12 }}
-          animate={{ opacity: 0.75, rotate: -8 }}
-          whileHover={{ rotate: -12, scale: 0.98 }}
-          transition={{ duration: 0.3 }}
-          style={{
-            position: 'absolute',
-            width: 300, height: 410,
-            top: 100,
-            left: 20,
-            background: 'var(--bg-2)',
-            border: '2.5px solid var(--border)',
-            boxShadow: '6px 6px 0 0 rgba(0,0,0,0.12)',
-            transformOrigin: 'center bottom',
-            overflow: 'hidden',
-            padding: 6,
-            zIndex: 2,
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: "easeInOut"
           }}
+          style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         >
-          <div style={{ position: 'relative', width: '100%', height: '100%', border: '1px solid var(--border-soft)', overflow: 'hidden' }}>
-            <Image 
-              src="/images/manga_hero_clean.png" 
-              alt="Background Manga" 
-              fill 
-              style={{ objectFit: 'cover', filter: 'grayscale(100%) contrast(1.1)', opacity: 0.85 }} 
-            />
-            <div style={{ position: 'absolute', top: 24, left: -40, background: 'var(--border)', color: 'var(--paper)', padding: '4px 48px', fontSize: 9, fontFamily: 'var(--font-mono)', transform: 'rotate(-45deg)', letterSpacing: '0.2em', fontWeight: 700 }}>
-              RAW_SCAN
-            </div>
-          </div>
-        </motion.div>
+          {/* Decorative Circle Seal Behind */}
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 30, ease: "linear" }}
+            style={{
+              position: "absolute",
+              width: 200, height: 200,
+              border: "1.5px dashed var(--border-soft)",
+              borderRadius: "50%",
+              opacity: 0.4,
+              top: 30, right: 30,
+              zIndex: 1
+            }}
+          />
 
-        {/* Front Page (Translated Cover) */}
-        <motion.div
-          initial={{ opacity: 0, rotate: 12 }}
-          animate={{ opacity: 1, rotate: 5 }}
-          whileHover={{ rotate: 2, scale: 1.03, y: -5 }}
-          transition={{ type: "spring", stiffness: 100, damping: 15 }}
-          className="panel-shadow-lg"
-          style={{
-            position: 'absolute',
-            width: 330, height: 450,
-            top: 50,
-            right: 20,
-            background: 'var(--panel)',
-            border: '3px solid var(--border)',
-            transformOrigin: 'center center',
-            overflow: 'hidden',
-            padding: 10,
-            zIndex: 3,
-          }}
-        >
-          {/* Cover Artwork Container */}
-          <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000', overflow: 'hidden', border: '1.5px solid var(--border)' }}>
-            <Image 
-              src="/images/manga_hero_ja.png" 
-              alt="Translated Manga Cover" 
-              fill 
-              style={{ objectFit: 'cover', objectPosition: 'center 20%', filter: 'grayscale(100%) contrast(1.2)', opacity: 0.95 }} 
-            />
-            <div className="halftone" style={{ position: 'absolute', inset: 0, opacity: 0.15, zIndex: 1 }} />
-            
-            {/* Magazine Title Deco */}
-            <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', flexDirection: 'column', zIndex: 5 }}>
-              <span className="display" style={{ fontSize: 38, color: 'var(--paper)', textShadow: '2px 2px 0 var(--border)', lineHeight: 0.95 }}>
-                STORY
-              </span>
-              <span className="display" style={{ fontSize: 38, color: 'var(--accent)', textShadow: '2px 2px 0 var(--paper)', lineHeight: 0.9 }}>
-                LENS
-              </span>
-            </div>
-
-            {/* Volume Stamp */}
-            <div className="seal seal-circle" style={{ position: 'absolute', top: 14, right: 14, width: 52, height: 52, fontSize: 13, zIndex: 5, transform: 'rotate(8deg)' }}>
-              VOL.1
-            </div>
-
-            {/* Translated Overlay Text */}
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, var(--border) 0%, rgba(0,0,0,0) 100%)', padding: '50px 12px 12px', zIndex: 5, color: 'var(--paper)', textAlign: 'center' }}>
-              <div className="mono" style={{ fontSize: 9, opacity: 0.8, letterSpacing: '0.15em', marginBottom: 6 }}>
-                AI TRANSLATED VERSION
-              </div>
-              <div className="serif" style={{ fontSize: 18, fontWeight: 900, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
-                KỶ NGUYÊN MỚI
+          {/* Back Page (Raw Manga) */}
+          <motion.div
+            initial={{ opacity: 0, rotate: -12 }}
+            animate={{ opacity: 0.75, rotate: -8 }}
+            whileHover={{ rotate: -12, scale: 0.98 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              position: 'absolute',
+              width: 300, height: 410,
+              top: 100,
+              left: 20,
+              background: 'var(--bg-2)',
+              border: '2.5px solid var(--border)',
+              boxShadow: '6px 6px 0 0 rgba(0,0,0,0.12)',
+              transformOrigin: 'center bottom',
+              overflow: 'hidden',
+              padding: 6,
+              zIndex: 2,
+            }}
+          >
+            <div style={{ position: 'relative', width: '100%', height: '100%', border: '1px solid var(--border-soft)', overflow: 'hidden' }}>
+              <Image 
+                src="/images/manga_hero_clean.png" 
+                alt="Background Manga" 
+                fill 
+                style={{ objectFit: 'cover', filter: 'grayscale(100%) contrast(1.1)', opacity: 0.85 }} 
+              />
+              <div style={{ position: 'absolute', top: 24, left: -40, background: 'var(--border)', color: 'var(--paper)', padding: '4px 48px', fontSize: 9, fontFamily: 'var(--font-mono)', transform: 'rotate(-45deg)', letterSpacing: '0.2em', fontWeight: 700 }}>
+                RAW_SCAN
               </div>
             </div>
+          </motion.div>
 
-            {/* AI Badge */}
-            <div style={{ position: 'absolute', bottom: '35%', right: 8, writingMode: 'vertical-rl', background: 'var(--panel)', color: 'var(--fg)', border: '1.5px solid var(--border)', padding: '8px 5px', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.1em', zIndex: 5 }}>
-              POWERED BY GEMINI
+          {/* Front Page (Translated Cover) */}
+          <motion.div
+            initial={{ opacity: 0, rotate: 12 }}
+            animate={{ opacity: 1, rotate: 5 }}
+            whileHover={{ rotate: 2, scale: 1.03, y: -5 }}
+            transition={{ type: "spring", stiffness: 100, damping: 15 }}
+            className="panel-shadow-lg"
+            style={{
+              position: 'absolute',
+              width: 330, height: 450,
+              top: 50,
+              right: 20,
+              background: 'var(--panel)',
+              border: '3px solid var(--border)',
+              transformOrigin: 'center center',
+              overflow: 'hidden',
+              padding: 10,
+              zIndex: 3,
+            }}
+          >
+            {/* Cover Artwork Container */}
+            <div style={{ position: 'relative', width: '100%', height: '100%', background: '#000', overflow: 'hidden', border: '1.5px solid var(--border)' }}>
+              <Image 
+                src="/images/manga_hero_ja.png" 
+                alt="Translated Manga Cover" 
+                fill 
+                style={{ objectFit: 'cover', objectPosition: 'center 20%', filter: 'grayscale(100%) contrast(1.2)', opacity: 0.95 }} 
+              />
+              <div className="halftone" style={{ position: 'absolute', inset: 0, opacity: 0.15, zIndex: 1 }} />
+              
+              {/* Magazine Title Deco */}
+              <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', flexDirection: 'column', zIndex: 5 }}>
+                <span className="display" style={{ fontSize: 38, color: 'var(--paper)', textShadow: '2px 2px 0 var(--border)', lineHeight: 0.95 }}>
+                  STORY
+                </span>
+                <span className="display" style={{ fontSize: 38, color: 'var(--accent)', textShadow: '2px 2px 0 var(--paper)', lineHeight: 0.9 }}>
+                  LENS
+                </span>
+              </div>
+
+              {/* Volume Stamp */}
+              <div className="seal seal-circle" style={{ position: 'absolute', top: 14, right: 14, width: 52, height: 52, fontSize: 13, zIndex: 5, transform: 'rotate(8deg)' }}>
+                VOL.1
+              </div>
+
+              {/* Translated Overlay Text */}
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, var(--border) 0%, rgba(0,0,0,0) 100%)', padding: '50px 12px 12px', zIndex: 5, color: 'var(--paper)', textAlign: 'center' }}>
+                <div className="mono" style={{ fontSize: 9, opacity: 0.8, letterSpacing: '0.15em', marginBottom: 6 }}>
+                  AI TRANSLATED VERSION
+                </div>
+                <div className="serif" style={{ fontSize: 18, fontWeight: 900, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+                  KỶ NGUYÊN MỚI
+                </div>
+              </div>
+
+              {/* AI Badge */}
+              <div style={{ position: 'absolute', bottom: '35%', right: 8, writingMode: 'vertical-rl', background: 'var(--panel)', color: 'var(--fg)', border: '1.5px solid var(--border)', padding: '8px 5px', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.1em', zIndex: 5 }}>
+                POWERED BY GEMINI
+              </div>
             </div>
-          </div>
+          </motion.div>
         </motion.div>
       </motion.div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -433,7 +435,7 @@ export default function Home() {
               </FadeIn>
               
               <FadeIn delay={0.3} direction="up" distance={30}>
-                <h1 className="display" style={{ fontSize: 84, margin: "18px 0 0", lineHeight: 0.92 }}>
+                <h1 className="display" style={{ fontSize: 62, margin: "18px 0 0", lineHeight: 1.15, letterSpacing: "0.02em" }}>
                   <span style={{ whiteSpace: 'nowrap' }}>ĐỌC TRUYỆN,</span><br/>
                   <span style={{ whiteSpace: 'nowrap' }}>KHÔNG CÒN</span><br/>
                   <span style={{ color: "var(--accent)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>rào cản.</span>
@@ -462,31 +464,30 @@ export default function Home() {
               </FadeIn>
             </div>
 
-            {/* Poster tags bottom */}
+            {/* Poster tags bottom & Barcode */}
             <FadeIn delay={0.8} direction="none" className="w-full">
               <div style={{ position: "absolute", left: 56, right: 56, bottom: 40, display: "flex", justifyContent: "space-between", alignItems: "flex-end", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)" }}>
                 <div>
                   <div style={{ color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>ISSUE №01</div>
                   <div>THE BEGINNING OF CONTEXTUAL READING</div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ marginBottom: 4 }}>￥ FREE · ZERO-BUDGET BUILD</div>
-                  <div>PRINTED WITH AI · MAY 2026</div>
+                
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 32 }}>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ marginBottom: 4 }}>￥ FREE · ZERO-BUDGET BUILD</div>
+                    <div>PRINTED WITH AI · MAY 2026</div>
+                  </div>
+
+                  {/* Barcode strip */}
+                  <div>
+                    <svg width="100" height="40">
+                      {Array.from({length: 20}).map((_, i) => (
+                        <rect key={i} x={i * 5} y="0" width={i % 3 === 0 ? 2 : 3} height="32" fill="var(--ink)"/>
+                      ))}
+                      <text x="50" y="40" textAnchor="middle" fontSize="9" fontFamily="var(--font-mono)" fill="var(--ink)">4 901234 567894</text>
+                    </svg>
+                  </div>
                 </div>
-              </div>
-            </FadeIn>
-
-
-
-            {/* Barcode strip */}
-            <FadeIn delay={1} direction="none">
-              <div style={{ position: "absolute", right: 56, bottom: 40 }}>
-                <svg width="100" height="40">
-                  {Array.from({length: 20}).map((_, i) => (
-                    <rect key={i} x={i * 5} y="0" width={i % 3 === 0 ? 2 : 3} height="32" fill="var(--ink)"/>
-                  ))}
-                  <text x="50" y="40" textAnchor="middle" fontSize="9" fontFamily="var(--font-mono)" fill="var(--ink)">4 901234 567894</text>
-                </svg>
               </div>
             </FadeIn>
           </div>

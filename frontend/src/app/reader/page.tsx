@@ -269,7 +269,9 @@ function ReaderContent() {
 
         {/* ── Left Rail: Dynamic Thumbnails ── */}
         {hasMultiplePages && (
-          <div 
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
             className="scroll"
             style={{ 
               width: 72, background: "var(--panel)", 
@@ -283,14 +285,16 @@ function ReaderContent() {
               const isCurrent = p.page_id === pageIdParam;
               return (
                 <Link key={p.page_id} href={`/reader?page=${p.page_id}`}>
-                  <div 
+                  <motion.div 
+                    whileHover={{ scale: 1.08, rotate: isCurrent ? 0 : -1 }}
+                    whileTap={{ scale: 0.95 }}
                     style={{ 
                       position: "relative", width: 48, height: 68, 
                       border: isCurrent ? "3px solid var(--accent)" : "2px solid var(--border)",
                       background: "#fff", cursor: "pointer", overflow: "hidden",
                       boxShadow: isCurrent ? "4px 4px 0 var(--accent)" : "2px 2px 0 var(--border)",
-                      transform: isCurrent ? "scale(1.05)" : "scale(1)",
-                      transition: "transform 0.15s, border-color 0.15s"
+                      transformOrigin: "center",
+                      transition: "border-color 0.15s, box-shadow 0.15s"
                     }}
                   >
                     {p.thumbnail_url ? (
@@ -302,11 +306,11 @@ function ReaderContent() {
                         {idx+1}
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 </Link>
               );
             })}
-          </div>
+          </motion.div>
         )}
 
         {/* ── Reader Canvas ── */}
@@ -316,7 +320,10 @@ function ReaderContent() {
           style={{ display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto", padding: "20px 32px", gap: 16 }}
         >
           {/* Toolbar */}
-          <div
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
             className="stroke-ink"
             style={{ background: "var(--panel)", padding: "8px 14px", display: "flex", gap: 6, alignItems: "center", width: "100%", maxWidth: 840, flexWrap: "wrap" }}
           >
@@ -326,7 +333,7 @@ function ReaderContent() {
             <div style={{ flex: 1 }}/>
 
             {/* View mode tabs */}
-            <div style={{ display: "flex", border: "1.5px solid var(--border)", borderRadius: 2 }}>
+            <div style={{ display: "flex", border: "1.5px solid var(--border)", borderRadius: 2, position: "relative", background: "var(--panel)" }}>
               {([
                 { id: "overlay", label: "Overlay", icon: "layers" },
                 { id: "sidebyside", label: "Song ngữ", icon: "grid" },
@@ -344,6 +351,9 @@ function ReaderContent() {
                     borderRight: i < 2 ? "1.5px solid var(--border)" : "none",
                     fontSize: 12, fontWeight: 600, cursor: "pointer",
                     display: "flex", alignItems: "center", gap: 5,
+                    position: "relative",
+                    zIndex: 2,
+                    transition: "background-color 0.2s, color 0.2s",
                   }}
                 >
                   <Icon name={m.icon} size={12}/> {m.label}
@@ -353,129 +363,147 @@ function ReaderContent() {
 
             {/* Overlay toggle */}
             {mode !== "sidebyside" && (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 className="btn btn-sm btn-ghost"
                 onClick={() => setShowOverlay(v => !v)}
                 aria-label="Bật/tắt bản dịch overlay"
                 title="Toggle overlay (O)"
               >
                 <Icon name={showOverlay ? "eye" : "eye-off"} size={14}/>
-              </button>
+              </motion.button>
             )}
 
             {/* Zoom */}
-            <button className="btn btn-sm btn-ghost" onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))} aria-label="Thu nhỏ" title="Zoom out (-)">
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))} aria-label="Thu nhỏ" title="Zoom out (-)">
               <Icon name="zoom-out" size={14}/>
-            </button>
+            </motion.button>
             <span className="mono" style={{ fontSize: 11, color: "var(--muted)", minWidth: 36, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
-            <button className="btn btn-sm btn-ghost" onClick={() => setZoom(z => Math.min(z + 0.1, 2.0))} aria-label="Phóng to" title="Zoom in (+)">
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setZoom(z => Math.min(z + 0.1, 2.0))} aria-label="Phóng to" title="Zoom in (+)">
               <Icon name="zoom-in" size={14}/>
-            </button>
-            <button className="btn btn-sm btn-ghost" aria-label="Bookmark trang này">
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" aria-label="Bookmark trang này">
               <Icon name="bookmark" size={14}/>
-            </button>
-            <button className="btn btn-sm btn-ghost" onClick={() => setShowContext(v => !v)} aria-label="Bật/tắt panel ngữ cảnh">
+            </motion.button>
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setShowContext(v => !v)} aria-label="Bật/tắt panel ngữ cảnh">
               <Icon name="info" size={14}/>
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
 
           {/* Loading state */}
-          {isLoadingPage && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: 40 }}>
-              <div style={{ width: 40, height: 40, border: "3px solid var(--border-soft)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }}/>
-              <span style={{ fontSize: 13, color: "var(--muted)" }}>Đang tải dữ liệu trang…</span>
-            </div>
-          )}
-
-          {/* Page Display */}
-          {!isLoadingPage && (
-            <div style={{ transform: `scale(${zoom})`, transformOrigin: "top center", transition: "transform 0.15s" }}>
-              {mode === "sidebyside" ? (
-                <div style={{ display: "flex", gap: 20 }}>
-                  <div>
-                    <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>BẢN GỐC</div>
-                    <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: SIDE_W, height: computedSideH, position: "relative" }}>
-                      {pageData?.original_image_url ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img 
-                          src={pageData.original_image_url} 
-                          alt="Ảnh gốc" 
-                          style={{ width: "100%", height: "100%", display: "block" }}
-                          onLoad={(e) => {
-                            if (!imgNaturalSize) {
-                              setImgNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
-                            }
-                          }}
-                        />
-                      ) : (
-                        <MangaPage w={SIDE_W} h={computedSideH} panels="default" showBubbles showOverlay={false}/>
-                      )}
+          <AnimatePresence mode="wait">
+            {isLoadingPage ? (
+              <motion.div 
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: 40 }}
+              >
+                <div style={{ width: 40, height: 40, border: "3px solid var(--border-soft)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }}/>
+                <span style={{ fontSize: 13, color: "var(--muted)" }}>Đang tải dữ liệu trang…</span>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key={pageIdParam || "no-page"}
+                initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 120, damping: 18 }}
+                style={{ transformOrigin: "top center" }}
+              >
+                <div style={{ transform: `scale(${zoom})`, transformOrigin: "top center", transition: "transform 0.15s" }}>
+                  {mode === "sidebyside" ? (
+                    <div style={{ display: "flex", gap: 20 }}>
+                      <div>
+                        <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>BẢN GỐC</div>
+                        <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: SIDE_W, height: computedSideH, position: "relative" }}>
+                          {pageData?.original_image_url ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img 
+                              src={pageData.original_image_url} 
+                              alt="Ảnh gốc" 
+                              style={{ width: "100%", height: "100%", display: "block" }}
+                              onLoad={(e) => {
+                                if (!imgNaturalSize) {
+                                  setImgNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+                                }
+                              }}
+                            />
+                          ) : (
+                            <MangaPage w={SIDE_W} h={computedSideH} panels="default" showBubbles showOverlay={false}/>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>BẢN DỊCH</div>
+                        <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", position: "relative", width: SIDE_W, height: computedSideH }}>
+                          {pageData?.original_image_url ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img src={translatedImageUrl || pageData.original_image_url} alt="Ảnh đã dịch" style={{ width: "100%", height: "100%", display: "block" }}/>
+                          ) : (
+                            <MangaPage w={SIDE_W} h={computedSideH} panels="default" showBubbles showOverlay overlayLang="vn"/>
+                          )}
+                          {pageData && showOverlay && !translatedImageUrl && imgNaturalSize && (
+                            <BubbleOverlays
+                              bubbles={pageData.processed_data}
+                              containerW={SIDE_W} containerH={computedSideH}
+                              imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
+                              selected={selected} onSelect={setSelected} mode="overlay"
+                            />
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>BẢN DỊCH</div>
-                    <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", position: "relative", width: SIDE_W, height: computedSideH }}>
-                      {pageData?.original_image_url ? (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={translatedImageUrl || pageData.original_image_url} alt="Ảnh đã dịch" style={{ width: "100%", height: "100%", display: "block" }}/>
-                      ) : (
-                        <MangaPage w={SIDE_W} h={computedSideH} panels="default" showBubbles showOverlay overlayLang="vn"/>
-                      )}
-                      {pageData && showOverlay && !translatedImageUrl && imgNaturalSize && (
-                        <BubbleOverlays
-                          bubbles={pageData.processed_data}
-                          containerW={SIDE_W} containerH={computedSideH}
-                          imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
-                          selected={selected} onSelect={setSelected} mode="overlay"
-                        />
-                      )}
+                  ) : (
+                    <div style={{ position: "relative" }}>
+                      <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: CANVAS_W, height: computedHeight, position: "relative" }}>
+                        {mainImageUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={mainImageUrl}
+                            alt="Trang truyện"
+                            style={{ width: "100%", height: "100%", display: "block" }}
+                            onLoad={(e) => {
+                              if (!imgNaturalSize) {
+                                setImgNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
+                              }
+                            }}
+                          />
+                        ) : (
+                          <MangaPage w={CANVAS_W} h={computedHeight} panels="default" showBubbles showOverlay={mode === "overlay" && showOverlay} overlayLang="vn"/>
+                        )}
+
+                        {/* Real bubble overlays */}
+                        {pageData && imgNaturalSize && (mode === "tap" || (mode === "overlay" && showOverlay && !translatedImageUrl)) && (
+                          <BubbleOverlays
+                            bubbles={pageData.processed_data}
+                            containerW={CANVAS_W} containerH={computedHeight}
+                            imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
+                            selected={selected} onSelect={setSelected} mode={mode}
+                          />
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              ) : (
-                <div style={{ position: "relative" }}>
-                  <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: CANVAS_W, height: computedHeight, position: "relative" }}>
-                    {mainImageUrl ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={mainImageUrl}
-                        alt="Trang truyện"
-                        style={{ width: "100%", height: "100%", display: "block" }}
-                        onLoad={(e) => {
-                          if (!imgNaturalSize) {
-                            setImgNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
-                          }
-                        }}
-                      />
-                    ) : (
-                      <MangaPage w={CANVAS_W} h={computedHeight} panels="default" showBubbles showOverlay={mode === "overlay" && showOverlay} overlayLang="vn"/>
-                    )}
-
-                    {/* Real bubble overlays */}
-                    {pageData && imgNaturalSize && (mode === "tap" || (mode === "overlay" && showOverlay && !translatedImageUrl)) && (
-                      <BubbleOverlays
-                        bubbles={pageData.processed_data}
-                        containerW={CANVAS_W} containerH={computedHeight}
-                        imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
-                        selected={selected} onSelect={setSelected} mode={mode}
-                      />
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* ── Bottom Navigation (conditional) ── */}
           {hasMultiplePages && currentPageIdx !== -1 && (
-            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12, padding: "8px 16px", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 2 }}>
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12, padding: "8px 16px", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 2 }}
+            >
               {prevPageId ? (
                 <Link href={`/reader?page=${prevPageId}`} style={{ color: "inherit" }}>
-                  <button className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4 }} aria-label="Trang trước">
+                  <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4 }} aria-label="Trang trước">
                     <Icon name="arrow-left" size={14}/>
-                  </button>
+                  </motion.button>
                 </Link>
               ) : (
                 <button className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4, opacity: 0.3, cursor: "not-allowed" }} disabled>
@@ -489,24 +517,29 @@ function ReaderContent() {
 
               {nextPageId ? (
                 <Link href={`/reader?page=${nextPageId}`} style={{ color: "inherit" }}>
-                  <button className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4 }} aria-label="Trang sau">
+                  <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4 }} aria-label="Trang sau">
                     <Icon name="arrow-right" size={14}/>
-                  </button>
+                  </motion.button>
                 </Link>
               ) : (
                 <button className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4, opacity: 0.3, cursor: "not-allowed" }} disabled>
                   <Icon name="arrow-right" size={14}/>
                 </button>
               )}
-            </div>
+            </motion.div>
           )}
 
           {/* Keyboard hint */}
-          <div style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)", display: "flex", gap: 16, marginTop: 8 }}>
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)", display: "flex", gap: 16, marginTop: 8 }}
+          >
             {hasMultiplePages && <span>← → : chuyển trang</span>}
             <span>O : toggle overlay</span>
             <span>+/- : zoom</span>
-          </div>
+          </motion.div>
         </div>
 
         {/* ── Context Panel ── */}

@@ -3,7 +3,7 @@ StoryLens Backend - RAG Q&A Service.
 
 Vector search runs against Supabase pgvector. If a freshly translated page has
 not produced vector chunks yet, Q&A falls back to the extracted translation
-context stored in bubble_data + translation_history and asks Gemini directly.
+context stored in bubble_data + translation_history.
 """
 from __future__ import annotations
 
@@ -33,6 +33,23 @@ Trả lời bằng tiếng Việt, ngắn gọn, và nêu chi tiết nào trong 
 Câu hỏi: {question}
 Trả lời:"""
 
+_GEMINI_KEY_ERROR_MARKERS = (
+    "429",
+    "quota",
+    "exhausted",
+    "rate_limit",
+    "rate limit",
+    "403",
+    "permission",
+    "leaked",
+    "api_key_invalid",
+    "api key expired",
+    "api key not valid",
+    "invalid api key",
+    "invalid_api_key",
+    "key invalid",
+)
+
 
 class _GeminiPool:
     """Thread-safe round-robin pool of Gemini clients."""
@@ -49,8 +66,8 @@ class _GeminiPool:
         with self._lock:
             if self._initialized:
                 return
-            keys = [k.strip() for k in settings.GEMINI_API_KEY.split(",") if k.strip()]
-            self._clients = [genai.Client(api_key=k) for k in keys]
+            keys = [key.strip() for key in settings.GEMINI_API_KEY.split(",") if key.strip()]
+            self._clients = [genai.Client(api_key=key) for key in keys]
             self._iterator = itertools.cycle(self._clients) if self._clients else None
             self._initialized = True
             logger.info("Initialized Gemini pool with %d API key(s).", len(self._clients))
@@ -73,6 +90,11 @@ class _GeminiPool:
 
 
 _pool = _GeminiPool()
+
+
+def _is_retryable_gemini_key_error(exc: Exception) -> bool:
+    err_msg = str(exc).lower()
+    return any(marker in err_msg for marker in _GEMINI_KEY_ERROR_MARKERS)
 
 
 def _latest_translation(translations: list[dict]) -> str:
@@ -133,11 +155,54 @@ def _page_context_from_db(supabase, page_id: str) -> tuple[str, list[str]]:
     return "\n\n".join(context_parts), source_ids
 
 
+def _translation_lines_from_context(context: str) -> list[str]:
+    lines: list[str] = []
+    for raw_line in context.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if "] Dịch:" in line:
+            line = line.split("] Dịch:", 1)[1].strip()
+        elif line.startswith("Dịch:"):
+            line = line.split("Dịch:", 1)[1].strip()
+        elif "] Gốc:" in line or line.startswith("Gốc:"):
+            continue
+
+        if line and line != "(không có)":
+            lines.append(line)
+    return lines
+
+
+def _context_fallback_answer(context: str) -> str:
+    """
+    Keep page-scoped Q&A useful even when Gemini cannot be reached.
+    This is intentionally extractive: it only echoes stored translations.
+    """
+    lines = _translation_lines_from_context(context)
+    if not lines:
+        compact_context = " ".join(part.strip() for part in context.splitlines() if part.strip())
+        if compact_context:
+            return (
+                "Hiện chưa gọi được Gemini để suy luận sâu. "
+                f"Nội dung liên quan đang có: {compact_context[:900]}"
+            )
+        return "Hiện chưa gọi được Gemini và không có nội dung đã lưu để trả lời."
+
+    preview = "\n".join(f"{index}. {line}" for index, line in enumerate(lines[:10], start=1))
+    suffix = "" if len(lines) <= 10 else f"\n... còn {len(lines) - 10} dòng nữa."
+    return (
+        "Hiện chưa gọi được Gemini, nhưng dựa trên bản dịch đã lưu thì trang này có các lời thoại chính:\n"
+        f"{preview}{suffix}"
+    )
+
+
 def _generate_answer(question: str, context: str) -> str:
     if not _pool.available:
-        return "Hệ thống chưa được cấu hình GEMINI_API_KEY."
+        logger.error("Gemini generation skipped: GEMINI_API_KEY is not configured.")
+        return _context_fallback_answer(context)
 
-    answer_text = "Đã xảy ra lỗi khi tạo câu trả lời. Vui lòng thử lại."
+    last_error: Exception | None = None
     prompt = QA_PROMPT.format(context=context, question=question)
 
     for _ in range(_pool.client_count()):
@@ -151,18 +216,19 @@ def _generate_answer(question: str, context: str) -> str:
             )
             answer_text = (response.text or "").strip()
             if not answer_text:
-                answer_text = "Gemini trả về phản hồi rỗng. Vui lòng thử lại."
-            break
+                logger.warning("Gemini returned an empty response; using context fallback.")
+                return _context_fallback_answer(context)
+            return answer_text
         except Exception as exc:
-            err_msg = str(exc).lower()
-            if any(kw in err_msg for kw in ("429", "quota", "exhausted", "rate_limit", "403", "permission", "leaked")):
-                logger.warning("Gemini key invalid or exhausted, rotating to next key. Error: %s", exc)
+            last_error = exc
+            if _is_retryable_gemini_key_error(exc):
+                logger.warning("Gemini key failed, rotating to next key. Error: %s", exc)
                 continue
             logger.error("Unexpected Gemini generation failure: %s", exc)
-            answer_text = "Lỗi khi gọi Gemini API. Vui lòng thử lại."
             break
 
-    return answer_text
+    logger.error("Gemini generation failed for all attempted keys: %s", last_error)
+    return _context_fallback_answer(context)
 
 
 def answer_question(
@@ -174,7 +240,7 @@ def answer_question(
     1. Embed question via HF Space when available.
     2. Vector search in Supabase pgvector.
     3. Fall back to extracted page context when no vector chunks exist.
-    4. Generate answer with Gemini 2.5 Flash or the configured GEMINI_MODEL.
+    4. Generate answer with Gemini, or return extractive page context if Gemini fails.
     """
     supabase = get_supabase()
 
@@ -182,7 +248,10 @@ def answer_question(
     try:
         q_vector = call_embed(question)
     except Exception as exc:
-        logger.error("Embedding failed: %s", exc)
+        if page_id:
+            logger.warning("Embedding failed; falling back to page context: %s", exc)
+        else:
+            logger.error("Embedding failed: %s", exc)
         if not page_id:
             return QAResponse(
                 question=question,

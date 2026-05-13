@@ -1,12 +1,15 @@
+"use client";
+import React from 'react';
 import Link from 'next/link';
-import type { Metadata } from 'next';
-
-export const metadata: Metadata = {
-  title: "404 — Trang không tồn tại | StoryLens",
-  description: "Trang bạn đang tìm kiếm không tồn tại hoặc đã bị di chuyển.",
-};
+import { motion } from 'framer-motion';
+import { Icon } from '@/components/Icons';
 
 export default function NotFound() {
+  // Fallback page head since it's a client component
+  React.useEffect(() => {
+    document.title = "404 — Trang không tồn tại | StoryLens";
+  }, []);
+
   return (
     <div
       className="paper-grain"
@@ -18,11 +21,26 @@ export default function NotFound() {
         justifyContent: "center",
         textAlign: "center",
         padding: 40,
+        position: "relative",
+        overflow: "hidden"
       }}
     >
+      {/* Background elements */}
+      <motion.div 
+        initial={{ opacity: 0, rotate: -10 }}
+        animate={{ opacity: 0.05, rotate: 10 }}
+        transition={{ duration: 20, repeat: Infinity, repeatType: "reverse", ease: "linear" }}
+        style={{ position: "absolute", top: -100, left: -100, fontSize: 300, fontFamily: "var(--font-serif)", fontWeight: 900, color: "var(--accent)", pointerEvents: "none", userSelect: "none" }}
+      >
+        零
+      </motion.div>
+
       {/* Giant 404 with manga-style overlay */}
       <div style={{ position: "relative", marginBottom: 32 }}>
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 100, damping: 15 }}
           className="display"
           style={{
             fontSize: 180,
@@ -33,7 +51,7 @@ export default function NotFound() {
           }}
         >
           404
-        </div>
+        </motion.div>
         <div
           style={{
             position: "absolute",
@@ -43,57 +61,107 @@ export default function NotFound() {
             justifyContent: "center",
           }}
         >
-          <div
+          <motion.div
+            animate={{ 
+              y: [0, -12, 0],
+              rotate: [0, -5, 5, 0]
+            }}
+            transition={{ 
+              duration: 4,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
             className="serif"
             style={{
-              fontSize: 64,
+              fontSize: 72,
               color: "var(--accent)",
               fontWeight: 800,
-              textShadow: "3px 3px 0 var(--border)",
+              textShadow: "4px 4px 0 var(--border)",
+              transformOrigin: "center"
             }}
           >
             ?
-          </div>
+          </motion.div>
         </div>
       </div>
 
       {/* Title */}
-      <div className="caps-sm" style={{ color: "var(--accent)", marginBottom: 10 }}>
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="caps-sm" style={{ color: "var(--accent)", marginBottom: 10 }}
+      >
         LỖI KHÔNG TÌM THẤY
-      </div>
-      <h1 className="display" style={{ fontSize: 40, margin: "0 0 16px" }}>
+      </motion.div>
+
+      <motion.h1 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="display" style={{ fontSize: 40, margin: "0 0 16px" }}
+      >
         Trang không tồn tại
-      </h1>
-      <p style={{ color: "var(--fg-soft)", maxWidth: 440, lineHeight: 1.6, marginBottom: 36 }}>
+      </motion.h1>
+
+      <motion.p 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        style={{ color: "var(--fg-soft)", maxWidth: 440, lineHeight: 1.6, marginBottom: 36 }}
+      >
         Trang bạn đang tìm kiếm đã bị di chuyển, xóa, hoặc chưa bao giờ tồn tại — giống như những trang truyện chưa được dịch.
-      </p>
+      </motion.p>
 
       {/* Bubble with error message */}
-      <div className="bubble" style={{ maxWidth: 320, marginBottom: 36, background: "#fff" }}>
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.8, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", delay: 0.5, stiffness: 120, damping: 12 }}
+        className="bubble" style={{ maxWidth: 320, marginBottom: 36, background: "#fff" }}
+      >
         <span className="serif" style={{ fontSize: 14 }}>
           "Lost in translation..."
         </span>
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, fontFamily: "var(--font-serif)" }}>
           — Lạc lối giữa những dòng dịch…
         </div>
-      </div>
+      </motion.div>
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: 12 }}>
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        style={{ display: "flex", gap: 12 }}
+      >
         <Link href="/">
-          <button className="btn btn-primary" style={{ padding: "14px 28px" }}>
+          <motion.button 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="btn btn-primary" style={{ padding: "14px 28px" }}
+          >
             Về trang chủ
-          </button>
+          </motion.button>
         </Link>
         <Link href="/upload">
-          <button className="btn" style={{ padding: "14px 28px" }}>
-            Tải truyện lên
-          </button>
+          <motion.button 
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="btn" style={{ padding: "14px 28px" }}
+          >
+            <Icon name="upload" size={14}/> Tải truyện lên
+          </motion.button>
         </Link>
-      </div>
+      </motion.div>
 
       {/* Decorative barcode */}
-      <div style={{ marginTop: 48, opacity: 0.4 }}>
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.4 }}
+        transition={{ delay: 0.8 }}
+        style={{ marginTop: 48 }}
+      >
         <svg width="120" height="40">
           {Array.from({ length: 24 }).map((_, i) => (
             <rect key={i} x={i * 5} y="0" width={i % 3 === 0 ? 2 : 3} height="32" fill="var(--ink)"/>
@@ -102,7 +170,7 @@ export default function NotFound() {
             SL-ERR-404
           </text>
         </svg>
-      </div>
+      </motion.div>
     </div>
   );
 }
