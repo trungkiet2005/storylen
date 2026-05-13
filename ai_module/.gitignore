@@ -1,0 +1,32 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Heavy model files — downloaded at Docker build time
+models/
+
+# Runtime/output folders
+result/
+upload-cache/
+pip-modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+venv/
+
+# Debug / test artifacts
+debug_log.txt
+test_output.txt
+*.log
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,3 +1,13 @@
+---
+title: AI STORYLEN
+emoji: 🖼️
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # AI Module
 
 Thu muc nay la backend FastAPI tach rieng cho frontend goi.
