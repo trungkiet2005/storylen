@@ -210,7 +210,6 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
     { id: "upload",  label: "Tải lên",   icon: "upload",  href: "/upload" },
     { id: "reader",  label: "Đọc",       icon: "book",    href: "/reader" },
     { id: "qa",      label: "Hỏi AI",    icon: "chat",    href: "/qa" },
-    { id: "batch",   label: "Batch",     icon: "stack",   href: "/batch" },
     { id: "history", label: "Lịch sử",   icon: "history", href: "/history" },
   ];
 
