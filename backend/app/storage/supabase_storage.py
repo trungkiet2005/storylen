@@ -145,3 +145,11 @@ def upload_translated_image(image_bytes: bytes, page_id: str) -> str | None:
     except Exception as exc:
         logger.warning("Translated image upload failed for page %s: %s", page_id, exc)
         return None
+
+
+def translated_image_public_url(page_id: str) -> str:
+    """Return the deterministic public URL for a rendered translated image."""
+    return _get_public_url(
+        settings.SUPABASE_BUCKET_ORIGINALS,
+        f"{page_id}/translated.png",
+    )

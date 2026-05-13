@@ -101,15 +101,15 @@ def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
         ai_result = call_translate(page_id, original_image_url)
         raw_bubbles = ai_result.get("bubbles", [])
         rendered_image_bytes = ai_result.get("rendered_image_bytes")
-        translated_image_url = (
-            upload_translated_image(rendered_image_bytes, page_id)
-            if isinstance(rendered_image_bytes, bytes) and rendered_image_bytes
-            else None
-        ) or ai_result.get("rendered_image_url")
+        if not isinstance(rendered_image_bytes, bytes) or not rendered_image_bytes:
+            raise RuntimeError("ai_module did not return a translated image.")
+        translated_image_url = upload_translated_image(rendered_image_bytes, page_id)
+        if not translated_image_url:
+            raise RuntimeError("Failed to store translated image.")
         logger.info(
-            "ai_module returned %d text regions for page %s",
-            len(raw_bubbles),
+            "ai_module returned rendered image for page %s (%d bytes)",
             page_id,
+            len(rendered_image_bytes),
         )
 
         _update_status(page_id, ProcessingStatus.TRANSLATING, 60)
@@ -194,11 +194,20 @@ def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
                     "translated_image_url": translated_image_url,
                 }).eq("page_id", page_id).execute()
             except Exception as exc:
-                logger.warning(
-                    "Failed to store translated_image_url for page %s: %s",
-                    page_id,
-                    exc,
-                )
+                error_text = str(exc)
+                if "translated_image_url" in error_text and (
+                    "schema cache" in error_text or "does not exist" in error_text
+                ):
+                    logger.info(
+                        "translated_image_url column is missing; page API will use the deterministic storage URL for page %s",
+                        page_id,
+                    )
+                else:
+                    logger.warning(
+                        "Failed to store translated_image_url for page %s: %s",
+                        page_id,
+                        exc,
+                    )
 
         _update_status(page_id, ProcessingStatus.COMPLETED, 100)
 

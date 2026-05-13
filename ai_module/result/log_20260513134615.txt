@@ -1,4 +1,4 @@
-[manga-translator.shared] Log file created: D:\AI_PROJECT\Storylen_WEB\storylen\ai_module\result\log_20260513132542.txt
+[manga-translator.shared] Log file created: D:\AI_PROJECT\Storylen_WEB\storylen\ai_module\result\log_20260513134615.txt
 [manga-translator.shared] Loading models
 [manga-translator.shared] Running text detection
 [manga-translator.DefaultDetector] Detection resolution: 1536x2048
@@ -93,80 +93,8 @@ Translate the following text into Vietnamese:
 <|8|>Im gefting freaked out.
 <|9|>...No- bodys here.
 ------------
-[manga-translator.GeminiTranslator] -- GPT Response --
-<|1|>A, Ngày Tết!
-<|2|>Mình có cảm giác tốt về năm nay.
-<|3|>Tôi sẽ không nói thế đâu, Noby Nobi.
-<|4|>Ngươi sẽ ngàn cân treo sợi tóc đấy.
-<|5|>Trong 40 phút nữa ngươi sẽ tiêu đời.
-<|6|>Ai đang nói đó!?
-<|7|>Ra mặt đi!
-<|8|>Mình đang phát hoảng rồi đấy.
-<|9|>...Không- có ai ở đây cả.
-[manga-translator.GeminiTranslator] Batch translated: 9/9 completed.
-[manga-translator.GeminiTranslator] Completed translations: ['A, Ngày Tết!', 'Mình có cảm giác tốt về năm nay.', 'Tôi sẽ không nói thế đâu, Noby Nobi.', 'Ngươi sẽ ngàn cân treo sợi tóc đấy.', 'Trong 40 phút nữa ngươi sẽ tiêu đời.', 'Ai đang nói đó!?', 'Ra mặt đi!', 'Mình đang phát hoảng rồi đấy.', '...Không- có ai ở đây cả.']
-[manga-translator.GeminiTranslator] ['A, Ngày Tết!', 'Mình có cảm giác tốt về năm nay.', 'Tôi sẽ không nói thế đâu, Noby Nobi.', 'Ngươi sẽ ngàn cân treo sợi tóc đấy.', 'Trong 40 phút nữa ngươi sẽ tiêu đời.', 'Ai đang nói đó!?', 'Ra mặt đi!', 'Mình đang phát hoảng rồi đấy.', '...Không- có ai ở đây cả.']
-[manga-translator.GeminiTranslator] Used 1798 tokens (Total: 443)
-[manga-translator.GeminiTranslator] 0: Ah, New Years Day! => A, Ngày Tết!
-[manga-translator.GeminiTranslator] 1: I got a good feeling about this year => Mình có cảm giác tốt về năm nay.
-[manga-translator.GeminiTranslator] 2: I wouldnt say that Noby Nobi. => Tôi sẽ không nói thế đâu, Noby Nobi.
-[manga-translator.GeminiTranslator] 3: youll be hanging by a thread. => Ngươi sẽ ngàn cân treo sợi tóc đấy.
-[manga-translator.GeminiTranslator] 4: In 4O minutes youll be toast. => Trong 40 phút nữa ngươi sẽ tiêu đời.
-[manga-translator.GeminiTranslator] 5: Whos saying that!? => Ai đang nói đó!?
-[manga-translator.GeminiTranslator] 6: Come out! => Ra mặt đi!
-[manga-translator.GeminiTranslator] 7: Im gefting freaked out. => Mình đang phát hoảng rồi đấy.
-[manga-translator.GeminiTranslator] 8: ...No- bodys here. => ...Không- có ai ở đây cả.
-[manga-translator.shared] No post-translation replacements made.
-[manga-translator.shared] Starting post-translation check...
-[manga-translator.shared] Starting page-level target language check with 9 regions...
-[manga-translator.shared] Page-level target language ratio check passed
-[manga-translator.shared] All translation regions passed post-translation check.
-[manga-translator.shared] Running mask refinement
-[manga-translator.LamaLargeInpainter] Inpainting resolution: 480x696
-[manga-translator.shared] Running rendering
-[manga-translator.shared] Loading models
-[manga-translator.shared] Running text detection
-[manga-translator.DefaultDetector] Detection resolution: 1536x2048
-[manga-translator.shared] Running ocr
-[manga-translator.Model48pxOCR] prob: 0.9854326844215393 I'm fg: (25, 23, 12) bg: (25, 23, 12)
-[manga-translator.Model48pxOCR] prob: 0.8018181324005127 out. fg: (22, 14, 7) bg: (22, 14, 7)
-[manga-translator.Model48pxOCR] prob: 0.9713747501373291 out! fg: (29, 22, 18) bg: (29, 22, 18)
-[manga-translator.Model48pxOCR] prob: 0.9978207349777222 Day! fg: (13, 11, 3) bg: (13, 11, 3)
-[manga-translator.Model48pxOCR] prob: 0.9666561484336853 here. fg: (13, 13, 5) bg: (13, 13, 5)
-[manga-translator.Model48pxOCR] prob: 0.46183377504348755 ...No- fg: (36, 33, 32) bg: (36, 33, 32)
-[manga-translator.Model48pxOCR] prob: 0.9592127203941345 toast. fg: (16, 14, 6) bg: (16, 14, 6)
-[manga-translator.Model48pxOCR] prob: 0.8612115383148193 year fg: (26, 26, 22) bg: (26, 26, 22)
-[manga-translator.Model48pxOCR] prob: 0.8392638564109802 Who's fg: (6, 6, 0) bg: (6, 6, 0)
-[manga-translator.Model48pxOCR] prob: 0.8478823900222778 Year's fg: (11, 12, 7) bg: (11, 12, 7)
-[manga-translator.Model48pxOCR] prob: 0.4826294183731079 gefting fg: (18, 16, 9) bg: (18, 16, 9)
-[manga-translator.Model48pxOCR] prob: 0.47757989168167114 that!? fg: (21, 15, 6) bg: (21, 15, 6)
-[manga-translator.Model48pxOCR] prob: 0.997606635093689 Come fg: (33, 25, 23) bg: (33, 25, 23)
-[manga-translator.Model48pxOCR] prob: 0.9228360056877136 body's fg: (7, 8, 1) bg: (7, 8, 1)
-[manga-translator.Model48pxOCR] prob: 0.6386932134628296 In 4O fg: (25, 19, 19) bg: (26, 19, 19)
-[manga-translator.Model48pxOCR] prob: 0.9380491375923157 saying fg: (25, 20, 17) bg: (25, 20, 17)
-[manga-translator.Model48pxOCR] prob: 0.8916381597518921 I got a fg: (14, 11, 5) bg: (14, 11, 5)
-[manga-translator.Model48pxOCR] prob: 0.9420687556266785 freaked fg: (21, 19, 10) bg: (21, 19, 10)
-[manga-translator.Model48pxOCR] prob: 0.4283817410469055 you'll be fg: (12, 13, 5) bg: (13, 14, 6)
-[manga-translator.Model48pxOCR] prob: 0.4020327627658844 say that fg: (8, 2, 0) bg: (8, 2, 0)
-[manga-translator.Model48pxOCR] prob: 0.9670259952545166 Ah, New fg: (22, 19, 17) bg: (22, 19, 16)
-[manga-translator.Model48pxOCR] prob: 0.788153886795044 minutes fg: (20, 19, 12) bg: (20, 19, 12)
-[manga-translator.Model48pxOCR] prob: 0.8071505427360535 I wouldn't fg: (20, 15, 10) bg: (20, 15, 9)
-[manga-translator.Model48pxOCR] prob: 0.9219490885734558 Noby Nobi. fg: (20, 17, 14) bg: (20, 18, 14)
-[manga-translator.Model48pxOCR] prob: 0.8795890212059021 about this fg: (16, 15, 5) bg: (16, 15, 5)
-[manga-translator.Model48pxOCR] prob: 0.9862573146820068 good feeling fg: (25, 21, 17) bg: (25, 21, 16)
-[manga-translator.Model48pxOCR] prob: 0.6955010890960693 by a thread. fg: (19, 17, 10) bg: (19, 17, 10)
-[manga-translator.Model48pxOCR] prob: 0.4702289402484894 you'll be hanging fg: (25, 18, 14) bg: (25, 18, 14)
-[manga-translator.shared] Removed unpaired bracket from "I'm gefting freaked out."
-[manga-translator.shared] Removed unpaired bracket from "Ah, New Year's Day!"
-[manga-translator.shared] Removed unpaired bracket from "...No- body's here."
-[manga-translator.shared] Removed unpaired bracket from "In 4O minutes you'll be toast."
-[manga-translator.shared] Removed unpaired bracket from "Who's saying that!?"
-[manga-translator.shared] Removed unpaired bracket from "I wouldn't say that Noby Nobi."
-[manga-translator.shared] Removed unpaired bracket from "you'll be hanging by a thread."
-[manga-translator.shared] No pre-translation replacements made.
-[manga-translator.shared] Running text translation
-[manga-translator.GeminiTranslator] Translating into Vietnamese
-[manga-translator.GeminiTranslator] Temperature: 0.5, TopP: 1
+[33mWARNING:[39m [manga-translator.GeminiTranslator] Switching Gemini API key #1 -> #2 after a retryable API error.
+[33mWARNING:[39m [manga-translator.GeminiTranslator] Retrying Gemini request with API key #2.
 [manga-translator.GeminiTranslator] -- GPT Prompt --
 
 [1mSystem Prompt[0m:
@@ -211,27 +139,27 @@ Translate the following text into Vietnamese:
 <|9|>...No- bodys here.
 ------------
 [manga-translator.GeminiTranslator] -- GPT Response --
-<|1|>A, Ngày đầu năm!
+<|1|>A, Ngày Năm Mới!
 <|2|>Mình có linh cảm tốt về năm nay.
 <|3|>Tôi sẽ không nói thế đâu, Noby Nobi.
-<|4|>Cậu sẽ ngàn cân treo sợi tóc đấy.
-<|5|>Trong 40 phút nữa cậu sẽ tiêu đời thôi.
+<|4|>Ngươi sẽ ở trong tình thế ngàn cân treo sợi tóc đấy.
+<|5|>Trong 40 phút nữa, ngươi sẽ tiêu đời thôi.
 <|6|>Ai đang nói đó!?
 <|7|>Ra mặt đi!
-<|8|>Mình đang sợ hãi lắm rồi.
+<|8|>Mình đang sợ phát khiếp đây.
 <|9|>...Không có ai ở đây cả.
 [manga-translator.GeminiTranslator] Batch translated: 9/9 completed.
-[manga-translator.GeminiTranslator] Completed translations: ['A, Ngày đầu năm!', 'Mình có linh cảm tốt về năm nay.', 'Tôi sẽ không nói thế đâu, Noby Nobi.', 'Cậu sẽ ngàn cân treo sợi tóc đấy.', 'Trong 40 phút nữa cậu sẽ tiêu đời thôi.', 'Ai đang nói đó!?', 'Ra mặt đi!', 'Mình đang sợ hãi lắm rồi.', '...Không có ai ở đây cả.']
-[manga-translator.GeminiTranslator] ['A, Ngày đầu năm!', 'Mình có linh cảm tốt về năm nay.', 'Tôi sẽ không nói thế đâu, Noby Nobi.', 'Cậu sẽ ngàn cân treo sợi tóc đấy.', 'Trong 40 phút nữa cậu sẽ tiêu đời thôi.', 'Ai đang nói đó!?', 'Ra mặt đi!', 'Mình đang sợ hãi lắm rồi.', '...Không có ai ở đây cả.']
-[manga-translator.GeminiTranslator] Used 1699 tokens (Total: 886)
-[manga-translator.GeminiTranslator] 0: Ah, New Years Day! => A, Ngày đầu năm!
+[manga-translator.GeminiTranslator] Completed translations: ['A, Ngày Năm Mới!', 'Mình có linh cảm tốt về năm nay.', 'Tôi sẽ không nói thế đâu, Noby Nobi.', 'Ngươi sẽ ở trong tình thế ngàn cân treo sợi tóc đấy.', 'Trong 40 phút nữa, ngươi sẽ tiêu đời thôi.', 'Ai đang nói đó!?', 'Ra mặt đi!', 'Mình đang sợ phát khiếp đây.', '...Không có ai ở đây cả.']
+[manga-translator.GeminiTranslator] ['A, Ngày Năm Mới!', 'Mình có linh cảm tốt về năm nay.', 'Tôi sẽ không nói thế đâu, Noby Nobi.', 'Ngươi sẽ ở trong tình thế ngàn cân treo sợi tóc đấy.', 'Trong 40 phút nữa, ngươi sẽ tiêu đời thôi.', 'Ai đang nói đó!?', 'Ra mặt đi!', 'Mình đang sợ phát khiếp đây.', '...Không có ai ở đây cả.']
+[manga-translator.GeminiTranslator] Used 1789 tokens (Total: 443)
+[manga-translator.GeminiTranslator] 0: Ah, New Years Day! => A, Ngày Năm Mới!
 [manga-translator.GeminiTranslator] 1: I got a good feeling about this year => Mình có linh cảm tốt về năm nay.
 [manga-translator.GeminiTranslator] 2: I wouldnt say that Noby Nobi. => Tôi sẽ không nói thế đâu, Noby Nobi.
-[manga-translator.GeminiTranslator] 3: youll be hanging by a thread. => Cậu sẽ ngàn cân treo sợi tóc đấy.
-[manga-translator.GeminiTranslator] 4: In 4O minutes youll be toast. => Trong 40 phút nữa cậu sẽ tiêu đời thôi.
+[manga-translator.GeminiTranslator] 3: youll be hanging by a thread. => Ngươi sẽ ở trong tình thế ngàn cân treo sợi tóc đấy.
+[manga-translator.GeminiTranslator] 4: In 4O minutes youll be toast. => Trong 40 phút nữa, ngươi sẽ tiêu đời thôi.
 [manga-translator.GeminiTranslator] 5: Whos saying that!? => Ai đang nói đó!?
 [manga-translator.GeminiTranslator] 6: Come out! => Ra mặt đi!
-[manga-translator.GeminiTranslator] 7: Im gefting freaked out. => Mình đang sợ hãi lắm rồi.
+[manga-translator.GeminiTranslator] 7: Im gefting freaked out. => Mình đang sợ phát khiếp đây.
 [manga-translator.GeminiTranslator] 8: ...No- bodys here. => ...Không có ai ở đây cả.
 [manga-translator.shared] No post-translation replacements made.
 [manga-translator.shared] Starting post-translation check...
@@ -241,5 +169,3 @@ Translate the following text into Vietnamese:
 [manga-translator.shared] Running mask refinement
 [manga-translator.LamaLargeInpainter] Inpainting resolution: 480x696
 [manga-translator.shared] Running rendering
-
-Translation cancelled by user.

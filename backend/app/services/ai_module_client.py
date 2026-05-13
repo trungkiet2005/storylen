@@ -1,14 +1,12 @@
 """
 StoryLens Backend - ai_module client.
 
-Delegates manga image translation to the local/remote ai_module FastAPI service
-and normalises its JSON response into the BubbleResult shape used by StoryLens.
+Delegates manga image rendering to the local/remote ai_module FastAPI service.
 """
 from __future__ import annotations
 
 import logging
 import time
-import uuid
 from typing import Any
 
 import httpx
@@ -28,12 +26,6 @@ def _ai_module_url(path: str) -> str:
     return f"{base}{path}"
 
 
-def _result_image_url(debug_folder: str | None) -> str | None:
-    if not debug_folder:
-        return None
-    return _ai_module_url(f"/result/{debug_folder}/final.png")
-
-
 def _build_headers() -> dict[str, str]:
     headers: dict[str, str] = {"Content-Type": "application/json"}
     token = settings.AI_MODULE_TOKEN.strip()
@@ -47,6 +39,7 @@ def _translation_config() -> dict[str, Any]:
         "translator": {
             "translator": settings.AI_MODULE_TRANSLATOR,
             "target_lang": settings.AI_MODULE_TARGET_LANG,
+            "no_text_lang_skip": True,
         },
         "detector": {"detector": settings.AI_MODULE_DETECTOR},
         "ocr": {"ocr": settings.AI_MODULE_OCR},
@@ -55,84 +48,15 @@ def _translation_config() -> dict[str, Any]:
     }
 
 
-def _normalise_bbox(item: dict[str, Any]) -> list[int]:
-    try:
-        min_x = int(float(item.get("minX", 0)))
-        min_y = int(float(item.get("minY", 0)))
-        max_x = int(float(item.get("maxX", min_x)))
-        max_y = int(float(item.get("maxY", min_y)))
-    except (TypeError, ValueError):
-        return [0, 0, 0, 0]
-
-    return [
-        max(0, min_x),
-        max(0, min_y),
-        max(0, max_x - min_x),
-        max(0, max_y - min_y),
-    ]
-
-
-def _normalise_text(text_map: Any) -> tuple[str, str]:
-    if not isinstance(text_map, dict):
-        return "", ""
-
-    target_lang = settings.AI_MODULE_TARGET_LANG
-    translated = str(
-        text_map.get(target_lang)
-        or text_map.get(target_lang.lower())
-        or text_map.get(target_lang.upper())
-        or ""
-    )
-
-    original = ""
-    for key in ("JPN", "JA", "ja", "jpn"):
-        if key != target_lang and text_map.get(key):
-            original = str(text_map[key])
-            break
-
-    if not original:
-        for key, value in text_map.items():
-            if key != target_lang and value:
-                original = str(value)
-                break
-
-    if not translated:
-        for key, value in text_map.items():
-            if key != target_lang and str(value) != original and value:
-                translated = str(value)
-                break
-
-    return original, translated
-
-
-def _normalise_translation(page_id: str, index: int, item: dict[str, Any]) -> dict[str, Any]:
-    bbox = _normalise_bbox(item)
-    original_text, translated_text = _normalise_text(item.get("text"))
-    try:
-        confidence = float(item.get("prob", 0.0))
-    except (TypeError, ValueError):
-        confidence = 0.0
-    confidence = max(0.0, min(1.0, confidence))
-
-    bubble_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{page_id}:{index}:{bbox}"))
-    return {
-        "bubble_id": bubble_id,
-        "bbox": bbox,
-        "original_text": original_text,
-        "translated_text": translated_text,
-        "confidence": confidence,
-    }
-
-
 def call_translate(page_id: str, image_url: str) -> dict[str, Any]:
     """
-    Call ai_module POST /translate/json with the Supabase image URL.
+    Call ai_module POST /translate/image with the Supabase image URL.
 
     Returns:
     {
-      "bubbles": StoryLens-compatible bubble dicts,
-      "rendered_image_url": ai_module final.png URL if available,
-      "rendered_image_bytes": PNG bytes if final.png can be fetched.
+      "bubbles": [],
+      "rendered_image_url": None,
+      "rendered_image_bytes": PNG bytes returned directly by ai_module.
     }
     """
     payload = {
@@ -145,55 +69,25 @@ def call_translate(page_id: str, image_url: str) -> dict[str, Any]:
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
             logger.info(
-                "Calling ai_module /translate/json for page %s (attempt %d/%d)",
+                "Calling ai_module /translate/image for page %s target=%s translator=%s (attempt %d/%d)",
                 page_id,
+                settings.AI_MODULE_TARGET_LANG,
+                settings.AI_MODULE_TRANSLATOR,
                 attempt,
                 _MAX_RETRIES,
             )
             with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
                 resp = client.post(
-                    _ai_module_url("/translate/json"),
+                    _ai_module_url("/translate/image"),
                     json=payload,
                     headers=headers,
                 )
 
             if resp.status_code == 200:
-                data = resp.json()
-                raw_translations = data.get("translations", [])
-                if not isinstance(raw_translations, list):
-                    raise RuntimeError(
-                        "ai_module returned unexpected 'translations' type: "
-                        f"{type(raw_translations)}"
-                    )
-                rendered_image_url = _result_image_url(data.get("debug_folder"))
-                rendered_image_bytes = None
-                if rendered_image_url:
-                    try:
-                        with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
-                            image_resp = client.get(rendered_image_url, headers=_build_headers())
-                        if image_resp.status_code == 200:
-                            rendered_image_bytes = image_resp.content
-                        else:
-                            logger.warning(
-                                "ai_module final image returned HTTP %d for page %s",
-                                image_resp.status_code,
-                                page_id,
-                            )
-                    except Exception as exc:
-                        logger.warning(
-                            "Failed to fetch ai_module final image for page %s: %s",
-                            page_id,
-                            exc,
-                        )
-
                 return {
-                    "bubbles": [
-                        _normalise_translation(page_id, index, item)
-                        for index, item in enumerate(raw_translations)
-                        if isinstance(item, dict)
-                    ],
-                    "rendered_image_url": rendered_image_url,
-                    "rendered_image_bytes": rendered_image_bytes,
+                    "bubbles": [],
+                    "rendered_image_url": None,
+                    "rendered_image_bytes": resp.content,
                 }
 
             if resp.status_code in (502, 503, 504):
@@ -238,5 +132,5 @@ def call_translate(page_id: str, image_url: str) -> dict[str, Any]:
             time.sleep(_RETRY_DELAY_SEC)
 
     raise RuntimeError(
-        f"ai_module /translate/json failed after {_MAX_RETRIES} attempts: {last_exc}"
+        f"ai_module /translate/image failed after {_MAX_RETRIES} attempts: {last_exc}"
     ) from last_exc

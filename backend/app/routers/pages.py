@@ -15,6 +15,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.database import get_supabase
 from app.models.schemas import BubbleResult, PageDataResponse, PageMetadata, ProcessingStatus
+from app.storage.supabase_storage import translated_image_public_url
 
 router = APIRouter(prefix="/page", tags=["pages"])
 logger = logging.getLogger(__name__)
@@ -139,7 +140,7 @@ def get_page(page_id: str):
     return PageDataResponse(
         page_id=page_id,
         original_image_url=page["original_image_url"],
-        translated_image_url=page.get("translated_image_url"),
+        translated_image_url=page.get("translated_image_url") or translated_image_public_url(page_id),
         processed_data=processed_data,
         metadata=PageMetadata(
             series_id=series_id,
