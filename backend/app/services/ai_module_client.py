@@ -28,6 +28,12 @@ def _ai_module_url(path: str) -> str:
     return f"{base}{path}"
 
 
+def _result_image_url(debug_folder: str | None) -> str | None:
+    if not debug_folder:
+        return None
+    return _ai_module_url(f"/result/{debug_folder}/final.png")
+
+
 def _build_headers() -> dict[str, str]:
     headers: dict[str, str] = {"Content-Type": "application/json"}
     token = settings.AI_MODULE_TOKEN.strip()
@@ -118,12 +124,16 @@ def _normalise_translation(page_id: str, index: int, item: dict[str, Any]) -> di
     }
 
 
-def call_translate(page_id: str, image_url: str) -> list[dict[str, Any]]:
+def call_translate(page_id: str, image_url: str) -> dict[str, Any]:
     """
     Call ai_module POST /translate/json with the Supabase image URL.
 
-    Returns StoryLens-compatible bubble dicts:
-    bubble_id, bbox [x, y, w, h], original_text, translated_text, confidence.
+    Returns:
+    {
+      "bubbles": StoryLens-compatible bubble dicts,
+      "rendered_image_url": ai_module final.png URL if available,
+      "rendered_image_bytes": PNG bytes if final.png can be fetched.
+    }
     """
     payload = {
         "image": image_url,
@@ -155,11 +165,36 @@ def call_translate(page_id: str, image_url: str) -> list[dict[str, Any]]:
                         "ai_module returned unexpected 'translations' type: "
                         f"{type(raw_translations)}"
                     )
-                return [
-                    _normalise_translation(page_id, index, item)
-                    for index, item in enumerate(raw_translations)
-                    if isinstance(item, dict)
-                ]
+                rendered_image_url = _result_image_url(data.get("debug_folder"))
+                rendered_image_bytes = None
+                if rendered_image_url:
+                    try:
+                        with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
+                            image_resp = client.get(rendered_image_url, headers=_build_headers())
+                        if image_resp.status_code == 200:
+                            rendered_image_bytes = image_resp.content
+                        else:
+                            logger.warning(
+                                "ai_module final image returned HTTP %d for page %s",
+                                image_resp.status_code,
+                                page_id,
+                            )
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to fetch ai_module final image for page %s: %s",
+                            page_id,
+                            exc,
+                        )
+
+                return {
+                    "bubbles": [
+                        _normalise_translation(page_id, index, item)
+                        for index, item in enumerate(raw_translations)
+                        if isinstance(item, dict)
+                    ],
+                    "rendered_image_url": rendered_image_url,
+                    "rendered_image_bytes": rendered_image_bytes,
+                }
 
             if resp.status_code in (502, 503, 504):
                 last_exc = RuntimeError(f"ai_module returned HTTP {resp.status_code}")

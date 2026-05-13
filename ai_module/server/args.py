@@ -36,7 +36,7 @@ def dir_path(string):
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Specify host and port for the server.")
     parser.add_argument('--host', type=str, default='127.0.0.1', help='The host address (default: 127.0.0.1)')
-    parser.add_argument('--port', type=int, default=8000, help='The port number (default: 8080)')
+    parser.add_argument('--port', type=int, default=8001, help='The port number (default: 8001)')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Print debug info and save intermediate images in result folder')
     parser.add_argument('--start-instance', action='store_true',

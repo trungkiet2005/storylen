@@ -628,8 +628,8 @@ class MangaTranslator:
             await self._report_progress('downscaling')
             ctx.result = ctx.result.resize(ctx.input.size)
 
-        # 在verbose模式下保存final.png到调试文件夹
-        if ctx.result and self.verbose:
+        # Always save final.png so API clients can use ai_module's rendered output.
+        if ctx.result:
             try:
                 final_img = np.array(ctx.result)
                 if len(final_img.shape) == 3:  # 彩色图片，转换BGR顺序

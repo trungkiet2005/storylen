@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS public.manga_pages (
     batch_id            UUID,                              -- groups pages from same upload
     page_number         INT,
     original_image_url  TEXT NOT NULL,
+    translated_image_url TEXT,
     thumbnail_url       TEXT,
     status              TEXT NOT NULL DEFAULT 'pending',   -- see ProcessingStatus enum
     progress            INT NOT NULL DEFAULT 0,            -- 0-100 percentage
@@ -51,6 +52,9 @@ CREATE TABLE IF NOT EXISTS public.manga_pages (
 
 CREATE INDEX IF NOT EXISTS idx_manga_pages_batch ON public.manga_pages(batch_id);
 CREATE INDEX IF NOT EXISTS idx_manga_pages_status ON public.manga_pages(status);
+
+ALTER TABLE public.manga_pages
+    ADD COLUMN IF NOT EXISTS translated_image_url TEXT;
 
 -- ─── Page Metadata ────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.page_metadata (

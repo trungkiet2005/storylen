@@ -28,6 +28,7 @@ from app.config import get_settings
 from app.database import get_supabase
 from app.models.schemas import BubbleResult, ProcessingStatus
 from app.services.ai_module_client import call_translate
+from app.storage.supabase_storage import upload_translated_image
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -97,7 +98,14 @@ def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
 
         # ── Step 2: Call HF Space — does all heavy lifting ─────────────────
         logger.info("Delegating page %s to ai_module", page_id)
-        raw_bubbles = call_translate(page_id, original_image_url)
+        ai_result = call_translate(page_id, original_image_url)
+        raw_bubbles = ai_result.get("bubbles", [])
+        rendered_image_bytes = ai_result.get("rendered_image_bytes")
+        translated_image_url = (
+            upload_translated_image(rendered_image_bytes, page_id)
+            if isinstance(rendered_image_bytes, bytes) and rendered_image_bytes
+            else None
+        ) or ai_result.get("rendered_image_url")
         logger.info(
             "ai_module returned %d text regions for page %s",
             len(raw_bubbles),
@@ -180,6 +188,18 @@ def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
                 )
 
         # ── Step 4: Mark as completed ──────────────────────────────────────
+        if translated_image_url:
+            try:
+                supabase.table("manga_pages").update({
+                    "translated_image_url": translated_image_url,
+                }).eq("page_id", page_id).execute()
+            except Exception as exc:
+                logger.warning(
+                    "Failed to store translated_image_url for page %s: %s",
+                    page_id,
+                    exc,
+                )
+
         _update_status(page_id, ProcessingStatus.COMPLETED, 100)
 
         return [

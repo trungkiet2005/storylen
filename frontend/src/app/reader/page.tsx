@@ -238,6 +238,12 @@ function ReaderContent() {
   // Sidebar side-by-side fixed width
   const SIDE_W = 360;
   const computedSideH = imgNaturalSize ? SIDE_W * (imgNaturalSize.h / imgNaturalSize.w) : 520;
+  const translatedImageUrl = pageData?.translated_image_url || null;
+  const mainImageUrl = pageData?.original_image_url
+    ? mode === "overlay" && showOverlay && translatedImageUrl
+      ? translatedImageUrl
+      : pageData.original_image_url
+    : null;
 
   return (
     <AnimatedPage>
@@ -387,11 +393,11 @@ function ReaderContent() {
                     <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", position: "relative", width: SIDE_W, height: computedSideH }}>
                       {pageData?.original_image_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-                        <img src={pageData.original_image_url} alt="Ảnh với overlay" style={{ width: "100%", height: "100%", display: "block" }}/>
+                        <img src={translatedImageUrl || pageData.original_image_url} alt="Ảnh đã dịch" style={{ width: "100%", height: "100%", display: "block" }}/>
                       ) : (
                         <MangaPage w={SIDE_W} h={computedSideH} panels={pageLayouts[page]} showBubbles showOverlay overlayLang="vn"/>
                       )}
-                      {pageData && showOverlay && imgNaturalSize && (
+                      {pageData && showOverlay && !translatedImageUrl && imgNaturalSize && (
                         <BubbleOverlays
                           bubbles={pageData.processed_data}
                           containerW={SIDE_W} containerH={computedSideH}
@@ -405,10 +411,10 @@ function ReaderContent() {
               ) : (
                 <div style={{ position: "relative" }}>
                   <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: CANVAS_W, height: computedHeight, position: "relative" }}>
-                    {pageData?.original_image_url ? (
+                    {mainImageUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
-                        src={pageData.original_image_url}
+                        src={mainImageUrl}
                         alt="Manga page"
                         style={{ width: "100%", height: "100%", display: "block" }}
                         onLoad={(e) => {
@@ -422,7 +428,7 @@ function ReaderContent() {
                     )}
 
                     {/* Real bubble overlays */}
-                    {pageData && (mode === "overlay" ? showOverlay : true) && imgNaturalSize && (
+                    {pageData && imgNaturalSize && (mode === "tap" || (mode === "overlay" && showOverlay && !translatedImageUrl)) && (
                       <BubbleOverlays
                         bubbles={pageData.processed_data}
                         containerW={CANVAS_W} containerH={computedHeight}

@@ -120,3 +120,28 @@ def upload_thumbnail(image_bytes: bytes, page_id: str) -> str | None:
     except Exception as exc:
         logger.warning("Thumbnail upload failed for page %s: %s", page_id, exc)
         return None
+
+
+def upload_translated_image(image_bytes: bytes, page_id: str) -> str | None:
+    """
+    Upload ai_module's rendered translation image.
+    Reuses the originals bucket so deployments do not need an extra storage bucket.
+    """
+    storage_path = f"{page_id}/translated.png"
+
+    try:
+        supabase = get_supabase()
+        supabase.storage.from_(settings.SUPABASE_BUCKET_ORIGINALS).upload(
+            path=storage_path,
+            file=image_bytes,
+            file_options={"content-type": "image/png", "upsert": "true"},
+        )
+        logger.info(
+            "Uploaded translated image to %s/%s",
+            settings.SUPABASE_BUCKET_ORIGINALS,
+            storage_path,
+        )
+        return _get_public_url(settings.SUPABASE_BUCKET_ORIGINALS, storage_path)
+    except Exception as exc:
+        logger.warning("Translated image upload failed for page %s: %s", page_id, exc)
+        return None

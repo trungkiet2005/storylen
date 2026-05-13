@@ -1,8 +1,8 @@
-# AI Service
+# AI Module
 
 Thu muc nay la backend FastAPI tach rieng cho frontend goi.
 
-`ai_service` da chua ban copy cua backend project:
+`ai_module` da chua ban copy cua backend project:
 
 - `server/`: FastAPI routes, queue, streaming, result APIs.
 - `manga_translator/`: pipeline dich anh, OCR, inpainting, rendering, translators.
@@ -10,12 +10,12 @@ Thu muc nay la backend FastAPI tach rieng cho frontend goi.
 - `fonts/`, `dict/`, `pip-modules/`: assets/backend support files.
 - `requirements.txt`: dependency backend.
 
-Entrypoint `ai_service/main.py` ep Python import code trong folder `ai_service` truoc, nen service khong can import `server` hoac `manga_translator` o folder ngoai.
+Entrypoint `ai_module/main.py` ep Python import code trong folder `ai_module` truoc, nen service khong can import `server` hoac `manga_translator` o folder ngoai.
 
 ## Cai dependency
 
 ```powershell
-pip install -r ai_service/requirements.txt
+pip install -r ai_module/requirements.txt
 ```
 
 ## Chay backend service
@@ -23,13 +23,13 @@ pip install -r ai_service/requirements.txt
 Chay tu root repo:
 
 ```powershell
-python -m ai_service.main --host 127.0.0.1 --port 8001
+python -m ai_module.main --host 127.0.0.1 --port 8001
 ```
 
-Hoac chay trong folder `ai_service`:
+Hoac chay trong folder `ai_module`:
 
 ```powershell
-cd ai_service
+cd ai_module
 python main.py --host 127.0.0.1 --port 8001
 ```
 

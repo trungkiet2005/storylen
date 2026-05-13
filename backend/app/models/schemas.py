@@ -67,6 +67,7 @@ class PageMetadata(BaseModel):
 class PageDataResponse(BaseModel):
     page_id: str
     original_image_url: str
+    translated_image_url: Optional[str] = None
     processed_data: list[BubbleResult]
     metadata: PageMetadata
     status: ProcessingStatus

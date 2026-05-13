@@ -69,10 +69,15 @@ def transform_to_json(ctx):
 def transform_to_bytes(ctx):
     return to_translation(ctx).to_bytes()
 
+def translation_response(ctx):
+    if isinstance(ctx, dict) and isinstance(ctx.get("translations"), list):
+        return ctx
+    return to_translation(ctx)
+
 @app.post("/translate/json", response_model=TranslationResponse, tags=["api", "json"],response_description="json strucure inspired by the ichigo translator extension")
 async def json(req: Request, data: TranslateRequest):
     ctx = await get_ctx(req, data.config, data.image)
-    return to_translation(ctx)
+    return translation_response(ctx)
 
 @app.post("/translate/bytes", response_class=StreamingResponse, tags=["api", "json"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def bytes(req: Request, data: TranslateRequest):
@@ -105,7 +110,7 @@ async def json_form(req: Request, image: UploadFile = File(...), config: str = F
     img = await image.read()
     conf = Config.parse_raw(config)
     ctx = await get_ctx(req, conf, img)
-    return to_translation(ctx)
+    return translation_response(ctx)
 
 @app.post("/translate/with-form/bytes", response_class=StreamingResponse, tags=["api", "form"],response_description="custom byte structure for decoding look at examples in 'examples/response.*'")
 async def bytes_form(req: Request, image: UploadFile = File(...), config: str = Form("{}")):

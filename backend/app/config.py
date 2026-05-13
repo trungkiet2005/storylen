@@ -57,9 +57,9 @@ class Settings(BaseSettings):
     SUPABASE_BUCKET_THUMBNAILS: str = "manga-thumbnails"
 
     # ─── HuggingFace Space (AI Worker) ────────────────────────────────────────
-    # For LOCAL development: use http://localhost:8001
+    # For LOCAL development: use http://localhost:7860
     # For production: set to your HF Space URL
-    HF_SPACE_URL: str = "http://localhost:8001"
+    HF_SPACE_URL: str = "http://localhost:7860"
     HF_SPACE_TOKEN: str = ""  # HF read token if the Space is set to private
 
     # ai_module image translation worker

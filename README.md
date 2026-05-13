@@ -52,8 +52,15 @@ cp .env.example .env
 # Edit .env and add your GEMINI_API_KEY, Database URL, etc.
 
 # Run the backend server
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+
+Local ports:
+
+*   Frontend: `http://localhost:3000`
+*   Backend API: `http://127.0.0.1:8000`
+*   AI Module image translator: `http://127.0.0.1:8001`
+*   AI Service / HF worker: `http://127.0.0.1:7860`
 
 ### 2. Frontend Setup
 
@@ -70,7 +77,15 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 ### 3. AI Service Setup (If running separately)
 ```bash
 cd ai_service
-# Similar to backend, install requirements and run the specific AI pipeline scripts.
+pip install -r requirements.txt
+uvicorn app:app --host 127.0.0.1 --port 7860 --reload
+```
+
+### 4. AI Module Setup (If running image translation locally)
+```bash
+cd ai_module
+pip install -r requirements.txt
+python main.py --host 127.0.0.1 --port 8001
 ```
 
 ## ☁️ Deployment

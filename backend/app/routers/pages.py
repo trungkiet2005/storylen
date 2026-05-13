@@ -33,13 +33,30 @@ def get_page(page_id: str):
     supabase = get_supabase()
 
     # Fetch page metadata
-    page_res = (
-        supabase.table("manga_pages")
-        .select("page_id, original_image_url, status, chapter_id, page_number")
-        .eq("page_id", page_id)
-        .maybe_single()
-        .execute()
-    )
+    try:
+        page_res = (
+            supabase.table("manga_pages")
+            .select(
+                "page_id, original_image_url, translated_image_url, "
+                "status, chapter_id, page_number"
+            )
+            .eq("page_id", page_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        logger.warning(
+            "Falling back to page query without translated_image_url for %s: %s",
+            page_id,
+            exc,
+        )
+        page_res = (
+            supabase.table("manga_pages")
+            .select("page_id, original_image_url, status, chapter_id, page_number")
+            .eq("page_id", page_id)
+            .maybe_single()
+            .execute()
+        )
 
     if not page_res.data:
         raise HTTPException(status_code=404, detail="Page not found.")
@@ -122,6 +139,7 @@ def get_page(page_id: str):
     return PageDataResponse(
         page_id=page_id,
         original_image_url=page["original_image_url"],
+        translated_image_url=page.get("translated_image_url"),
         processed_data=processed_data,
         metadata=PageMetadata(
             series_id=series_id,
