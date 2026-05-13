@@ -536,6 +536,95 @@ def me(user: AuthUser = Depends(get_current_user)) -> AuthResponse:
     return AuthResponse(authenticated=True, user=user)
 
 
+@router.patch("/me", response_model=AuthResponse)
+def update_me(
+    payload: ProfileUpdateRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> AuthResponse:
+    updates: dict[str, Any] = {}
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        if isinstance(value, date):
+            updates[field] = value.isoformat()
+        else:
+            updates[field] = value
+
+    if not updates:
+        return AuthResponse(authenticated=True, user=user)
+
+    try:
+        get_supabase().table("profiles").update(updates).eq("user_id", user.id).execute()
+    except Exception as exc:
+        logger.warning("Profile update failed for %s: %s", user.id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể cập nhật hồ sơ lúc này.",
+        ) from exc
+
+    refreshed = _to_auth_user({"id": user.id, "email": user.email})
+    return AuthResponse(authenticated=True, user=refreshed, message="Đã cập nhật hồ sơ.")
+
+
+@router.post("/me/avatar", response_model=AuthResponse)
+async def upload_me_avatar(
+    file: UploadFile = File(...),
+    user: AuthUser = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> AuthResponse:
+    content_type = (file.content_type or "").lower().split(";")[0].strip()
+    if content_type not in AVATAR_ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Avatar phải là JPG, PNG hoặc WebP.",
+        )
+
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tệp tải lên rỗng.")
+    max_bytes = settings.MAX_AVATAR_SIZE_MB * 1024 * 1024
+    if len(image_bytes) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Avatar vượt quá {settings.MAX_AVATAR_SIZE_MB} MB.",
+        )
+
+    try:
+        public_url = upload_avatar(image_bytes, user.id)
+    except RuntimeError as exc:
+        logger.warning("Avatar upload failed for %s: %s", user.id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể tải avatar lên lúc này.",
+        ) from exc
+
+    try:
+        get_supabase().table("profiles").update({"avatar_url": public_url}).eq("user_id", user.id).execute()
+    except Exception as exc:
+        logger.warning("Avatar URL persist failed for %s: %s", user.id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Đã tải avatar nhưng không lưu được hồ sơ.",
+        ) from exc
+
+    refreshed = _to_auth_user({"id": user.id, "email": user.email})
+    return AuthResponse(authenticated=True, user=refreshed, message="Đã cập nhật avatar.")
+
+
+@router.delete("/me/avatar", response_model=AuthResponse)
+def remove_me_avatar(user: AuthUser = Depends(get_current_user)) -> AuthResponse:
+    delete_avatar(user.id)
+    try:
+        get_supabase().table("profiles").update({"avatar_url": None}).eq("user_id", user.id).execute()
+    except Exception as exc:
+        logger.warning("Avatar clear failed for %s: %s", user.id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể gỡ avatar lúc này.",
+        ) from exc
+
+    refreshed = _to_auth_user({"id": user.id, "email": user.email})
+    return AuthResponse(authenticated=True, user=refreshed, message="Đã gỡ avatar.")
+
+
 @router.post("/logout", response_model=AuthResponse)
 def logout(
     request: Request,

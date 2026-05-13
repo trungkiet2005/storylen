@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Icon } from './Icons';
-import { useAuth, getAvatarInitial } from '@/contexts/AuthContext';
+import { useAuth, getAvatarInitial, getDisplayName } from '@/contexts/AuthContext';
 import { useToast } from './Toast';
 
 export const Logo = ({ size = 22 }: { size?: number }) => (
@@ -59,6 +59,7 @@ function UserMenu() {
   }
 
   const initial = getAvatarInitial(user);
+  const displayName = getDisplayName(user);
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -88,12 +89,16 @@ function UserMenu() {
             background: "var(--accent)", color: "#fff",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "var(--font-serif)", fontWeight: 800, fontSize: 13,
+            overflow: "hidden",
+            backgroundImage: user.avatar_url ? `url(${user.avatar_url})` : undefined,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
           }}
         >
-          {initial}
+          {!user.avatar_url && initial}
         </div>
-        <span style={{ fontSize: 13, fontWeight: 600, maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {user.username}
+        <span style={{ fontSize: 13, fontWeight: 600, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {displayName}
         </span>
         <Icon name="arrow-right" size={11} />
       </button>
@@ -115,8 +120,9 @@ function UserMenu() {
         >
           {/* User info header */}
           <div style={{ padding: "14px 16px", borderBottom: "1.5px solid var(--border-soft)" }}>
-            <div style={{ fontSize: 13, fontWeight: 700 }}>{user.username}</div>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>{displayName}</div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{user.email}</div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>@{user.username}</div>
           </div>
 
           {/* Menu items */}

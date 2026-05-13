@@ -15,7 +15,34 @@ export interface User {
   username: string;
   email: string;
   role: "user" | "admin";
+  full_name: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  locale: string;
+  timezone: string;
+  date_of_birth: string | null;
+  gender: "male" | "female" | "other" | "prefer_not_to_say" | null;
+  country: string | null;
+  phone: string | null;
+  preferred_target_lang: string;
+  created_at: string | null;
+  updated_at: string | null;
+  last_seen_at: string | null;
 }
+
+export type ProfileUpdate = Partial<{
+  full_name: string | null;
+  display_name: string | null;
+  bio: string | null;
+  locale: string;
+  timezone: string;
+  date_of_birth: string | null;
+  gender: User["gender"];
+  country: string | null;
+  phone: string | null;
+  preferred_target_lang: string;
+}>;
 
 export interface AuthResult {
   authenticated: boolean;
@@ -33,6 +60,9 @@ interface AuthContextValue {
   register: (username: string, email: string, password: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<User | null>;
+  updateProfile: (patch: ProfileUpdate) => Promise<User>;
+  uploadAvatar: (file: File) => Promise<User>;
+  removeAvatar: () => Promise<User>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -136,6 +166,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateProfile = useCallback(async (patch: ProfileUpdate) => {
+    const res = await authFetch("/auth/me", {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    });
+    const data = await parseAuthResponse(res, "Không thể cập nhật hồ sơ");
+    if (!data.user) throw new Error("Phản hồi không hợp lệ");
+    setUser(data.user);
+    return data.user;
+  }, []);
+
+  const uploadAvatar = useCallback(async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${BASE_URL}/auth/me/avatar`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    const data = await parseAuthResponse(res, "Tải avatar thất bại");
+    if (!data.user) throw new Error("Phản hồi không hợp lệ");
+    setUser(data.user);
+    return data.user;
+  }, []);
+
+  const removeAvatar = useCallback(async () => {
+    const res = await authFetch("/auth/me/avatar", { method: "DELETE" });
+    const data = await parseAuthResponse(res, "Không thể gỡ avatar");
+    if (!data.user) throw new Error("Phản hồi không hợp lệ");
+    setUser(data.user);
+    return data.user;
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -146,8 +209,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       refreshUser,
+      updateProfile,
+      uploadAvatar,
+      removeAvatar,
     }),
-    [isLoading, login, logout, refreshUser, register, user],
+    [isLoading, login, logout, refreshUser, register, user, updateProfile, uploadAvatar, removeAvatar],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -160,5 +226,20 @@ export function useAuth(): AuthContextValue {
 }
 
 export function getAvatarInitial(user: User): string {
-  return (user.username?.[0] || user.email?.[0] || "?").toUpperCase();
+  const source =
+    user.display_name?.trim() ||
+    user.full_name?.trim() ||
+    user.username ||
+    user.email ||
+    "?";
+  return source[0]!.toUpperCase();
+}
+
+export function getDisplayName(user: User): string {
+  return (
+    user.display_name?.trim() ||
+    user.full_name?.trim() ||
+    user.username ||
+    user.email.split("@")[0]
+  );
 }
