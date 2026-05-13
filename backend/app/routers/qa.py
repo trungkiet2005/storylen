@@ -14,10 +14,12 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.config import get_settings
 from app.database import get_supabase
 from app.models.schemas import QARequest, QAResponse
+from app.rate_limit import limiter
 from app.routers.auth import AuthUser, get_current_user
 from app.services.rag import answer_question
 
@@ -26,7 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=QAResponse)
-def ask_question(payload: QARequest, user: AuthUser = Depends(get_current_user)):
+@limiter.limit(lambda: get_settings().RATE_LIMIT_QA)
+def ask_question(request: Request, payload: QARequest, user: AuthUser = Depends(get_current_user)):
     """
     Ask a question about a manga page or series.
     Uses RAG (vector search + Gemini) to generate a grounded answer.

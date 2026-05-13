@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.config import Settings, get_settings
 from app.database import get_supabase
+from app.rate_limit import limiter
+from app.services.image_validation import verify_image_bytes
 from app.storage.supabase_storage import delete_avatar, upload_avatar
 
 logger = logging.getLogger(__name__)
@@ -479,7 +481,8 @@ def get_current_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
 
 
 @router.post("/register", response_model=AuthResponse)
-def register(payload: RegisterRequest, response: Response, settings: Settings = Depends(get_settings)) -> AuthResponse:
+@limiter.limit(lambda: get_settings().RATE_LIMIT_REGISTER)
+def register(request: Request, payload: RegisterRequest, response: Response, settings: Settings = Depends(get_settings)) -> AuthResponse:
     if not _username_available(payload.username):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Tên đăng nhập đã được sử dụng.")
 
@@ -514,7 +517,8 @@ def register(payload: RegisterRequest, response: Response, settings: Settings = 
 
 
 @router.post("/login", response_model=AuthResponse)
-def login(payload: LoginRequest, response: Response, settings: Settings = Depends(get_settings)) -> AuthResponse:
+@limiter.limit(lambda: get_settings().RATE_LIMIT_LOGIN)
+def login(request: Request, payload: LoginRequest, response: Response, settings: Settings = Depends(get_settings)) -> AuthResponse:
     data = _request_auth(
         "POST",
         "token?grant_type=password",
@@ -586,6 +590,14 @@ async def upload_me_avatar(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Avatar vượt quá {settings.MAX_AVATAR_SIZE_MB} MB.",
         )
+
+    try:
+        verify_image_bytes(image_bytes)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Avatar không phải ảnh hợp lệ.",
+        ) from exc
 
     try:
         public_url = upload_avatar(image_bytes, user.id)

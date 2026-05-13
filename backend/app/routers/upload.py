@@ -21,13 +21,15 @@ from threading import Thread
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from app.config import get_settings
 from app.database import get_supabase
 from app.models.schemas import ProcessingStatus, UploadResponse
+from app.rate_limit import limiter
 from app.routers.auth import AuthUser, get_current_user
 from app.services.ai_pipeline import process_page
+from app.services.image_validation import verify_image_bytes
 from app.storage.supabase_storage import upload_original, upload_thumbnail
 
 router = APIRouter(prefix="/upload", tags=["upload"])
@@ -116,7 +118,9 @@ def _start_pipeline_task(
 
 
 @router.post("", response_model=UploadResponse, status_code=202)
+@limiter.limit(lambda: get_settings().RATE_LIMIT_UPLOAD)
 async def upload_manga_images(
+    request: Request,
     files: list[UploadFile] = File(...),
     ai_config: str | None = Form(default=None),
     user: AuthUser = Depends(get_current_user),
@@ -154,6 +158,16 @@ async def upload_manga_images(
                 detail=(
                     f"'{upload.filename}' exceeds "
                     f"{settings.MAX_FILE_SIZE_MB} MB limit."
+                ),
+            )
+        try:
+            verify_image_bytes(image_bytes)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"'{upload.filename}' không phải ảnh hợp lệ "
+                    "hoặc đã bị hỏng."
                 ),
             )
         validated.append((upload, image_bytes, content_type))

@@ -171,6 +171,30 @@ class Settings(BaseSettings):
     # ─── RAG ──────────────────────────────────────────────────────────────────
     RAG_TOP_K: int = 5
 
+    # ─── Production sanity check ──────────────────────────────────────────────
+    @model_validator(mode="after")
+    def _check_production_safety(self) -> "Settings":
+        if self.DEBUG:
+            return self
+        origins = self.ALLOWED_ORIGINS if isinstance(self.ALLOWED_ORIGINS, list) else []
+        if not origins:
+            raise ValueError(
+                "ALLOWED_ORIGINS must be set when DEBUG is disabled."
+            )
+        if any(
+            o.startswith("http://localhost") or o.startswith("http://127.")
+            for o in origins
+        ):
+            raise ValueError(
+                "ALLOWED_ORIGINS contains localhost while DEBUG is disabled. "
+                "Set ALLOWED_ORIGINS to your production frontend domains only."
+            )
+        if "*" in origins:
+            raise ValueError(
+                "ALLOWED_ORIGINS=* is not allowed when DEBUG is disabled."
+            )
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:
