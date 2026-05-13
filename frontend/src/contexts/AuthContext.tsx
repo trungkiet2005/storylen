@@ -37,7 +37,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://storylens-api.onrender.com/v1";
 
 async function parseAuthResponse(res: Response, fallback: string): Promise<AuthResult> {
   let body: Partial<AuthResult> & { detail?: string } = {};

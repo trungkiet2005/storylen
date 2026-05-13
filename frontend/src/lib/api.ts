@@ -4,7 +4,7 @@
  */
 
 const BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
+  process.env.NEXT_PUBLIC_API_URL || "https://storylens-api.onrender.com/v1";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
