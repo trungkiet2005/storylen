@@ -12,7 +12,13 @@
       "PowerShell(Get-Location; npx tsc --noEmit 2>&1 | Select-Object -Last 50; \"EXIT=$LASTEXITCODE\")",
       "PowerShell(Set-Location ..\\\\backend; python -m py_compile app/routers/history.py; \"EXIT=$LASTEXITCODE\")",
       "Bash(echo \"exit=$?\")",
-      "Bash(grep -E \"\\\\.tsx$\")"
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(psql --version)",
+      "Bash(supabase --version)",
+      "PowerShell(psql --version 2>&1)",
+      "PowerShell(supabase --version 2>&1)",
+      "PowerShell(npx supabase --version 2>&1)",
+      "PowerShell(npx supabase login --token *)"
     ]
   }
 }
