@@ -1,458 +1,257 @@
 "use client";
+
 import React, { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { TopBar } from "@/components/TopBar";
+import Link from "next/link";
 import { SectionHeader } from "@/components/SectionHeader";
 import { Icon } from "@/components/Icons";
-import { useToast } from "@/components/Toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from "@/components/Animations";
 import {
-  adminListUsers,
-  adminUpdateUserRole,
-  adminDeleteUser,
-  adminGetStats,
-  APIError,
+  AdminActivityResponse,
+  AdminBreakdownItem,
   AdminStats,
-  AdminUserItem,
-  UserRole,
+  AdminTopUser,
+  adminGetActivity,
+  adminGetStats,
+  adminGetStatusBreakdown,
+  adminGetTargetLangBreakdown,
+  adminGetTopUsers,
 } from "@/lib/api";
+import { errorMessage } from "./_shared";
 
-const PAGE_SIZE = 20;
+const ACTIVITY_DAYS = 14;
 
-function formatDate(value: string | null): string {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString("vi-VN", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return value;
-  }
+function StatCard({ label, value, icon, sub }: { label: string; value: number; icon: string; sub?: string }) {
+  return (
+    <div
+      className="stroke-ink panel-shadow"
+      style={{
+        background: "var(--panel)",
+        padding: "16px 18px",
+        display: "flex",
+        gap: 14,
+        alignItems: "center",
+      }}
+    >
+      <Icon name={icon} size={22} />
+      <div>
+        <div className="display" style={{ fontSize: 26, lineHeight: 1 }}>
+          {value.toLocaleString("vi-VN")}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>{label}</div>
+        {sub && <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>{sub}</div>}
+      </div>
+    </div>
+  );
 }
 
-export default function AdminPage() {
-  const router = useRouter();
-  const { toast } = useToast();
-  const { user, isLoading, isAdmin } = useAuth();
+function ActivitySparkline({ activity }: { activity: AdminActivityResponse | null }) {
+  if (!activity || activity.points.length === 0) {
+    return <div style={{ padding: 32, color: "var(--muted)", fontSize: 12 }}>Chưa có dữ liệu.</div>;
+  }
+  const points = activity.points;
+  const max = Math.max(1, ...points.flatMap((p) => [p.pages_uploaded, p.qa_asked, p.new_users]));
+  const W = 720;
+  const H = 160;
+  const stepX = W / Math.max(1, points.length - 1);
 
+  function path(values: number[]): string {
+    return values
+      .map((v, i) => `${i === 0 ? "M" : "L"} ${(i * stepX).toFixed(1)} ${(H - (v / max) * (H - 12) - 6).toFixed(1)}`)
+      .join(" ");
+  }
+
+  return (
+    <div style={{ width: "100%", overflowX: "auto" }}>
+      <svg viewBox={`0 0 ${W} ${H + 24}`} width="100%" style={{ display: "block", minWidth: 600 }} aria-label="Hoạt động 14 ngày">
+        {[0.25, 0.5, 0.75].map((r) => (
+          <line key={r} x1={0} x2={W} y1={H * r} y2={H * r} stroke="var(--border-soft)" strokeDasharray="3 3" />
+        ))}
+        <path d={path(points.map((p) => p.pages_uploaded))} fill="none" stroke="var(--accent)" strokeWidth={2.4} />
+        <path d={path(points.map((p) => p.qa_asked))} fill="none" stroke="#2A6FDB" strokeWidth={2} />
+        <path d={path(points.map((p) => p.new_users))} fill="none" stroke="#1E8F4E" strokeWidth={2} />
+        {points.map((p, i) => (
+          <text
+            key={p.day}
+            x={i * stepX}
+            y={H + 18}
+            textAnchor="middle"
+            fontSize={9}
+            fill="var(--muted)"
+            style={{ fontFamily: "var(--font-mono)" }}
+          >
+            {p.day.slice(5)}
+          </text>
+        ))}
+      </svg>
+      <div style={{ display: "flex", gap: 18, marginTop: 8, fontSize: 11, color: "var(--muted)" }}>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "var(--accent)", marginRight: 6 }} />Trang</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#2A6FDB", marginRight: 6 }} />Q&amp;A</span>
+        <span><span style={{ display: "inline-block", width: 10, height: 10, background: "#1E8F4E", marginRight: 6 }} />User mới</span>
+      </div>
+    </div>
+  );
+}
+
+function BarList({ items, accent = "var(--accent)" }: { items: AdminBreakdownItem[]; accent?: string }) {
+  if (items.length === 0) {
+    return <div style={{ padding: 16, color: "var(--muted)", fontSize: 12 }}>Chưa có dữ liệu.</div>;
+  }
+  const max = Math.max(1, ...items.map((i) => i.count));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {items.map((item) => (
+        <div key={item.label}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+            <span style={{ color: "var(--fg-soft)" }}>{item.label}</span>
+            <span className="mono" style={{ color: "var(--muted)" }}>{item.count.toLocaleString("vi-VN")}</span>
+          </div>
+          <div style={{ background: "var(--bg-2)", height: 8, borderRadius: 4, overflow: "hidden" }}>
+            <div
+              style={{
+                width: `${(item.count / max) * 100}%`,
+                height: "100%",
+                background: accent,
+                transition: "width 0.3s",
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function AdminDashboardPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [users, setUsers] = useState<AdminUserItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
+  const [activity, setActivity] = useState<AdminActivityResponse | null>(null);
+  const [topUsers, setTopUsers] = useState<AdminTopUser[]>([]);
+  const [statusBreakdown, setStatusBreakdown] = useState<AdminBreakdownItem[]>([]);
+  const [langBreakdown, setLangBreakdown] = useState<AdminBreakdownItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busyUserId, setBusyUserId] = useState<string | null>(null);
 
-  // Redirect non-admins
-  useEffect(() => {
-    if (!isLoading && !isAdmin) {
-      toast("Bạn không có quyền truy cập khu vực quản trị.", "error");
-      router.replace("/");
-    }
-  }, [isAdmin, isLoading, router, toast]);
-
-  const loadData = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [statsRes, listRes] = await Promise.all([
+      const [s, a, t, sb, lb] = await Promise.all([
         adminGetStats(),
-        adminListUsers({ limit: PAGE_SIZE, offset }),
+        adminGetActivity(ACTIVITY_DAYS),
+        adminGetTopUsers("total", 8),
+        adminGetStatusBreakdown(),
+        adminGetTargetLangBreakdown(),
       ]);
-      setStats(statsRes);
-      setUsers(listRes.items);
-      setTotal(listRes.total);
+      setStats(s);
+      setActivity(a);
+      setTopUsers(t.items);
+      setStatusBreakdown(sb.items);
+      setLangBreakdown(lb.items);
     } catch (err) {
-      const msg =
-        err instanceof APIError ? err.message :
-        err instanceof Error ? err.message :
-        "Không thể tải dữ liệu quản trị.";
-      setError(msg);
+      setError(errorMessage(err, "Không thể tải dashboard."));
     } finally {
       setLoading(false);
     }
-  }, [offset]);
+  }, []);
 
   useEffect(() => {
-    if (isAdmin) {
-      void loadData();
-    }
-  }, [isAdmin, loadData]);
-
-  const handleRoleChange = async (target: AdminUserItem, newRole: UserRole) => {
-    if (target.role === newRole) return;
-    if (target.id === user?.id && newRole !== "admin") {
-      toast("Không thể tự gỡ quyền quản trị của chính mình.", "error");
-      return;
-    }
-    setBusyUserId(target.id);
-    try {
-      await adminUpdateUserRole(target.id, newRole);
-      toast(
-        newRole === "admin"
-          ? `Đã cấp quyền admin cho ${target.username || target.email}.`
-          : `Đã hạ quyền ${target.username || target.email} về user.`,
-        "success",
-      );
-      await loadData();
-    } catch (err) {
-      const msg =
-        err instanceof APIError ? err.message :
-        err instanceof Error ? err.message :
-        "Không cập nhật được quyền.";
-      toast(msg, "error");
-    } finally {
-      setBusyUserId(null);
-    }
-  };
-
-  const handleDelete = async (target: AdminUserItem) => {
-    if (target.id === user?.id) {
-      toast("Không thể tự xóa tài khoản của chính mình.", "error");
-      return;
-    }
-    const label = target.username || target.email || target.id;
-    const confirmed = window.confirm(
-      `Xóa vĩnh viễn người dùng "${label}"?\nMọi trang truyện và lịch sử Q&A của họ cũng sẽ bị xóa.`,
-    );
-    if (!confirmed) return;
-
-    setBusyUserId(target.id);
-    try {
-      await adminDeleteUser(target.id);
-      toast(`Đã xóa người dùng "${label}".`, "success");
-      await loadData();
-    } catch (err) {
-      const msg =
-        err instanceof APIError ? err.message :
-        err instanceof Error ? err.message :
-        "Không xóa được người dùng.";
-      toast(msg, "error");
-    } finally {
-      setBusyUserId(null);
-    }
-  };
-
-  if (isLoading || !isAdmin) {
-    return (
-      <AnimatedPage>
-        <div className="paper-grain" style={{ minHeight: "100vh" }}>
-          <TopBar active="" />
-          <div style={{ padding: 56, textAlign: "center", color: "var(--muted)" }}>
-            Đang kiểm tra quyền truy cập…
-          </div>
-        </div>
-      </AnimatedPage>
-    );
-  }
-
-  const statCards: Array<{ label: string; value: number; icon: string }> = stats
-    ? [
-        { label: "Tổng người dùng", value: stats.total_users, icon: "user" },
-        { label: "Quản trị viên", value: stats.total_admins, icon: "key" },
-        { label: "Tổng trang đã upload", value: stats.total_pages, icon: "book" },
-        { label: "Tổng câu hỏi Q&A", value: stats.total_qa, icon: "chat" },
-      ]
-    : [];
-
-  const hasNext = offset + PAGE_SIZE < total;
-  const hasPrev = offset > 0;
+    void load();
+  }, [load]);
 
   return (
-    <AnimatedPage>
-      <div className="paper-grain" style={{ minHeight: "100vh" }}>
-        <TopBar active="admin" />
-        <div style={{ padding: "40px 56px" }}>
-          <FadeIn direction="up" distance={20} delay={0.1}>
-            <SectionHeader
-              kanji="管"
-              label="Admin · Quản trị hệ thống"
-              title="Quản lý người dùng"
-              subtitle="Xem danh sách tài khoản, cấp/hạ quyền quản trị và xóa người dùng cùng toàn bộ dữ liệu của họ."
-              stamp="ADMIN"
-            />
-          </FadeIn>
+    <div>
+      <SectionHeader
+        kanji="管"
+        label="Admin · Tổng quan"
+        title="Dashboard"
+        subtitle="Toàn cảnh hệ thống StoryLens: người dùng, nội dung, hoạt động gần đây."
+        stamp="ADMIN"
+      />
 
-          {/* Stats */}
-          {stats && (
-            <StaggerContainer
-              staggerDelay={0.06}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: 16,
-                marginBottom: 28,
-              }}
-            >
-              {statCards.map((stat) => (
-                <StaggerItem key={stat.label} direction="up" distance={12}>
-                  <div
-                    className="stroke-ink panel-shadow"
-                    style={{
-                      background: "var(--panel)",
-                      padding: "16px 20px",
-                      display: "flex",
-                      gap: 14,
-                      alignItems: "center",
-                    }}
-                  >
-                    <Icon name={stat.icon} size={22} />
-                    <div>
-                      <div className="display" style={{ fontSize: 26, lineHeight: 1 }}>
-                        {stat.value}
-                      </div>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
-                        {stat.label}
-                      </div>
-                    </div>
-                  </div>
-                </StaggerItem>
-              ))}
-            </StaggerContainer>
-          )}
+      {error && (
+        <div className="stroke-ink" style={{ background: "var(--bg-2)", color: "var(--accent)", padding: "10px 14px", marginBottom: 20, fontSize: 13 }}>
+          {error}
+        </div>
+      )}
 
-          {/* Error banner */}
-          {error && (
-            <div
-              className="stroke-ink"
-              style={{
-                background: "var(--bg-2)",
-                color: "var(--accent)",
-                padding: "10px 14px",
-                marginBottom: 20,
-                fontSize: 13,
-              }}
-            >
-              {error}
-            </div>
-          )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        <span className="caps-xs" style={{ color: "var(--muted)" }}>{loading ? "Đang tải…" : "Cập nhật thời gian thực"}</span>
+        <button className="btn btn-sm btn-ghost" onClick={load} disabled={loading}>
+          <Icon name="refresh" size={12} /> Làm mới
+        </button>
+      </div>
 
-          {/* Toolbar */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 14,
-            }}
-          >
-            <div className="caps-xs" style={{ color: "var(--muted)" }}>
-              {loading ? "Đang tải…" : `${total} người dùng`}
-            </div>
-            <button className="btn btn-sm btn-ghost" onClick={loadData} disabled={loading}>
-              <Icon name="refresh" size={12} /> Làm mới
-            </button>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: 14,
+          marginBottom: 28,
+        }}
+      >
+        <StatCard label="Tổng người dùng"  value={stats?.total_users ?? 0}        icon="user"  sub={stats ? `+${stats.new_users_today} hôm nay` : undefined} />
+        <StatCard label="Quản trị viên"    value={stats?.total_admins ?? 0}       icon="key" />
+        <StatCard label="Tổng trang"       value={stats?.total_pages ?? 0}        icon="book"  sub={stats ? `+${stats.pages_today} hôm nay` : undefined} />
+        <StatCard label="Tổng Q&A"         value={stats?.total_qa ?? 0}           icon="chat"  sub={stats ? `+${stats.qa_today} hôm nay` : undefined} />
+        <StatCard label="Bản dịch đã lưu"  value={stats?.total_translations ?? 0} icon="translate" />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 20, marginBottom: 28 }}>
+        <div className="stroke-ink panel-shadow" style={{ background: "var(--panel)", padding: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 14 }}>
+            <h3 style={{ margin: 0, fontSize: 14 }}>Hoạt động {ACTIVITY_DAYS} ngày gần nhất</h3>
+            <Link href="/admin/analytics" style={{ fontSize: 12, color: "var(--accent)" }}>
+              Xem chi tiết →
+            </Link>
           </div>
+          <ActivitySparkline activity={activity} />
+        </div>
 
-          {/* Users table */}
-          <div className="stroke-ink" style={{ background: "var(--panel)", overflow: "hidden" }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1.4fr 1.8fr 110px 90px 90px 170px 220px",
-                padding: "10px 16px",
-                background: "var(--bg-2)",
-                borderBottom: "2px solid var(--border)",
-              }}
-              className="caps-xs"
-            >
-              <span>Người dùng</span>
-              <span>Email</span>
-              <span>Quyền</span>
-              <span>Trang</span>
-              <span>Q&amp;A</span>
-              <span>Đăng nhập gần nhất</span>
-              <span>Hành động</span>
-            </div>
-
-            {users.length === 0 && !loading ? (
-              <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--muted)" }}>
-                Chưa có người dùng nào.
-              </div>
-            ) : (
-              users.map((u, i) => {
-                const isSelf = u.id === user?.id;
-                const isBusy = busyUserId === u.id;
-                return (
+        <div className="stroke-ink panel-shadow" style={{ background: "var(--panel)", padding: 18 }}>
+          <h3 style={{ margin: "0 0 14px", fontSize: 14 }}>Top người dùng tích cực</h3>
+          {topUsers.length === 0 ? (
+            <div style={{ padding: 16, color: "var(--muted)", fontSize: 12 }}>Chưa có dữ liệu.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {topUsers.map((u, idx) => (
+                <Link key={u.user_id} href={`/admin/users/${u.user_id}`} style={{ textDecoration: "none" }}>
                   <div
-                    key={u.id}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1.4fr 1.8fr 110px 90px 90px 170px 220px",
-                      padding: "12px 16px",
-                      borderBottom: i < users.length - 1 ? "1px dashed var(--border-soft)" : "none",
+                      gridTemplateColumns: "20px 1fr auto",
+                      gap: 10,
                       alignItems: "center",
-                      fontSize: 13,
-                      opacity: isBusy ? 0.55 : 1,
-                      transition: "opacity 0.15s",
+                      padding: "6px 8px",
+                      borderRadius: 4,
+                      color: "var(--fg)",
+                      transition: "background 0.1s",
                     }}
+                    onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = "var(--bg-2)")}
+                    onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = "transparent")}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                      <div
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: "50%",
-                          background: u.role === "admin" ? "var(--accent)" : "var(--bg-3)",
-                          color: u.role === "admin" ? "#fff" : "var(--fg)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontFamily: "var(--font-serif)",
-                          fontWeight: 800,
-                          fontSize: 12,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {(u.username?.[0] || u.email?.[0] || "?").toUpperCase()}
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {u.username || "—"}
-                          {isSelf && (
-                            <span
-                              className="chip"
-                              style={{ marginLeft: 8, padding: "1px 6px", fontSize: 10 }}
-                            >
-                              Bạn
-                            </span>
-                          )}
-                        </div>
-                        <div
-                          className="mono"
-                          style={{
-                            fontSize: 10,
-                            color: "var(--muted)",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {u.id.slice(0, 8)}…
-                        </div>
-                      </div>
-                    </div>
-
-                    <span
-                      style={{
-                        color: "var(--fg-soft)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        paddingRight: 12,
-                      }}
-                    >
-                      {u.email || "—"}
+                    <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>#{idx + 1}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {u.username || u.user_id.slice(0, 8)}
                     </span>
-
-                    <span
-                      className="chip"
-                      style={{
-                        padding: "2px 10px",
-                        fontSize: 10,
-                        background: u.role === "admin" ? "var(--accent)" : "var(--bg-2)",
-                        color: u.role === "admin" ? "#fff" : "var(--fg-soft)",
-                        borderColor: "var(--border)",
-                        justifySelf: "start",
-                      }}
-                    >
-                      {u.role === "admin" ? "ADMIN" : "USER"}
+                    <span className="mono" style={{ fontSize: 11, color: "var(--muted)" }}>
+                      {u.pages_count}p · {u.qa_count}q
                     </span>
-
-                    <span className="mono" style={{ color: "var(--muted)" }}>
-                      {u.pages_count}
-                    </span>
-                    <span className="mono" style={{ color: "var(--muted)" }}>
-                      {u.qa_count}
-                    </span>
-                    <span style={{ fontSize: 11, color: "var(--muted)" }}>
-                      {formatDate(u.last_sign_in_at)}
-                    </span>
-
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {u.role === "admin" ? (
-                        <button
-                          className="btn btn-sm btn-ghost"
-                          disabled={isBusy || isSelf}
-                          onClick={() => handleRoleChange(u, "user")}
-                          title={isSelf ? "Không thể tự hạ quyền" : "Hạ quyền về user"}
-                          style={{ fontSize: 11 }}
-                        >
-                          <Icon name="arrow-right" size={11} /> User
-                        </button>
-                      ) : (
-                        <button
-                          className="btn btn-sm"
-                          disabled={isBusy}
-                          onClick={() => handleRoleChange(u, "admin")}
-                          title="Cấp quyền admin"
-                          style={{ fontSize: 11 }}
-                        >
-                          <Icon name="key" size={11} /> Admin
-                        </button>
-                      )}
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        disabled={isBusy || isSelf}
-                        onClick={() => handleDelete(u)}
-                        title={isSelf ? "Không thể tự xóa" : "Xóa người dùng"}
-                        style={{ color: "var(--accent)", fontSize: 11 }}
-                      >
-                        <Icon name="trash" size={11} /> Xóa
-                      </button>
-                    </div>
                   </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Pagination */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: 16,
-              fontSize: 12,
-              color: "var(--muted)",
-            }}
-          >
-            <div>
-              Hiển thị {users.length === 0 ? 0 : offset + 1}–{offset + users.length} /{" "}
-              {total}
+                </Link>
+              ))}
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                className="btn btn-sm btn-ghost"
-                disabled={!hasPrev || loading}
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-              >
-                ← Trước
-              </button>
-              <button
-                className="btn btn-sm btn-ghost"
-                disabled={!hasNext || loading}
-                onClick={() => setOffset(offset + PAGE_SIZE)}
-              >
-                Tiếp →
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       </div>
-    </AnimatedPage>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div className="stroke-ink panel-shadow" style={{ background: "var(--panel)", padding: 18 }}>
+          <h3 style={{ margin: "0 0 14px", fontSize: 14 }}>Phân bố theo trạng thái trang</h3>
+          <BarList items={statusBreakdown} accent="var(--accent)" />
+        </div>
+        <div className="stroke-ink panel-shadow" style={{ background: "var(--panel)", padding: 18 }}>
+          <h3 style={{ margin: "0 0 14px", fontSize: 14 }}>Ngôn ngữ dịch ưa thích</h3>
+          <BarList items={langBreakdown} accent="#2A6FDB" />
+        </div>
+      </div>
+    </div>
   );
 }

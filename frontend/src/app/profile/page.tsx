@@ -87,7 +87,7 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabId>("profile");
-  const [form, setForm] = useState(() => (user ? toFormState(user) : null));
+  const [form, setForm] = useState<FormState | null>(() => (user ? toFormState(user) : null));
   const [saving, setSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -139,7 +139,7 @@ export default function ProfilePage() {
     router.push("/");
   }
 
-  function setField<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
+  function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
 

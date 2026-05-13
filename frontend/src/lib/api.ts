@@ -337,14 +337,21 @@ export async function deleteHistoryItem(pageId: string): Promise<void> {
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 export type UserRole = "user" | "admin";
+export type UserStatusFilter = "all" | "active" | "banned" | "unverified";
 
 export interface AdminUserItem {
   id: string;
   username: string | null;
   email: string | null;
   role: UserRole;
+  avatar_url: string | null;
+  display_name: string | null;
+  full_name: string | null;
   created_at: string | null;
   last_sign_in_at: string | null;
+  last_seen_at: string | null;
+  banned_until: string | null;
+  email_confirmed: boolean;
   pages_count: number;
   qa_count: number;
 }
@@ -355,8 +362,14 @@ export interface AdminUserListResponse {
 }
 
 export interface AdminUserDetail extends AdminUserItem {
+  bio: string | null;
+  locale: string | null;
+  timezone: string | null;
+  country: string | null;
+  phone: string | null;
+  preferred_target_lang: string | null;
   email_confirmed_at: string | null;
-  banned_until: string | null;
+  translations_count: number;
 }
 
 export interface AdminStats {
@@ -364,15 +377,29 @@ export interface AdminStats {
   total_admins: number;
   total_pages: number;
   total_qa: number;
+  total_translations: number;
+  pages_today: number;
+  qa_today: number;
+  new_users_today: number;
 }
 
-export async function adminListUsers(params?: {
+export interface AdminListUsersParams {
   limit?: number;
   offset?: number;
-}): Promise<AdminUserListResponse> {
+  search?: string;
+  role?: UserRole | "all";
+  status?: UserStatusFilter;
+  sort?: string; // "created_at:desc", "email:asc", etc.
+}
+
+export async function adminListUsers(params?: AdminListUsersParams): Promise<AdminUserListResponse> {
   const qs = new URLSearchParams();
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
+  if (params?.search) qs.set("search", params.search);
+  if (params?.role && params.role !== "all") qs.set("role", params.role);
+  if (params?.status && params.status !== "all") qs.set("status", params.status);
+  if (params?.sort) qs.set("sort", params.sort);
   const q = qs.toString();
   return request<AdminUserListResponse>(`/admin/users${q ? `?${q}` : ""}`);
 }
@@ -381,10 +408,7 @@ export async function adminGetUser(userId: string): Promise<AdminUserDetail> {
   return request<AdminUserDetail>(`/admin/users/${userId}`);
 }
 
-export async function adminUpdateUserRole(
-  userId: string,
-  role: UserRole,
-): Promise<AdminUserItem> {
+export async function adminUpdateUserRole(userId: string, role: UserRole): Promise<AdminUserItem> {
   return request<AdminUserItem>(`/admin/users/${userId}/role`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -392,10 +416,289 @@ export async function adminUpdateUserRole(
   });
 }
 
+export interface AdminProfilePatch {
+  full_name?: string | null;
+  display_name?: string | null;
+  bio?: string | null;
+  locale?: string;
+  timezone?: string;
+  date_of_birth?: string | null;
+  gender?: "male" | "female" | "other" | "prefer_not_to_say" | null;
+  country?: string | null;
+  phone?: string | null;
+  preferred_target_lang?: string;
+  avatar_url?: string | null;
+}
+
+export async function adminUpdateUserProfile(
+  userId: string,
+  patch: AdminProfilePatch,
+): Promise<AdminUserDetail> {
+  return request<AdminUserDetail>(`/admin/users/${userId}/profile`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function adminBanUser(
+  userId: string,
+  payload: { duration: string; reason?: string | null },
+): Promise<AdminUserItem> {
+  return request<AdminUserItem>(`/admin/users/${userId}/ban`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function adminUnbanUser(userId: string): Promise<AdminUserItem> {
+  return request<AdminUserItem>(`/admin/users/${userId}/unban`, { method: "POST" });
+}
+
+export async function adminSendPasswordReset(userId: string): Promise<{ message: string }> {
+  return request<{ message: string }>(`/admin/users/${userId}/password-reset`, { method: "POST" });
+}
+
+export async function adminResendVerification(userId: string): Promise<{ message: string }> {
+  return request<{ message: string }>(`/admin/users/${userId}/resend-verification`, { method: "POST" });
+}
+
 export async function adminDeleteUser(userId: string): Promise<void> {
   return request<void>(`/admin/users/${userId}`, { method: "DELETE" });
 }
 
+export interface AdminBulkResult {
+  succeeded: string[];
+  failed: { user_id?: string; id?: string; error: string }[];
+}
+
+export async function adminBulkDeleteUsers(userIds: string[]): Promise<AdminBulkResult> {
+  return request<AdminBulkResult>("/admin/users/bulk-delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_ids: userIds }),
+  });
+}
+
+// ─── Content management ───────────────────────────────────────────────────────
+
+export interface AdminPageItem {
+  page_id: string;
+  user_id: string | null;
+  username: string | null;
+  thumbnail_url: string | null;
+  original_image_url: string | null;
+  status: string;
+  progress: number;
+  page_number: number | null;
+  uploaded_at: string | null;
+  processed_at: string | null;
+}
+
+export interface AdminPageListResponse {
+  total: number;
+  items: AdminPageItem[];
+}
+
+export async function adminListPages(params?: {
+  limit?: number;
+  offset?: number;
+  user_id?: string;
+  status?: string;
+}): Promise<AdminPageListResponse> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  if (params?.user_id) qs.set("user_id", params.user_id);
+  if (params?.status) qs.set("status", params.status);
+  const q = qs.toString();
+  return request<AdminPageListResponse>(`/admin/pages${q ? `?${q}` : ""}`);
+}
+
+export async function adminDeletePage(pageId: string): Promise<void> {
+  return request<void>(`/admin/pages/${pageId}`, { method: "DELETE" });
+}
+
+export async function adminBulkDeletePages(pageIds: string[]): Promise<AdminBulkResult> {
+  return request<AdminBulkResult>("/admin/pages/bulk-delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: pageIds }),
+  });
+}
+
+export interface AdminQAItem {
+  qa_id: string;
+  user_id: string | null;
+  username: string | null;
+  page_id: string | null;
+  user_question: string;
+  ai_answer: string | null;
+  asked_at: string | null;
+}
+
+export interface AdminQAListResponse {
+  total: number;
+  items: AdminQAItem[];
+}
+
+export async function adminListQA(params?: {
+  limit?: number;
+  offset?: number;
+  user_id?: string;
+  page_id?: string;
+}): Promise<AdminQAListResponse> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  if (params?.user_id) qs.set("user_id", params.user_id);
+  if (params?.page_id) qs.set("page_id", params.page_id);
+  const q = qs.toString();
+  return request<AdminQAListResponse>(`/admin/qa${q ? `?${q}` : ""}`);
+}
+
+export async function adminDeleteQA(qaId: string): Promise<void> {
+  return request<void>(`/admin/qa/${qaId}`, { method: "DELETE" });
+}
+
+export async function adminBulkDeleteQA(qaIds: string[]): Promise<AdminBulkResult> {
+  return request<AdminBulkResult>("/admin/qa/bulk-delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: qaIds }),
+  });
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
 export async function adminGetStats(): Promise<AdminStats> {
   return request<AdminStats>("/admin/stats");
+}
+
+export interface AdminActivityPoint {
+  day: string;
+  new_users: number;
+  pages_uploaded: number;
+  qa_asked: number;
+}
+
+export interface AdminActivityResponse {
+  days: number;
+  points: AdminActivityPoint[];
+}
+
+export async function adminGetActivity(days = 30): Promise<AdminActivityResponse> {
+  return request<AdminActivityResponse>(`/admin/activity?days=${days}`);
+}
+
+export interface AdminTopUser {
+  user_id: string;
+  username: string | null;
+  pages_count: number;
+  qa_count: number;
+}
+
+export async function adminGetTopUsers(
+  metric: "pages" | "qa" | "total" = "pages",
+  limit = 10,
+): Promise<{ metric: string; items: AdminTopUser[] }> {
+  return request(`/admin/top-users?metric=${metric}&limit=${limit}`);
+}
+
+export interface AdminBreakdownItem {
+  label: string;
+  count: number;
+}
+
+export async function adminGetStatusBreakdown(): Promise<{ items: AdminBreakdownItem[] }> {
+  return request("/admin/breakdown/status");
+}
+
+export async function adminGetTargetLangBreakdown(): Promise<{ items: AdminBreakdownItem[] }> {
+  return request("/admin/breakdown/target-lang");
+}
+
+// ─── Audit log ────────────────────────────────────────────────────────────────
+
+export interface AdminAuditEntry {
+  id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  summary: string | null;
+  metadata: Record<string, unknown> | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string | null;
+}
+
+export async function adminGetAudit(params?: {
+  limit?: number;
+  offset?: number;
+  actor_id?: string;
+  action?: string;
+  target_type?: string;
+}): Promise<{ total: number; items: AdminAuditEntry[] }> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  if (params?.actor_id) qs.set("actor_id", params.actor_id);
+  if (params?.action) qs.set("action", params.action);
+  if (params?.target_type) qs.set("target_type", params.target_type);
+  const q = qs.toString();
+  return request(`/admin/audit${q ? `?${q}` : ""}`);
+}
+
+// ─── App settings ─────────────────────────────────────────────────────────────
+
+export interface AdminSettingItem {
+  key: string;
+  value: unknown;
+  description: string | null;
+  updated_by: string | null;
+  updated_at: string | null;
+}
+
+export async function adminListSettings(): Promise<{ items: AdminSettingItem[] }> {
+  return request("/admin/settings");
+}
+
+export async function adminUpsertSetting(
+  key: string,
+  value: unknown,
+  description?: string | null,
+): Promise<AdminSettingItem> {
+  return request<AdminSettingItem>(`/admin/settings/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ value, description: description ?? null }),
+  });
+}
+
+export async function adminDeleteSetting(key: string): Promise<void> {
+  return request<void>(`/admin/settings/${encodeURIComponent(key)}`, { method: "DELETE" });
+}
+
+// ─── Health ───────────────────────────────────────────────────────────────────
+
+export interface AdminServiceHealth {
+  name: string;
+  ok: boolean;
+  latency_ms: number | null;
+  detail: string | null;
+}
+
+export interface AdminHealth {
+  app_name: string;
+  app_version: string;
+  debug: boolean;
+  services: AdminServiceHealth[];
+  checked_at: string;
+}
+
+export async function adminGetHealth(): Promise<AdminHealth> {
+  return request<AdminHealth>("/admin/health");
 }
