@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -26,8 +26,12 @@ class Settings(BaseSettings):
     APP_NAME: str = "StoryLens API"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
-    # Accepts JSON list string from .env OR Python list
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "https://storylens.vercel.app"]
+    # Accepts JSON list string from .env OR comma-separated string (NoDecode skips
+    # pydantic-settings' built-in JSON decoding so our validator handles both).
+    ALLOWED_ORIGINS: Annotated[list[str], NoDecode] = [
+        "http://localhost:3000",
+        "https://storylens.vercel.app",
+    ]
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
@@ -121,7 +125,7 @@ class Settings(BaseSettings):
 
     # ─── Upload constraints ───────────────────────────────────────────────────
     MAX_FILE_SIZE_MB: int = 10
-    ALLOWED_EXTENSIONS: list[str] = ["jpg", "jpeg", "png", "webp"]
+    ALLOWED_EXTENSIONS: Annotated[list[str], NoDecode] = ["jpg", "jpeg", "png", "webp"]
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod
