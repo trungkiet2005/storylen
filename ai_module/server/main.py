@@ -5,8 +5,10 @@ import shutil
 import signal
 import subprocess
 import sys
+import base64
 from argparse import Namespace
 import asyncio
+from typing import Any
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -24,6 +26,8 @@ from manga_translator.translators import VALID_LANGUAGES
 from server.instance import ExecutorInstance, executor_instances
 from server.myqueue import task_queue
 from server.request_extraction import get_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
+from pydantic import BaseModel
+
 from server.to_json import to_translation, TranslationResponse
 
 app = FastAPI()
@@ -89,6 +93,59 @@ def translation_response(ctx):
         return ctx
     return to_translation(ctx)
 
+
+class StoryLensBubble(BaseModel):
+    bbox: list[int]
+    original_text: str
+    translated_text: str
+    confidence: float
+    source_lang: str | None = None
+    target_lang: str | None = None
+
+
+class StoryLensTranslationResponse(BaseModel):
+    image_mime: str = "image/png"
+    rendered_image_base64: str
+    bubbles: list[StoryLensBubble]
+    debug_folder: str | None = None
+
+
+def _storylens_response(ctx: Any) -> StoryLensTranslationResponse:
+    img_byte_arr = io.BytesIO()
+    ctx.result.save(img_byte_arr, format="PNG")
+    rendered_image_base64 = base64.b64encode(img_byte_arr.getvalue()).decode("ascii")
+
+    bubbles: list[StoryLensBubble] = []
+    for region in getattr(ctx, "text_regions", []) or []:
+        try:
+            x, y, w, h = [int(v) for v in region.xywh]
+        except Exception:
+            try:
+                min_x, min_y, max_x, max_y = [int(v) for v in region.xyxy]
+                x, y, w, h = min_x, min_y, max(0, max_x - min_x), max(0, max_y - min_y)
+            except Exception:
+                x, y, w, h = 0, 0, 0, 0
+
+        original_text = str(getattr(region, "text_raw", None) or getattr(region, "text", "") or "")
+        translated_text = str(getattr(region, "translation", "") or "")
+        confidence = float(getattr(region, "prob", 0.0) or 0.0)
+        bubbles.append(
+            StoryLensBubble(
+                bbox=[x, y, w, h],
+                original_text=original_text,
+                translated_text=translated_text,
+                confidence=max(0.0, min(1.0, confidence)),
+                source_lang=getattr(region, "source_lang", None),
+                target_lang=getattr(region, "target_lang", None),
+            )
+        )
+
+    return StoryLensTranslationResponse(
+        rendered_image_base64=rendered_image_base64,
+        bubbles=bubbles,
+        debug_folder=getattr(ctx, "debug_folder", None),
+    )
+
 @app.post("/translate/json", response_model=TranslationResponse, tags=["api", "json"],response_description="json strucure inspired by the ichigo translator extension")
 async def json(req: Request, data: TranslateRequest):
     ctx = await get_ctx(req, data.config, data.image)
@@ -107,6 +164,11 @@ async def image(req: Request, data: TranslateRequest) -> StreamingResponse:
     img_byte_arr.seek(0)
 
     return StreamingResponse(img_byte_arr, media_type="image/png")
+
+@app.post("/translate/storylens", response_model=StoryLensTranslationResponse, tags=["api", "json"], response_description="StoryLens image plus extracted translation context")
+async def storylens(req: Request, data: TranslateRequest):
+    ctx = await get_ctx(req, data.config, data.image)
+    return _storylens_response(ctx)
 
 @app.post("/translate/json/stream", response_class=StreamingResponse,tags=["api", "json"], response_description="A stream over elements with strucure(1byte status, 4 byte size, n byte data) status code are 0,1,2,3,4 0 is result data, 1 is progress report, 2 is error, 3 is waiting queue position, 4 is waiting for translator instance")
 async def stream_json(req: Request, data: TranslateRequest) -> StreamingResponse:

@@ -378,34 +378,18 @@ export default function UploadPage() {
                     />
                   </div>
 
-                  {/* Preview side by side */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  {/* Preview single */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                     <div>
                       <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>Ảnh gốc</div>
                       <div className="stroke-ink" style={{ background: "#fff", overflow: "hidden" }}>
                         {previewUrl ? (
-                          <motion.img initial={{ filter: "blur(4px)" }} animate={{ filter: "blur(0px)" }} src={previewUrl} alt="Ảnh truyện gốc" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}/>
+                          <motion.img initial={{ filter: "blur(4px)" }} animate={{ filter: "blur(0px)" }} src={previewUrl} alt="Ảnh truyện gốc" style={{ width: "100%", height: 340, objectFit: "contain", display: "block" }}/>
                         ) : (
-                          <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
+                          <div style={{ display: "flex", justifyContent: "center", padding: "20px 0" }}>
+                            <MangaPage w={320} h={340} panels="default" showBubbles={true} showOverlay={false}/>
+                          </div>
                         )}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>◯ ai_module · phát hiện vùng chữ</div>
-                      <div className="stroke-ink" style={{ background: "#fff", position: "relative" }}>
-                        <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
-                        <svg viewBox="0 0 280 200" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
-                          <motion.rect initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: progress > 20 ? 1 : 0, opacity: progress > 20 ? 1 : 0 }} transition={{ duration: 0.4 }} x="18" y="18" width="90" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
-                          <motion.rect initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: progress > 20 ? 1 : 0, opacity: progress > 20 ? 1 : 0 }} transition={{ duration: 0.4, delay: 0.1 }} x="18" y="135" width="90" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
-                          <motion.rect initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: progress > 20 ? 1 : 0, opacity: progress > 20 ? 1 : 0 }} transition={{ duration: 0.4, delay: 0.2 }} x="148" y="135" width="80" height="28" fill="none" stroke="var(--beni)" strokeWidth="2" strokeDasharray="4 3"/>
-                          {progress > 20 && (
-                            <>
-                              <text x="112" y="16" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.96</text>
-                              <text x="112" y="133" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.91</text>
-                              <text x="232" y="133" fontSize="9" fill="var(--beni)" fontFamily="monospace">0.88</text>
-                            </>
-                          )}
-                        </svg>
                       </div>
                     </div>
                   </div>

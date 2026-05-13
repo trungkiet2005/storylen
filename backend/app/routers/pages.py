@@ -39,7 +39,7 @@ def get_page(page_id: str):
             supabase.table("manga_pages")
             .select(
                 "page_id, original_image_url, translated_image_url, "
-                "status, chapter_id, page_number"
+                "status, chapter_id, page_number, batch_id"
             )
             .eq("page_id", page_id)
             .maybe_single()
@@ -53,7 +53,7 @@ def get_page(page_id: str):
         )
         page_res = (
             supabase.table("manga_pages")
-            .select("page_id, original_image_url, status, chapter_id, page_number")
+            .select("page_id, original_image_url, status, chapter_id, page_number, batch_id")
             .eq("page_id", page_id)
             .maybe_single()
             .execute()
@@ -143,6 +143,7 @@ def get_page(page_id: str):
         translated_image_url=page.get("translated_image_url") or translated_image_public_url(page_id),
         processed_data=processed_data,
         metadata=PageMetadata(
+            batch_id=page.get("batch_id"),
             series_id=series_id,
             chapter_id=chapter_id,
             page_number=page.get("page_number"),

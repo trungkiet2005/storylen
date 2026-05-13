@@ -1,7 +1,14 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 export interface User {
   id: string;
@@ -9,124 +16,145 @@ export interface User {
   email: string;
 }
 
+export interface AuthResult {
+  authenticated: boolean;
+  user: User | null;
+  requires_email_confirmation?: boolean;
+  message?: string;
+}
+
 interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
-  token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
-  demoLogin: () => void;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<AuthResult>;
+  register: (username: string, email: string, password: string) => Promise<AuthResult>;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<User | null>;
 }
-
-// ─── Context ──────────────────────────────────────────────────────────────────
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/v1";
-const STORAGE_KEY = "sl-auth";
 
-// ─── Provider ────────────────────────────────────────────────────────────────
+async function parseAuthResponse(res: Response, fallback: string): Promise<AuthResult> {
+  let body: Partial<AuthResult> & { detail?: string } = {};
+  try {
+    body = await res.json();
+  } catch {
+    // Keep fallback below.
+  }
+
+  if (!res.ok) {
+    throw new Error(body.detail || body.message || fallback);
+  }
+
+  return {
+    authenticated: Boolean(body.authenticated),
+    user: body.user ?? null,
+    requires_email_confirmation: body.requires_email_confirmation,
+    message: body.message,
+  };
+}
+
+async function authFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${BASE_URL}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...init?.headers,
+    },
+  });
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Hydrate from localStorage on mount
-  useEffect(() => {
+  const refreshUser = useCallback(async () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { user: User; token: string };
-        setUser(parsed.user);
-        setToken(parsed.token);
+      const res = await authFetch("/auth/me", { method: "GET" });
+      if (!res.ok) {
+        setUser(null);
+        return null;
       }
+
+      const data = await parseAuthResponse(res, "Không thể tải phiên đăng nhập");
+      setUser(data.user);
+      return data.user;
     } catch {
-      localStorage.removeItem(STORAGE_KEY);
-    } finally {
-      setIsLoading(false);
+      setUser(null);
+      return null;
     }
   }, []);
 
-  const persist = useCallback((u: User, t: string) => {
-    setUser(u);
-    setToken(t);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ user: u, token: t }));
-  }, []);
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrate() {
+      const nextUser = await refreshUser();
+      if (!cancelled) {
+        setUser(nextUser);
+        setIsLoading(false);
+      }
+    }
+
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {
-    const res = await fetch(`${BASE_URL}/auth/login`, {
+    const res = await authFetch("/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-
-    if (!res.ok) {
-      let msg = "Đăng nhập thất bại";
-      try {
-        const body = await res.json();
-        msg = body.detail || msg;
-      } catch { /* ignore */ }
-      throw new Error(msg);
-    }
-
-    const data = await res.json() as { user: User; access_token: string };
-    persist(data.user, data.access_token);
-  }, [persist]);
-
-  const register = useCallback(async (username: string, email: string, password: string) => {
-    const res = await fetch(`${BASE_URL}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email, password }),
-    });
-
-    if (!res.ok) {
-      let msg = "Đăng ký thất bại";
-      try {
-        const body = await res.json();
-        msg = body.detail || msg;
-      } catch { /* ignore */ }
-      throw new Error(msg);
-    }
-
-    const data = await res.json() as { user: User; access_token: string };
-    persist(data.user, data.access_token);
-  }, [persist]);
-
-  const logout = useCallback(() => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem(STORAGE_KEY);
+    const data = await parseAuthResponse(res, "Đăng nhập thất bại");
+    setUser(data.user);
+    return data;
   }, []);
 
-  const demoLogin = useCallback(() => {
-    const demoUser: User = {
-      id: "demo-001",
-      username: "KietDemo",
-      email: "demo@storylens.ai",
-    };
-    const demoToken = "demo-token-" + Date.now();
-    persist(demoUser, demoToken);
-  }, [persist]);
+  const register = useCallback(async (username: string, email: string, password: string) => {
+    const res = await authFetch("/auth/register", {
+      method: "POST",
+      body: JSON.stringify({ username, email, password }),
+    });
+    const data = await parseAuthResponse(res, "Đăng ký thất bại");
+    setUser(data.authenticated ? data.user : null);
+    return data;
+  }, []);
 
-  return (
-    <AuthContext.Provider value={{ user, isLoading, token, login, register, logout, demoLogin }}>
-      {children}
-    </AuthContext.Provider>
+  const logout = useCallback(async () => {
+    try {
+      await authFetch("/auth/logout", { method: "POST", body: "{}" });
+    } finally {
+      setUser(null);
+    }
+  }, []);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      isLoading,
+      isAuthenticated: Boolean(user),
+      login,
+      register,
+      logout,
+      refreshUser,
+    }),
+    [isLoading, login, logout, refreshUser, register, user],
   );
-}
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
 
 export function useAuth(): AuthContextValue {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
   return ctx;
 }
-
-// ─── Avatar helper ────────────────────────────────────────────────────────────
 
 export function getAvatarInitial(user: User): string {
   return (user.username?.[0] || user.email?.[0] || "?").toUpperCase();

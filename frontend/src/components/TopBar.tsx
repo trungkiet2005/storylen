@@ -150,8 +150,8 @@ function UserMenu() {
 
           {/* Logout */}
           <button
-            onClick={() => {
-              logout();
+            onClick={async () => {
+              await logout();
               setOpen(false);
               toast("Đã đăng xuất. Hẹn gặp lại! 👋", "info");
               router.push("/");
@@ -191,9 +191,11 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
   // Hydrate from localStorage on mount
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem("sl-theme") || "light" : "light";
-    setTheme(saved);
     document.documentElement.dataset.theme = saved;
-    setMounted(true);
+    queueMicrotask(() => {
+      setTheme(saved);
+      setMounted(true);
+    });
   }, []);
 
   const toggleTheme = useCallback(() => {

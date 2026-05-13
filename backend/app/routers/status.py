@@ -25,8 +25,9 @@ def get_batch_status(batch_id: str):
     supabase = get_supabase()
     result = (
         supabase.table("manga_pages")
-        .select("page_id, status, progress, error")
+        .select("page_id, status, progress, error, original_image_url, thumbnail_url")
         .eq("batch_id", batch_id)
+        .order("uploaded_at", desc=False)  # Order by upload sequence to keep logical order!
         .execute()
     )
 
@@ -47,6 +48,8 @@ def get_batch_status(batch_id: str):
                 status=status,
                 progress=r.get("progress") or 0,
                 error=r.get("error"),
+                original_image_url=r.get("original_image_url"),
+                thumbnail_url=r.get("thumbnail_url"),
             )
         )
 
@@ -71,7 +74,7 @@ def get_page_status(page_id: str):
     supabase = get_supabase()
     result = (
         supabase.table("manga_pages")
-        .select("page_id, status, progress, error")
+        .select("page_id, status, progress, error, original_image_url, thumbnail_url")
         .eq("page_id", page_id)
         .maybe_single()
         .execute()
@@ -92,4 +95,6 @@ def get_page_status(page_id: str):
         status=status,
         progress=row.get("progress") or 0,
         error=row.get("error"),
+        original_image_url=row.get("original_image_url"),
+        thumbnail_url=row.get("thumbnail_url"),
     )

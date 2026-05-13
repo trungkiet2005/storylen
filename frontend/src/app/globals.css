@@ -330,6 +330,25 @@ button:disabled { opacity: 0.45; cursor: not-allowed !important; }
 button:disabled:hover { transform: none !important; box-shadow: none !important; }
 
 /* ---------- Responsive helpers ---------- */
+.hero-mockup-wrapper {
+  position: absolute;
+  right: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 420px;
+  height: 500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+}
+
+@media (max-width: 1200px) {
+  .hero-mockup-wrapper {
+    display: none !important;
+  }
+}
+
 @media (max-width: 900px) {
   /* TopBar collapses nav labels */
   .nav-label { display: none; }

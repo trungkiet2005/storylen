@@ -1,29 +1,18 @@
 "use client";
-import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { TopBar } from '@/components/TopBar';
 import { Icon } from '@/components/Icons';
 import { MangaPage } from '@/components/MangaPage';
 import { useToast } from '@/components/Toast';
-import { getPage, PageData, BubbleData, APIError } from '@/lib/api';
+import { getPage, getBatchStatus, PageData, PageStatus, BubbleData, APIError } from '@/lib/api';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AnimatedPage, StaggerContainer, StaggerItem } from '@/components/Animations';
+import { AnimatedPage } from '@/components/Animations';
 
 type ViewMode = "overlay" | "sidebyside" | "tap";
 
-const TOTAL_PAGES = 8;
 
-const CHARACTERS = [
-  { original: "Arthur", vn: "Arthur", role: "Nhân vật chính", color: "var(--accent)" },
-  { original: "Elena", vn: "Elena", role: "Đồng minh", color: "var(--jade)" },
-];
-
-const GLOSSARY = [
-  { original: "Destiny", vn: "Định mệnh", note: "Dùng trong ngữ cảnh số phận không thể tránh" },
-  { original: "Oath", vn: "Lời thề", note: "Lời hứa danh dự thiêng liêng" },
-  { original: "Excalibur", vn: "Thánh kiếm", note: "Biểu trưng cho công lý và hy vọng" },
-];
 
 // ── Overlay bubble renderer using real bbox data ────────────────────────────
 function BubbleOverlays({
@@ -175,10 +164,11 @@ function BubbleOverlays({
 function ReaderContent() {
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const pageIdParam = searchParams.get("page");
 
   const [mode, setMode] = useState<ViewMode>("overlay");
-  const [page, setPage] = useState(2); // 0-indexed local pages
+
   const [selected, setSelected] = useState<number | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [zoom, setZoom] = useState(1.0);
@@ -191,6 +181,29 @@ function ReaderContent() {
   
   // Capture actual image dimensions to calculate scaling accurately
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
+
+  // Batch processing support for multiple pages
+  const [batchPages, setBatchPages] = useState<PageStatus[]>([]);
+  const batchId = pageData?.metadata?.batch_id;
+
+  useEffect(() => {
+    if (!batchId) {
+      setBatchPages([]);
+      return;
+    }
+    getBatchStatus(batchId)
+      .then(status => {
+        setBatchPages(status.pages || []);
+      })
+      .catch(() => {
+        setBatchPages([]);
+      });
+  }, [batchId]);
+
+  const hasMultiplePages = batchPages.length > 1;
+  const currentPageIdx = batchPages.findIndex(p => p.page_id === pageIdParam);
+  const prevPageId = currentPageIdx > 0 ? batchPages[currentPageIdx - 1].page_id : null;
+  const nextPageId = currentPageIdx >= 0 && currentPageIdx < batchPages.length - 1 ? batchPages[currentPageIdx + 1].page_id : null;
 
   // Load page data if page_id provided
   useEffect(() => {
@@ -214,22 +227,24 @@ function ReaderContent() {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       switch (e.key) {
-        case "ArrowRight": case "l": setPage(p => Math.min(p + 1, TOTAL_PAGES - 1)); break;
-        case "ArrowLeft":  case "h": setPage(p => Math.max(p - 1, 0)); break;
         case "o": setShowOverlay(v => !v); break;
         case "+": case "=": setZoom(z => Math.min(z + 0.1, 2.0)); break;
         case "-": setZoom(z => Math.max(z - 0.1, 0.5)); break;
+        case "ArrowRight":
+        case "l":
+          if (nextPageId) router.push(`/reader?page=${nextPageId}`);
+          break;
+        case "ArrowLeft":
+        case "h":
+          if (prevPageId) router.push(`/reader?page=${prevPageId}`);
+          break;
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, []);
+  }, [nextPageId, prevPageId, router]);
 
-  useEffect(() => setSelected(null), [page]);
-
-  const pageLayouts: ("default" | "action" | "dialogue")[] = [
-    "default", "action", "dialogue", "default", "action", "dialogue", "default", "action"
-  ];
+  useEffect(() => setSelected(null), [pageIdParam]);
 
   const CANVAS_W = 520;
   // Dynamically compute canvas height from image aspect ratio to avoid letterboxing disconnect
@@ -250,40 +265,49 @@ function ReaderContent() {
     <div style={{ height: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <TopBar active="reader" compact />
 
-      <div style={{ display: "grid", gridTemplateColumns: `72px 1fr ${showContext ? "320px" : "0px"}`, flex: 1, overflow: "hidden", transition: "grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: `${hasMultiplePages ? "72px" : ""} 1fr ${showContext ? "320px" : "0px"}`, flex: 1, overflow: "hidden", transition: "grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}>
 
-        {/* ── Thumbnail Rail ── */}
-        <StaggerContainer
-          className="scroll"
-          staggerDelay={0.05}
-          style={{ background: "var(--bg-2)", borderRight: "2px solid var(--border)", padding: "14px 8px", display: "flex", flexDirection: "column", gap: 8, overflowY: "auto" }}
-        >
-          <div className="caps-xs" style={{ color: "var(--muted)", textAlign: "center", marginBottom: 4 }}>P</div>
-          {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
-            <StaggerItem key={i} direction="right" distance={10}>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setPage(i)}
-                title={`Trang ${i + 1}`}
-                aria-current={i === page ? "page" : undefined}
-                style={{
-                  width: 52, height: 68,
-                  background: "#fff",
-                  cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  border: `${i === page ? 3 : 2}px solid ${i === page ? "var(--accent)" : "var(--border)"}`,
-                  boxShadow: i === page ? "2px 2px 0 var(--accent)" : "none",
-                  transition: "border-color 0.1s, box-shadow 0.1s",
-                }}
-              >
-                <span className="mono" style={{ fontSize: 11, color: i === page ? "var(--accent)" : "var(--muted)", fontWeight: i === page ? 700 : 400 }}>
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-              </motion.button>
-            </StaggerItem>
-          ))}
-        </StaggerContainer>
+        {/* ── Left Rail: Dynamic Thumbnails ── */}
+        {hasMultiplePages && (
+          <div 
+            className="scroll"
+            style={{ 
+              width: 72, background: "var(--panel)", 
+              borderRight: "2.5px solid var(--border)", 
+              display: "flex", flexDirection: "column", 
+              alignItems: "center", gap: 12, padding: "20px 0",
+              overflowY: "auto"
+            }}
+          >
+            {batchPages.map((p, idx) => {
+              const isCurrent = p.page_id === pageIdParam;
+              return (
+                <Link key={p.page_id} href={`/reader?page=${p.page_id}`}>
+                  <div 
+                    style={{ 
+                      position: "relative", width: 48, height: 68, 
+                      border: isCurrent ? "3px solid var(--accent)" : "2px solid var(--border)",
+                      background: "#fff", cursor: "pointer", overflow: "hidden",
+                      boxShadow: isCurrent ? "4px 4px 0 var(--accent)" : "2px 2px 0 var(--border)",
+                      transform: isCurrent ? "scale(1.05)" : "scale(1)",
+                      transition: "transform 0.15s, border-color 0.15s"
+                    }}
+                  >
+                    {p.thumbnail_url ? (
+                      <img src={p.thumbnail_url} alt={`Trang ${idx+1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : p.original_image_url ? (
+                      <img src={p.original_image_url} alt={`Trang ${idx+1}`} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: "bold", color: "var(--muted)" }}>
+                        {idx+1}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
 
         {/* ── Reader Canvas ── */}
         <div
@@ -297,7 +321,7 @@ function ReaderContent() {
             style={{ background: "var(--panel)", padding: "8px 14px", display: "flex", gap: 6, alignItems: "center", width: "100%", maxWidth: 840, flexWrap: "wrap" }}
           >
             <span className="caps-xs" style={{ color: "var(--accent)", marginRight: 6 }}>
-              {pageData ? `Trang đã dịch · ${pageData.page_id.slice(0, 8)}…` : `Moonlight Blade · Ch. 12 · P.${String(page + 1).padStart(2, "0")}`}
+              {pageData ? `Trang đã dịch · ${pageData.page_id.slice(0, 8)}…` : `Reader · Trang truyện`}
             </span>
             <div style={{ flex: 1 }}/>
 
@@ -384,7 +408,7 @@ function ReaderContent() {
                           }}
                         />
                       ) : (
-                        <MangaPage w={SIDE_W} h={computedSideH} panels={pageLayouts[page]} showBubbles showOverlay={false}/>
+                        <MangaPage w={SIDE_W} h={computedSideH} panels="default" showBubbles showOverlay={false}/>
                       )}
                     </div>
                   </div>
@@ -395,7 +419,7 @@ function ReaderContent() {
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img src={translatedImageUrl || pageData.original_image_url} alt="Ảnh đã dịch" style={{ width: "100%", height: "100%", display: "block" }}/>
                       ) : (
-                        <MangaPage w={SIDE_W} h={computedSideH} panels={pageLayouts[page]} showBubbles showOverlay overlayLang="vn"/>
+                        <MangaPage w={SIDE_W} h={computedSideH} panels="default" showBubbles showOverlay overlayLang="vn"/>
                       )}
                       {pageData && showOverlay && !translatedImageUrl && imgNaturalSize && (
                         <BubbleOverlays
@@ -424,7 +448,7 @@ function ReaderContent() {
                         }}
                       />
                     ) : (
-                      <MangaPage w={CANVAS_W} h={computedHeight} panels={pageLayouts[page]} showBubbles showOverlay={mode === "overlay" && showOverlay} overlayLang="vn"/>
+                      <MangaPage w={CANVAS_W} h={computedHeight} panels="default" showBubbles showOverlay={mode === "overlay" && showOverlay} overlayLang="vn"/>
                     )}
 
                     {/* Real bubble overlays */}
@@ -442,34 +466,44 @@ function ReaderContent() {
             </div>
           )}
 
-          {/* Page navigation */}
-          <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 4 }}>
-            <button
-              className="btn btn-sm"
-              onClick={() => setPage(p => Math.max(p - 1, 0))}
-              disabled={page === 0}
-              aria-label="Trang trước"
-              style={{ opacity: page === 0 ? 0.4 : 1 }}
-            >
-              <Icon name="arrow-left" size={14}/>
-            </button>
-            <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
-              {page + 1} / {TOTAL_PAGES}
-            </span>
-            <button
-              className="btn btn-sm"
-              onClick={() => setPage(p => Math.min(p + 1, TOTAL_PAGES - 1))}
-              disabled={page === TOTAL_PAGES - 1}
-              aria-label="Trang tiếp"
-              style={{ opacity: page === TOTAL_PAGES - 1 ? 0.4 : 1 }}
-            >
-              <Icon name="arrow-right" size={14}/>
-            </button>
-          </div>
+
+
+          {/* ── Bottom Navigation (conditional) ── */}
+          {hasMultiplePages && currentPageIdx !== -1 && (
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12, padding: "8px 16px", background: "var(--panel)", border: "1.5px solid var(--border)", borderRadius: 2 }}>
+              {prevPageId ? (
+                <Link href={`/reader?page=${prevPageId}`} style={{ color: "inherit" }}>
+                  <button className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4 }} aria-label="Trang trước">
+                    <Icon name="arrow-left" size={14}/>
+                  </button>
+                </Link>
+              ) : (
+                <button className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4, opacity: 0.3, cursor: "not-allowed" }} disabled>
+                  <Icon name="arrow-left" size={14}/>
+                </button>
+              )}
+
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, fontWeight: 700, padding: "0 8px" }}>
+                {currentPageIdx + 1} / {batchPages.length}
+              </span>
+
+              {nextPageId ? (
+                <Link href={`/reader?page=${nextPageId}`} style={{ color: "inherit" }}>
+                  <button className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4 }} aria-label="Trang sau">
+                    <Icon name="arrow-right" size={14}/>
+                  </button>
+                </Link>
+              ) : (
+                <button className="btn btn-sm btn-ghost" style={{ minWidth: 32, padding: 4, opacity: 0.3, cursor: "not-allowed" }} disabled>
+                  <Icon name="arrow-right" size={14}/>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Keyboard hint */}
-          <div style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)", display: "flex", gap: 16 }}>
-            <span>← → : chuyển trang</span>
+          <div style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)", display: "flex", gap: 16, marginTop: 8 }}>
+            {hasMultiplePages && <span>← → : chuyển trang</span>}
             <span>O : toggle overlay</span>
             <span>+/- : zoom</span>
           </div>
@@ -499,40 +533,7 @@ function ReaderContent() {
                 </button>
               </div>
 
-              {/* Characters */}
-              <div style={{ marginBottom: 20 }}>
-                <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 8 }}>Nhân vật trên trang</div>
-                {CHARACTERS.map(c => (
-                  <motion.div 
-                    whileHover={{ x: 4 }}
-                    key={c.original} 
-                    className="stroke-ink" 
-                    style={{ background: "var(--panel)", padding: 10, display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}
-                  >
-                    <div style={{ width: 36, height: 36, background: c.color, color: "var(--paper)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif)", fontWeight: 800, fontSize: 18, border: "2px solid var(--border)", flexShrink: 0 }}>
-                      {c.vn.charAt(0)}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>{c.vn} <span style={{ fontWeight: 400, color: "var(--muted)" }}>· {c.original}</span></div>
-                      <div style={{ fontSize: 11, color: "var(--muted)" }}>{c.role}</div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
 
-              {/* Glossary */}
-              <div style={{ marginBottom: 20 }}>
-                <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 8 }}>Thuật ngữ</div>
-                {GLOSSARY.map(g => (
-                  <div key={g.original} style={{ padding: "10px 0", borderBottom: "1px dashed var(--border-soft)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <span className="serif" style={{ fontSize: 14, fontWeight: 700 }}>{g.original}</span>
-                      <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>{g.vn}</span>
-                    </div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{g.note}</div>
-                  </div>
-                ))}
-              </div>
 
               {/* Real bubble data stats */}
               <div className="stroke-ink" style={{ background: "var(--panel)", padding: 12, marginBottom: 16 }}>

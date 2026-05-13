@@ -41,8 +41,8 @@ export default function ProfilePage() {
 
   const initial = getAvatarInitial(user);
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     toast("Đã đăng xuất. Hẹn gặp lại! 👋", "info");
     router.push("/");
   }

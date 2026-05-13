@@ -57,6 +57,8 @@ class PageStatusResponse(BaseModel):
     status: ProcessingStatus
     progress: int = Field(ge=0, le=100, description="Processing progress percentage")
     error: Optional[str] = None
+    original_image_url: Optional[str] = None
+    thumbnail_url: Optional[str] = None
 
 
 class BatchStatusResponse(BaseModel):
@@ -78,6 +80,7 @@ class BubbleResult(BaseModel):
 
 
 class PageMetadata(BaseModel):
+    batch_id: Optional[str] = None
     series_id: Optional[str] = None
     chapter_id: Optional[str] = None
     page_number: Optional[int] = None

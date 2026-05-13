@@ -56,6 +56,23 @@ class Settings(BaseSettings):
     SUPABASE_BUCKET_ORIGINALS: str = "manga-originals"
     SUPABASE_BUCKET_THUMBNAILS: str = "manga-thumbnails"
 
+    # Auth cookies. For cross-domain production deployments (for example
+    # Vercel frontend + Render API), set SameSite=None and Secure=true.
+    AUTH_COOKIE_SECURE: bool | None = None
+    AUTH_COOKIE_SAMESITE: str = "lax"
+    AUTH_COOKIE_DOMAIN: str = ""
+    AUTH_ACCESS_COOKIE_NAME: str = "sl_access_token"
+    AUTH_REFRESH_COOKIE_NAME: str = "sl_refresh_token"
+    AUTH_REFRESH_COOKIE_MAX_AGE_SECONDS: int = 60 * 60 * 24 * 30
+
+    @field_validator("AUTH_COOKIE_SAMESITE", mode="before")
+    @classmethod
+    def normalize_cookie_samesite(cls, v: Any) -> str:
+        value = str(v or "lax").strip().lower()
+        if value not in {"lax", "strict", "none"}:
+            return "lax"
+        return value
+
     # ─── HuggingFace Space (AI Worker) ────────────────────────────────────────
     # For LOCAL development: use http://localhost:7860
     # For production: set to your HF Space URL
