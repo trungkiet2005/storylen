@@ -36,7 +36,7 @@ services:
       - key: DEBUG
         value: "false"
       - key: ALLOWED_ORIGINS
-        value: "https://storylens.vercel.app,http://localhost:3000"
+        value: "https://storylen.vercel.app,https://storylens.vercel.app,http://localhost:3000"
       - key: GEMINI_MODEL
         value: "gemini-2.5-flash"
 

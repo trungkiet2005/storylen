@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # pydantic-settings' built-in JSON decoding so our validator handles both).
     ALLOWED_ORIGINS: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "https://storylen.vercel.app",
         "https://storylens.vercel.app",
     ]
 
