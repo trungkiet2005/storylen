@@ -79,6 +79,26 @@ class BubbleResult(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
 
 
+class TranslationEditRequest(BaseModel):
+    translated_text: str = Field(..., min_length=1, max_length=5000)
+
+
+class TranslationHistoryItem(BaseModel):
+    translation_id: str
+    bubble_id: str
+    translated_text: str
+    translated_at: datetime
+    llm_model_used: Optional[str] = None
+    user_id: Optional[str] = None
+    username: Optional[str] = None
+
+
+class TranslationHistoryResponse(BaseModel):
+    bubble_id: str
+    total: int
+    items: list[TranslationHistoryItem]
+
+
 class PageMetadata(BaseModel):
     batch_id: Optional[str] = None
     series_id: Optional[str] = None

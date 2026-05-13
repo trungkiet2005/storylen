@@ -59,6 +59,7 @@ export interface BatchStatus {
 }
 
 export interface BubbleData {
+  bubble_id: string;
   bbox: [number, number, number, number]; // [x, y, w, h]
   original_text: string;
   translated_text: string;
@@ -107,6 +108,22 @@ export interface HistoryItem {
 export interface HistoryResponse {
   total: number;
   items: HistoryItem[];
+}
+
+export interface TranslationHistoryItem {
+  translation_id: string;
+  bubble_id: string;
+  translated_text: string;
+  translated_at: string;
+  llm_model_used?: string | null;
+  user_id?: string | null;
+  username?: string | null;
+}
+
+export interface TranslationHistoryResponse {
+  bubble_id: string;
+  total: number;
+  items: TranslationHistoryItem[];
 }
 
 // ─── Error class ──────────────────────────────────────────────────────────────
@@ -260,6 +277,27 @@ export async function pollUntilDone(
 
 export async function getPage(pageId: string): Promise<PageData> {
   return request<PageData>(`/page/${pageId}`);
+}
+
+export async function getTranslationHistory(
+  pageId: string,
+  bubbleId: string,
+): Promise<TranslationHistoryResponse> {
+  return request<TranslationHistoryResponse>(
+    `/page/${pageId}/bubbles/${bubbleId}/translations`,
+  );
+}
+
+export async function updateBubbleTranslation(
+  pageId: string,
+  bubbleId: string,
+  translatedText: string,
+): Promise<TranslationHistoryItem> {
+  return request<TranslationHistoryItem>(`/page/${pageId}/bubbles/${bubbleId}/translation`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ translated_text: translatedText }),
+  });
 }
 
 // ─── Q&A ─────────────────────────────────────────────────────────────────────

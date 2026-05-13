@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field, field_validator
 
 from app.database import get_supabase
@@ -274,11 +274,11 @@ def update_user_role(
     return get_user(user_id, _admin=admin_user)  # type: ignore[arg-type]
 
 
-@router.delete("/users/{user_id}", status_code=204)
+@router.delete("/users/{user_id}", status_code=204, response_class=Response)
 def delete_user(
     user_id: str,
     admin_user: AuthUser = Depends(get_current_admin),
-) -> None:
+) -> Response:
     """Delete a user and cascade their data (pages, qa, profile)."""
     if user_id == admin_user.id:
         raise HTTPException(
@@ -297,6 +297,7 @@ def delete_user(
         ) from exc
     # The auth.users → profiles FK has ON DELETE CASCADE, which in turn cascades
     # manga_pages → bubble_data → translation_history / embeddings via FKs.
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/stats", response_model=AdminStatsResponse)

@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import field_validator, model_validator
-from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -26,9 +26,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "StoryLens API"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
-    # Accepts JSON list string from .env OR comma-separated string (NoDecode skips
-    # pydantic-settings' built-in JSON decoding so our validator handles both).
-    ALLOWED_ORIGINS: Annotated[list[str], NoDecode] = [
+    # Accepts JSON list string from .env OR comma-separated string.
+    ALLOWED_ORIGINS: list[str] | str = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",
@@ -36,6 +35,17 @@ class Settings(BaseSettings):
         "https://storylen.vercel.app",
         "https://storylens.vercel.app",
     ]
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, v: Any) -> bool:
+        if isinstance(v, str):
+            value = v.strip().lower()
+            if value in {"release", "prod", "production", "false", "0", "no", "off"}:
+                return False
+            if value in {"debug", "dev", "development", "true", "1", "yes", "on"}:
+                return True
+        return v
 
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
@@ -129,7 +139,7 @@ class Settings(BaseSettings):
 
     # ─── Upload constraints ───────────────────────────────────────────────────
     MAX_FILE_SIZE_MB: int = 20
-    ALLOWED_EXTENSIONS: Annotated[list[str], NoDecode] = ["jpg", "jpeg", "png", "webp"]
+    ALLOWED_EXTENSIONS: list[str] | str = ["jpg", "jpeg", "png", "webp"]
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod

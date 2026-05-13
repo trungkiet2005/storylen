@@ -5,7 +5,17 @@ import { TopBar } from '@/components/TopBar';
 import { Icon } from '@/components/Icons';
 import { MangaPage } from '@/components/MangaPage';
 import { useToast } from '@/components/Toast';
-import { getPage, getBatchStatus, PageData, PageStatus, BubbleData, APIError } from '@/lib/api';
+import {
+  getPage,
+  getBatchStatus,
+  getTranslationHistory,
+  updateBubbleTranslation,
+  PageData,
+  PageStatus,
+  BubbleData,
+  APIError,
+  TranslationHistoryItem,
+} from '@/lib/api';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedPage } from '@/components/Animations';
@@ -178,6 +188,11 @@ function ReaderContent() {
   // Real page data from API
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
+  const [editTexts, setEditTexts] = useState<Record<string, string>>({});
+  const [savingBubbleId, setSavingBubbleId] = useState<string | null>(null);
+  const [openHistoryBubbleId, setOpenHistoryBubbleId] = useState<string | null>(null);
+  const [historyByBubble, setHistoryByBubble] = useState<Record<string, TranslationHistoryItem[]>>({});
+  const [historyLoadingBubbleId, setHistoryLoadingBubbleId] = useState<string | null>(null);
   
   // Capture actual image dimensions to calculate scaling accurately
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
@@ -213,6 +228,13 @@ function ReaderContent() {
     getPage(pageIdParam)
       .then(data => {
         setPageData(data);
+        setEditTexts(
+          Object.fromEntries(
+            data.processed_data.map((bubble) => [bubble.bubble_id, bubble.translated_text]),
+          ),
+        );
+        setHistoryByBubble({});
+        setOpenHistoryBubbleId(null);
         toast("Đã tải dữ liệu trang", "success");
       })
       .catch(err => {
@@ -259,6 +281,67 @@ function ReaderContent() {
       ? translatedImageUrl
       : pageData.original_image_url
     : null;
+
+  const saveTranslation = async (bubble: BubbleData) => {
+    if (!pageIdParam) return;
+    const nextText = (editTexts[bubble.bubble_id] ?? "").trim();
+    if (!nextText) {
+      toast("Bản dịch không được để trống.", "error");
+      return;
+    }
+
+    setSavingBubbleId(bubble.bubble_id);
+    try {
+      const saved = await updateBubbleTranslation(pageIdParam, bubble.bubble_id, nextText);
+      setPageData((current) => current
+        ? {
+            ...current,
+            processed_data: current.processed_data.map((item) =>
+              item.bubble_id === bubble.bubble_id
+                ? { ...item, translated_text: saved.translated_text }
+                : item,
+            ),
+          }
+        : current);
+      setHistoryByBubble((current) => current[bubble.bubble_id]
+        ? {
+            ...current,
+            [bubble.bubble_id]: [saved, ...current[bubble.bubble_id]],
+          }
+        : current);
+      toast("Đã lưu bản sửa dịch.", "success");
+    } catch (err) {
+      const msg = err instanceof APIError ? err.message : "Không thể lưu bản sửa dịch.";
+      toast(msg, "error");
+    } finally {
+      setSavingBubbleId(null);
+    }
+  };
+
+  const toggleTranslationHistory = async (bubble: BubbleData) => {
+    if (!pageIdParam) return;
+    if (openHistoryBubbleId === bubble.bubble_id) {
+      setOpenHistoryBubbleId(null);
+      return;
+    }
+
+    setOpenHistoryBubbleId(bubble.bubble_id);
+    if (historyByBubble[bubble.bubble_id]) return;
+
+    setHistoryLoadingBubbleId(bubble.bubble_id);
+    try {
+      const history = await getTranslationHistory(pageIdParam, bubble.bubble_id);
+      setHistoryByBubble((current) => ({
+        ...current,
+        [bubble.bubble_id]: history.items,
+      }));
+    } catch (err) {
+      const msg = err instanceof APIError ? err.message : "Không thể tải lịch sử sửa dịch.";
+      toast(msg, "error");
+    } finally {
+      setHistoryLoadingBubbleId(null);
+    }
+  };
 
   return (
     <AnimatedPage>
@@ -582,6 +665,93 @@ function ReaderContent() {
                     <span className="mono" style={{ fontWeight: 700 }}>{v}</span>
                   </div>
                 ))}
+              </div>
+
+              {/* Translation edits */}
+              <div style={{ marginBottom: 16 }}>
+                <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 8 }}>Sửa bản dịch</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {(pageData?.processed_data || []).map((bubble, index) => {
+                    const history = historyByBubble[bubble.bubble_id] || [];
+                    const isHistoryOpen = openHistoryBubbleId === bubble.bubble_id;
+                    const isSaving = savingBubbleId === bubble.bubble_id;
+                    const isHistoryLoading = historyLoadingBubbleId === bubble.bubble_id;
+
+                    return (
+                      <div key={bubble.bubble_id} className="stroke-ink" style={{ background: "var(--panel)", padding: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                          <span className="mono" style={{ fontSize: 11, fontWeight: 800 }}>#{index + 1}</span>
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            style={{ padding: "3px 6px", fontSize: 11 }}
+                            onClick={() => toggleTranslationHistory(bubble)}
+                            aria-label="Xem lịch sử sửa dịch"
+                          >
+                            <Icon name="history" size={12}/> {isHistoryOpen ? "Ẩn" : "Lịch sử"}
+                          </button>
+                        </div>
+
+                        <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, marginBottom: 8 }}>
+                          {bubble.original_text || "Không có OCR gốc"}
+                        </div>
+
+                        <textarea
+                          value={editTexts[bubble.bubble_id] ?? bubble.translated_text}
+                          onChange={(event) => setEditTexts((current) => ({
+                            ...current,
+                            [bubble.bubble_id]: event.target.value,
+                          }))}
+                          rows={3}
+                          style={{
+                            width: "100%",
+                            resize: "vertical",
+                            border: "1.5px solid var(--border)",
+                            background: "#fff",
+                            color: "var(--fg)",
+                            padding: 8,
+                            fontSize: 12,
+                            lineHeight: 1.4,
+                            fontFamily: "var(--font-serif)",
+                            boxSizing: "border-box",
+                          }}
+                        />
+
+                        <button
+                          className="btn btn-sm btn-primary"
+                          style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
+                          disabled={isSaving}
+                          onClick={() => saveTranslation(bubble)}
+                        >
+                          <Icon name="check" size={13}/> {isSaving ? "Đang lưu..." : "Lưu bản sửa"}
+                        </button>
+
+                        {isHistoryOpen && (
+                          <div style={{ borderTop: "1px solid var(--border-soft)", marginTop: 10, paddingTop: 8 }}>
+                            {isHistoryLoading ? (
+                              <div style={{ fontSize: 11, color: "var(--muted)" }}>Đang tải lịch sử...</div>
+                            ) : history.length ? (
+                              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                {history.map((item) => (
+                                  <div key={item.translation_id} style={{ fontSize: 11, lineHeight: 1.45 }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, color: "var(--muted)", marginBottom: 2 }}>
+                                      <span>{item.username || (item.llm_model_used === "user_edit" ? "User" : "AI")}</span>
+                                      <span className="mono">{new Date(item.translated_at).toLocaleString("vi-VN")}</span>
+                                    </div>
+                                    <div style={{ background: "var(--bg)", border: "1px solid var(--border-soft)", padding: 6 }}>
+                                      {item.translated_text}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 11, color: "var(--muted)" }}>Chưa có lịch sử sửa dịch.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Q&A CTA */}

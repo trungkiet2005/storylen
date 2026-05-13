@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import logging
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 from PIL import Image
 
@@ -21,6 +22,7 @@ from app.database import get_supabase
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+SIGNED_URL_EXPIRES_SECONDS = 60 * 60
 
 # Correct MIME type mapping
 _EXT_TO_MIME: dict[str, str] = {
@@ -63,6 +65,63 @@ def _get_public_url(bucket: str, path: str) -> str:
     url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{bucket}/{path}"
     logger.warning("get_public_url returned unexpected response type, using fallback URL: %s", url)
     return url
+
+
+def _get_signed_url(bucket: str, path: str) -> str | None:
+    """Return a temporary signed URL for private or public Supabase Storage."""
+    try:
+        response = get_supabase().storage.from_(bucket).create_signed_url(
+            path,
+            SIGNED_URL_EXPIRES_SECONDS,
+        )
+    except Exception as exc:
+        logger.warning("Failed to create signed URL for %s/%s: %s", bucket, path, exc)
+        return None
+
+    if isinstance(response, str) and response.startswith("http"):
+        return response
+    if isinstance(response, dict):
+        signed = (
+            response.get("signedURL")
+            or response.get("signedUrl")
+            or response.get("signed_url")
+        )
+        if isinstance(signed, str) and signed.startswith("http"):
+            return signed
+    logger.warning("create_signed_url returned unexpected response for %s/%s", bucket, path)
+    return None
+
+
+def _storage_path_from_public_url(bucket: str, url: str | None) -> str | None:
+    if not url:
+        return None
+    path = urlparse(url).path
+    marker = f"/storage/v1/object/public/{bucket}/"
+    index = path.find(marker)
+    if index == -1:
+        return None
+    return unquote(path[index + len(marker):])
+
+
+def signed_url_from_public_url(bucket: str, public_url: str | None) -> str | None:
+    """Create a signed URL from a stored public URL, falling back to the input."""
+    storage_path = _storage_path_from_public_url(bucket, public_url)
+    if not storage_path:
+        return public_url
+    return _get_signed_url(bucket, storage_path) or public_url
+
+
+def signed_translated_image_url(page_id: str, fallback_url: str | None = None) -> str | None:
+    storage_path = f"{page_id}/translated.png"
+    return _get_signed_url(settings.SUPABASE_BUCKET_ORIGINALS, storage_path) or fallback_url
+
+
+def signed_original_image_url(public_url: str | None) -> str | None:
+    return signed_url_from_public_url(settings.SUPABASE_BUCKET_ORIGINALS, public_url)
+
+
+def signed_thumbnail_image_url(public_url: str | None) -> str | None:
+    return signed_url_from_public_url(settings.SUPABASE_BUCKET_THUMBNAILS, public_url)
 
 
 def upload_original(image_bytes: bytes, original_filename: str, page_id: str) -> str:

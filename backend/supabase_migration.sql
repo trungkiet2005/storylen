@@ -90,6 +90,13 @@ CREATE TABLE IF NOT EXISTS public.translation_history (
 
 CREATE INDEX IF NOT EXISTS idx_translation_bubble ON public.translation_history(bubble_id);
 
+-- User edits are stored as additional translation_history rows.
+-- AI-generated rows may keep user_id NULL; manual edits store the editor user_id.
+ALTER TABLE public.translation_history
+    ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.profiles(user_id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_translation_history_user ON public.translation_history(user_id);
+
 -- ─── Q&A History ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.qa_history (
     qa_id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

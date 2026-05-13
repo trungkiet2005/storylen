@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.database import get_supabase
 from app.models.schemas import BatchStatusResponse, PageStatusResponse, ProcessingStatus
 from app.routers.auth import AuthUser, get_current_user
+from app.storage.supabase_storage import signed_original_image_url, signed_thumbnail_image_url
 
 router = APIRouter(prefix="/status", tags=["status"])
 logger = logging.getLogger(__name__)
@@ -50,8 +51,8 @@ def get_batch_status(batch_id: str, user: AuthUser = Depends(get_current_user)):
                 status=status,
                 progress=r.get("progress") or 0,
                 error=r.get("error"),
-                original_image_url=r.get("original_image_url"),
-                thumbnail_url=r.get("thumbnail_url"),
+                original_image_url=signed_original_image_url(r.get("original_image_url")),
+                thumbnail_url=signed_thumbnail_image_url(r.get("thumbnail_url")),
             )
         )
 
@@ -100,6 +101,6 @@ def get_page_status(page_id: str, user: AuthUser = Depends(get_current_user)):
         status=status,
         progress=row.get("progress") or 0,
         error=row.get("error"),
-        original_image_url=row.get("original_image_url"),
-        thumbnail_url=row.get("thumbnail_url"),
+        original_image_url=signed_original_image_url(row.get("original_image_url")),
+        thumbnail_url=signed_thumbnail_image_url(row.get("thumbnail_url")),
     )
