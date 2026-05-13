@@ -18,6 +18,7 @@ import {
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from '@/components/Animations';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DEFAULT_AI_CONFIG: AIModuleCurrentConfig = {
   translator: "gemini",
@@ -163,6 +164,7 @@ async function convertPdfToImageFiles(
 
 export default function UploadPage() {
   const { toast } = useToast();
+  const { isAuthenticated, isLoading: authLoading, refreshUser } = useAuth();
   const [state, setState] = useState<UploadState>("idle");
   const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([]);
   const selectedFilesRef = useRef<FileItem[]>([]);
@@ -310,6 +312,25 @@ export default function UploadPage() {
 
   const startProcessing = async () => {
     if (selectedFiles.length === 0 || isPreparingFiles) return;
+
+    if (authLoading) {
+      const msg = "Đang kiểm tra phiên đăng nhập. Vui lòng thử lại sau vài giây.";
+      setErrorMsg(msg);
+      setState("error");
+      addLog(`LỖI: ${msg}`, 'error');
+      toast(msg, "error");
+      return;
+    }
+
+    const activeUser = isAuthenticated ? await refreshUser() : null;
+    if (!activeUser) {
+      const msg = "Phiên đăng nhập không hợp lệ hoặc cookie đăng nhập chưa được trình duyệt gửi. Vui lòng đăng nhập lại.";
+      setErrorMsg(msg);
+      setState("error");
+      addLog(`LỖI: ${msg}`, 'error');
+      toast(msg, "error");
+      return;
+    }
 
     if (!backendOnline) {
       const msg = "Backend đang offline. Vui lòng kiểm tra kết nối và thử lại.";
@@ -607,7 +628,7 @@ export default function UploadPage() {
                             whileTap={{ scale: 0.99 }}
                             className="btn btn-primary btn-lg"
                             style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "18px 0", fontSize: 16 }}
-                            disabled={isPreparingFiles}
+                            disabled={isPreparingFiles || authLoading}
                             onClick={startProcessing}
                           >
                             <Icon name="sparkle" size={18}/> {isPreparingFiles ? "ĐANG CẮT PDF..." : `BẮT ĐẦU DỊCH THUẬT (${selectedFiles.length} TRANG TRUYỆN)`}

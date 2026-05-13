@@ -66,8 +66,8 @@ class Settings(BaseSettings):
 
     # Auth cookies. For cross-domain production deployments (for example
     # Vercel frontend + Render API), set SameSite=None and Secure=true.
-    AUTH_COOKIE_SECURE: bool | None = None
-    AUTH_COOKIE_SAMESITE: str = "lax"
+    AUTH_COOKIE_SECURE: bool | None = True
+    AUTH_COOKIE_SAMESITE: str = "none"
     AUTH_COOKIE_DOMAIN: str = ""
     AUTH_ACCESS_COOKIE_NAME: str = "sl_access_token"
     AUTH_REFRESH_COOKIE_NAME: str = "sl_refresh_token"
