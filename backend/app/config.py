@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     # ─── Supabase Storage ─────────────────────────────────────────────────────
     SUPABASE_BUCKET_ORIGINALS: str = "manga-originals"
     SUPABASE_BUCKET_THUMBNAILS: str = "manga-thumbnails"
+    SUPABASE_BUCKET_AVATARS: str = "avatars"
+    MAX_AVATAR_SIZE_MB: int = 5
 
     # Auth cookies. For cross-domain production deployments (for example
     # Vercel frontend + Render API), set SameSite=None and Secure=true.

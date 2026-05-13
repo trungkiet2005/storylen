@@ -5,7 +5,12 @@
       "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" submodule status)",
       "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" ls-files --stage ai_service)",
       "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" rm --cached ai_service)",
-      "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" status)"
+      "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" status)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"EXIT=$?\")",
+      "PowerShell(Set-Location frontend; npx tsc --noEmit 2>&1 | Select-Object -Last 40; \"EXIT=$LASTEXITCODE\")",
+      "PowerShell(Get-Location; npx tsc --noEmit 2>&1 | Select-Object -Last 50; \"EXIT=$LASTEXITCODE\")",
+      "PowerShell(Set-Location ..\\\\backend; python -m py_compile app/routers/history.py; \"EXIT=$LASTEXITCODE\")"
     ]
   }
 }

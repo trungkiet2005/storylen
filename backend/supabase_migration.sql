@@ -15,6 +15,55 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ─── Profile production fields ────────────────────────────────────────────────
+-- Idempotent extension of the profile schema. Safe to re-run.
+ALTER TABLE public.profiles
+    ADD COLUMN IF NOT EXISTS full_name             TEXT,
+    ADD COLUMN IF NOT EXISTS display_name          TEXT,
+    ADD COLUMN IF NOT EXISTS avatar_url            TEXT,
+    ADD COLUMN IF NOT EXISTS bio                   TEXT,
+    ADD COLUMN IF NOT EXISTS locale                TEXT NOT NULL DEFAULT 'vi',
+    ADD COLUMN IF NOT EXISTS timezone              TEXT NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
+    ADD COLUMN IF NOT EXISTS date_of_birth         DATE,
+    ADD COLUMN IF NOT EXISTS gender                TEXT
+        CHECK (gender IS NULL OR gender IN ('male', 'female', 'other', 'prefer_not_to_say')),
+    ADD COLUMN IF NOT EXISTS country               TEXT,
+    ADD COLUMN IF NOT EXISTS phone                 TEXT,
+    ADD COLUMN IF NOT EXISTS preferred_target_lang TEXT NOT NULL DEFAULT 'VIN',
+    ADD COLUMN IF NOT EXISTS updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ADD COLUMN IF NOT EXISTS last_seen_at          TIMESTAMPTZ;
+
+-- Auto-bump updated_at on every UPDATE.
+CREATE OR REPLACE FUNCTION public.touch_profile_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    NEW.updated_at := NOW();
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS profiles_set_updated_at ON public.profiles;
+CREATE TRIGGER profiles_set_updated_at
+    BEFORE UPDATE ON public.profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION public.touch_profile_updated_at();
+
+CREATE INDEX IF NOT EXISTS idx_profiles_username ON public.profiles(username);
+
+-- ─── Avatars bucket ───────────────────────────────────────────────────────────
+-- Public bucket so avatar_url can be read by anyone. The backend uses the
+-- service-role key and bypasses RLS, so it can upload/replace files.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', TRUE)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
+
+DROP POLICY IF EXISTS "avatars_public_read"  ON storage.objects;
+CREATE POLICY "avatars_public_read"
+    ON storage.objects FOR SELECT
+    USING (bucket_id = 'avatars');
+
 -- ─── Manga Series ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.manga_series (
     series_id   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -212,3 +212,65 @@ def translated_image_public_url(page_id: str) -> str:
         settings.SUPABASE_BUCKET_ORIGINALS,
         f"{page_id}/translated.png",
     )
+
+
+def _make_avatar(image_bytes: bytes, size: int = 512) -> tuple[bytes, str]:
+    """Normalize an avatar image: square-cropped, max `size`px, WebP."""
+    img = Image.open(io.BytesIO(image_bytes))
+    if img.mode in ("RGBA", "P", "LA"):
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        if img.mode == "P":
+            img = img.convert("RGBA")
+        background.paste(img, mask=img.split()[-1] if img.mode in ("RGBA", "LA") else None)
+        img = background
+    elif img.mode != "RGB":
+        img = img.convert("RGB")
+
+    # Square center-crop, then resize.
+    w, h = img.size
+    side = min(w, h)
+    left = (w - side) // 2
+    top = (h - side) // 2
+    img = img.crop((left, top, left + side, top + side))
+    img.thumbnail((size, size), Image.LANCZOS)
+
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP", quality=82, method=4)
+    return buf.getvalue(), "image/webp"
+
+
+def upload_avatar(image_bytes: bytes, user_id: str) -> str:
+    """
+    Normalize and upload an avatar image. Returns a public URL with a
+    cache-busting query so the frontend reloads it after a re-upload.
+    """
+    try:
+        normalized, content_type = _make_avatar(image_bytes)
+    except Exception as exc:
+        raise RuntimeError(f"Invalid image for avatar: {exc}") from exc
+
+    storage_path = f"{user_id}/avatar.webp"
+    bucket = settings.SUPABASE_BUCKET_AVATARS
+
+    try:
+        get_supabase().storage.from_(bucket).upload(
+            path=storage_path,
+            file=normalized,
+            file_options={"content-type": content_type, "upsert": "true"},
+        )
+        logger.info("Uploaded avatar to %s/%s", bucket, storage_path)
+    except Exception as exc:
+        raise RuntimeError(f"Failed to upload avatar: {exc}") from exc
+
+    public_url = _get_public_url(bucket, storage_path)
+    import time
+    return f"{public_url}?v={int(time.time())}"
+
+
+def delete_avatar(user_id: str) -> None:
+    """Remove the avatar object for a user. Idempotent."""
+    storage_path = f"{user_id}/avatar.webp"
+    try:
+        get_supabase().storage.from_(settings.SUPABASE_BUCKET_AVATARS).remove([storage_path])
+    except Exception as exc:
+        logger.warning("Failed to delete avatar for %s: %s", user_id, exc)

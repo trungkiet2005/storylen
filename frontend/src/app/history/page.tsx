@@ -1,50 +1,187 @@
 "use client";
-import React, { useState } from 'react';
-import { TopBar } from '@/components/TopBar';
-import { SectionHeader } from '@/components/SectionHeader';
-import { Icon } from '@/components/Icons';
-import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
-import { AnimatedPage, FadeIn, ScaleIn, StaggerContainer, StaggerItem } from '@/components/Animations';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 
-interface Series {
-  kanji: string;
-  title: string;
-  jp: string;
-  chapters: number;
-  pages: number;
-  progress: number;
-  last: string;
-  qaReady: boolean;
+import { TopBar } from "@/components/TopBar";
+import { SectionHeader } from "@/components/SectionHeader";
+import { Icon } from "@/components/Icons";
+import { useToast } from "@/components/Toast";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  AnimatedPage,
+  FadeIn,
+  StaggerContainer,
+  StaggerItem,
+} from "@/components/Animations";
+import {
+  APIError,
+  deleteHistoryItem,
+  getHistory,
+  type HistoryItem,
+  type PageStatus,
+} from "@/lib/api";
+
+type StatusFilter = "all" | "ready" | "processing" | "failed";
+
+const STATUS_META: Record<
+  PageStatus["status"],
+  { label: string; tone: "ready" | "processing" | "failed"; color: string }
+> = {
+  pending:      { label: "Đang chờ",   tone: "processing", color: "var(--muted)" },
+  ocr_running:  { label: "Đang OCR",   tone: "processing", color: "var(--accent)" },
+  translating:  { label: "Đang dịch",  tone: "processing", color: "var(--accent)" },
+  translated:   { label: "Đã dịch",    tone: "ready",      color: "var(--jade)" },
+  completed:    { label: "Hoàn tất",   tone: "ready",      color: "var(--jade)" },
+  ocr_failed:   { label: "Lỗi OCR",    tone: "failed",     color: "var(--accent)" },
+  failed:       { label: "Thất bại",   tone: "failed",     color: "var(--accent)" },
+  error:        { label: "Lỗi",        tone: "failed",     color: "var(--accent)" },
+};
+
+function formatRelativeTime(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const diff = Date.now() - then;
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return "vừa xong";
+  if (min < 60) return `${min} phút trước`;
+  const hours = Math.floor(min / 60);
+  if (hours < 24) return `${hours} giờ trước`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} ngày trước`;
+  return new Date(iso).toLocaleDateString("vi-VN");
 }
 
-const ALL_SERIES: Series[] = [
-  { kanji: "M", title: "Kiếm Nguyệt Ảnh",   jp: "Moonlight Blade",   chapters: 12, pages: 124, progress: 0.78, last: "2 giờ trước",    qaReady: true },
-  { kanji: "S", title: "Bước Chân Mùa Xuân", jp: "Spring Whispers",   chapters: 4,  pages: 78,  progress: 0.42, last: "hôm qua",       qaReady: true },
-  { kanji: "R", title: "Lời Thề Son Đỏ",     jp: "Red Vow",           chapters: 21, pages: 210, progress: 1.0,  last: "3 ngày trước", qaReady: true },
-  { kanji: "S", title: "Biển Lặng",           jp: "Silent Sea",        chapters: 7,  pages: 56,  progress: 0.28, last: "1 tuần trước", qaReady: false },
-  { kanji: "W", title: "Ký Ức Của Gió",       jp: "Wind Memories",     chapters: 9,  pages: 92,  progress: 0.64, last: "1 tuần trước", qaReady: true },
-  { kanji: "S", title: "Bóng Của Người",       jp: "Shadow Person",     chapters: 15, pages: 150, progress: 0.12, last: "2 tuần trước", qaReady: false },
-];
-
-type Filter = "all" | "reading" | "done";
-type ViewLayout = "grid" | "list";
+function StatusBadge({ status }: { status: PageStatus["status"] }) {
+  const meta = STATUS_META[status] ?? STATUS_META.failed;
+  const isProcessing = meta.tone === "processing";
+  return (
+    <span
+      className="chip"
+      style={{
+        padding: "3px 9px",
+        fontSize: 10,
+        color: meta.color,
+        borderColor: meta.color,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+      }}
+    >
+      {isProcessing && (
+        <motion.span
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "linear" }}
+          style={{ display: "inline-flex" }}
+        >
+          <Icon name="refresh" size={9} />
+        </motion.span>
+      )}
+      {meta.tone === "ready" && <Icon name="check" size={9} />}
+      {meta.tone === "failed" && <Icon name="alert" size={9} />}
+      {meta.label}
+    </span>
+  );
+}
 
 export default function HistoryPage() {
-  const [filter, setFilter] = useState<Filter>("all");
-  const [layout, setLayout] = useState<ViewLayout>("grid");
-  const [search, setSearch] = useState("");
+  const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
 
-  const filtered = ALL_SERIES.filter(s => {
-    const matchesFilter =
-      filter === "all" ? true :
-      filter === "done" ? s.progress === 1.0 :
-      filter === "reading" ? s.progress < 1.0 : true;
-    const matchesSearch = search.trim() === "" ||
-      s.title.toLowerCase().includes(search.toLowerCase()) ||
-      s.jp.includes(search);
-    return matchesFilter && matchesSearch;
-  });
+  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<StatusFilter>("all");
+  const [search, setSearch] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Redirect unauthenticated users
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace("/login?next=/history");
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getHistory({ limit: 100, offset: 0 });
+      setItems(res.items);
+      setTotal(res.total);
+    } catch (err) {
+      const msg =
+        err instanceof APIError
+          ? err.message
+          : "Không tải được lịch sử dịch. Hãy thử lại.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) load();
+  }, [isAuthenticated, load]);
+
+  const handleDelete = useCallback(
+    async (item: HistoryItem) => {
+      const ok = window.confirm(
+        `Xoá "${item.title}" khỏi lịch sử dịch? Hành động này không thể hoàn tác.`,
+      );
+      if (!ok) return;
+      setDeletingId(item.id);
+      try {
+        await deleteHistoryItem(item.id);
+        setItems(prev => prev.filter(it => it.id !== item.id));
+        setTotal(prev => Math.max(0, prev - 1));
+        toast("Đã xoá khỏi lịch sử.", "success");
+      } catch (err) {
+        const msg =
+          err instanceof APIError ? err.message : "Xoá thất bại. Hãy thử lại.";
+        toast(msg, "error");
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [toast],
+  );
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items.filter(it => {
+      const tone = STATUS_META[it.status]?.tone ?? "failed";
+      const matchesFilter =
+        filter === "all"
+          ? true
+          : filter === "ready"
+            ? tone === "ready"
+            : filter === "processing"
+              ? tone === "processing"
+              : tone === "failed";
+      const matchesSearch =
+        q === "" ||
+        it.title.toLowerCase().includes(q) ||
+        it.id.toLowerCase().includes(q);
+      return matchesFilter && matchesSearch;
+    });
+  }, [items, filter, search]);
+
+  const counts = useMemo(() => {
+    let ready = 0;
+    let processing = 0;
+    let failed = 0;
+    for (const it of items) {
+      const tone = STATUS_META[it.status]?.tone ?? "failed";
+      if (tone === "ready") ready++;
+      else if (tone === "processing") processing++;
+      else failed++;
+    }
+    return { ready, processing, failed };
+  }, [items]);
 
   return (
     <AnimatedPage>
@@ -53,234 +190,403 @@ export default function HistoryPage() {
         <div style={{ padding: "40px 56px" }}>
           <FadeIn direction="up" distance={20} delay={0.1}>
             <SectionHeader
-              kanji="H"
-              label="Lịch Sử · History"
-              title="Bộ truyện đã đọc"
-              subtitle="Tất cả truyện tranh bạn đã upload, dịch, và thảo luận với AI. Dữ liệu lưu trong session hoặc tài khoản."
+              kanji="訳"
+              label="Lịch Sử Dịch · Translation History"
+              title="Các trang bạn đã dịch bằng AI"
+              subtitle="Toàn bộ ảnh manga bạn đã tải lên và để AI dịch. Mở để đọc lại, hoặc xoá khỏi lịch sử."
               stamp="ARCHIVE"
             />
           </FadeIn>
 
           {/* Filter bar */}
           <FadeIn direction="up" distance={15} delay={0.2}>
-            <div style={{ display: "flex", gap: 10, marginBottom: 24, alignItems: "center", flexWrap: "wrap" }}>
-              {/* Search */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", border: "2px solid var(--border)", background: "var(--panel)", flex: 1, maxWidth: 360 }}>
-                <Icon name="search" size={14}/>
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                marginBottom: 24,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  border: "2px solid var(--border)",
+                  background: "var(--panel)",
+                  flex: 1,
+                  maxWidth: 360,
+                }}
+              >
+                <Icon name="search" size={14} />
                 <input
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  placeholder="Tìm theo tên bộ truyện…"
-                  style={{ border: "none", background: "transparent", flex: 1, fontSize: 13, outline: "none", color: "var(--fg)" }}
-                  aria-label="Tìm kiếm bộ truyện"
+                  placeholder="Tìm theo tên trang hoặc ID…"
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    flex: 1,
+                    fontSize: 13,
+                    outline: "none",
+                    color: "var(--fg)",
+                  }}
+                  aria-label="Tìm kiếm lịch sử dịch"
                 />
                 {search && (
-                  <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 0 }}>
-                    <Icon name="x" size={13}/>
+                  <button
+                    onClick={() => setSearch("")}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "var(--muted)",
+                      padding: 0,
+                    }}
+                    aria-label="Xoá tìm kiếm"
+                  >
+                    <Icon name="x" size={13} />
                   </button>
                 )}
               </div>
 
-              {/* Filter chips */}
-              {(["all", "reading", "done"] as Filter[]).map(f => {
-                const labels = { all: `Tất cả ${ALL_SERIES.length}`, reading: "Đang đọc", done: "Đã xong" };
-                return (
-                  <motion.button
-                    key={f}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`btn btn-sm ${filter === f ? "btn-primary" : "btn-ghost"}`}
-                    onClick={() => setFilter(f)}
-                    aria-pressed={filter === f}
-                  >
-                    {labels[f]}
-                  </motion.button>
-                );
-              })}
+              {(
+                [
+                  { id: "all", label: `Tất cả ${items.length}` },
+                  { id: "ready", label: `Đã dịch ${counts.ready}` },
+                  { id: "processing", label: `Đang xử lý ${counts.processing}` },
+                  { id: "failed", label: `Thất bại ${counts.failed}` },
+                ] as { id: StatusFilter; label: string }[]
+              ).map(f => (
+                <motion.button
+                  key={f.id}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`btn btn-sm ${filter === f.id ? "btn-primary" : "btn-ghost"}`}
+                  onClick={() => setFilter(f.id)}
+                  aria-pressed={filter === f.id}
+                >
+                  {f.label}
+                </motion.button>
+              ))}
 
-              <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`btn btn-sm ${layout === "grid" ? "" : "btn-ghost"}`}
-                  onClick={() => setLayout("grid")}
-                  aria-label="Dạng lưới" aria-pressed={layout === "grid"}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  className="btn btn-sm btn-ghost"
+                  onClick={load}
+                  disabled={loading}
+                  aria-label="Tải lại"
+                  title="Tải lại"
                 >
-                  <Icon name="grid" size={14}/>
+                  <Icon name="refresh" size={13} />
                 </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`btn btn-sm ${layout === "list" ? "" : "btn-ghost"}`}
-                  onClick={() => setLayout("list")}
-                  aria-label="Dạng danh sách" aria-pressed={layout === "list"}
-                >
-                  <Icon name="menu" size={14}/>
-                </motion.button>
+                <Link href="/upload">
+                  <motion.button
+                    whileHover={{ scale: 1.04 }}
+                    whileTap={{ scale: 0.96 }}
+                    className="btn btn-sm btn-primary"
+                  >
+                    <Icon name="upload" size={13} /> Dịch ảnh mới
+                  </motion.button>
+                </Link>
               </div>
             </div>
           </FadeIn>
 
-          {/* Empty search result */}
+          {/* Content */}
           <AnimatePresence mode="wait">
-            {filtered.length === 0 ? (
+            {loading ? (
+              <motion.div
+                key="loading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{
+                  textAlign: "center",
+                  padding: "60px 20px",
+                  color: "var(--muted)",
+                }}
+              >
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
+                  style={{ display: "inline-flex" }}
+                >
+                  <Icon name="refresh" size={28} />
+                </motion.div>
+                <div style={{ marginTop: 10 }}>Đang tải lịch sử…</div>
+              </motion.div>
+            ) : error ? (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="stroke-ink"
+                style={{
+                  background: "var(--panel)",
+                  padding: "20px 24px",
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "center",
+                  color: "var(--accent)",
+                }}
+              >
+                <Icon name="alert" size={18} />
+                <div style={{ flex: 1, fontSize: 13 }}>{error}</div>
+                <button className="btn btn-sm" onClick={load}>
+                  Thử lại
+                </button>
+              </motion.div>
+            ) : filtered.length === 0 ? (
               <motion.div
                 key="empty"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                style={{ textAlign: "center", padding: "60px 20px", color: "var(--muted)" }}
+                style={{
+                  textAlign: "center",
+                  padding: "60px 20px",
+                  color: "var(--muted)",
+                }}
               >
                 <div className="serif" style={{ fontSize: 48, opacity: 0.3 }}>∅</div>
-                <div style={{ marginTop: 8 }}>Không tìm thấy bộ truyện nào phù hợp</div>
+                <div style={{ marginTop: 8 }}>
+                  {items.length === 0
+                    ? "Bạn chưa dịch ảnh nào. Hãy bắt đầu bằng cách tải ảnh lên."
+                    : "Không có mục nào phù hợp."}
+                </div>
+                {items.length === 0 && (
+                  <Link href="/upload" style={{ display: "inline-block", marginTop: 14 }}>
+                    <button className="btn btn-sm btn-primary">
+                      <Icon name="upload" size={13} /> Tải ảnh lên
+                    </button>
+                  </Link>
+                )}
               </motion.div>
             ) : (
-              <motion.div
-                key={layout}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+              <StaggerContainer
+                key="grid"
+                staggerDelay={0.05}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                  gap: 16,
+                }}
               >
-                {/* Grid layout */}
-                {layout === "grid" && (
-                  <StaggerContainer staggerDelay={0.06} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
-                    {filtered.map(s => (
-                      <StaggerItem key={s.title} direction="up" distance={15}>
-                        <motion.div
-                          whileHover={{ y: -4, x: -2, boxShadow: "6px 6px 0 0 var(--border)" }}
-                          className="stroke-ink panel-shadow"
-                          style={{ background: "var(--panel)", overflow: "hidden", cursor: "pointer", transition: "box-shadow 0.2s" }}
+                {filtered.map(item => {
+                  const meta = STATUS_META[item.status] ?? STATUS_META.failed;
+                  const isReady = meta.tone === "ready";
+                  const isDeleting = deletingId === item.id;
+                  return (
+                    <StaggerItem key={item.id} direction="up" distance={15}>
+                      <motion.div
+                        whileHover={{ y: -3, boxShadow: "6px 6px 0 0 var(--border)" }}
+                        className="stroke-ink panel-shadow"
+                        style={{
+                          background: "var(--panel)",
+                          overflow: "hidden",
+                          transition: "box-shadow 0.2s",
+                          display: "flex",
+                          flexDirection: "column",
+                          opacity: isDeleting ? 0.5 : 1,
+                        }}
+                      >
+                        {/* Thumbnail */}
+                        <div
+                          style={{
+                            width: "100%",
+                            aspectRatio: "3/4",
+                            background: "var(--bg-3)",
+                            borderBottom: "2px solid var(--border)",
+                            position: "relative",
+                            overflow: "hidden",
+                          }}
+                          className="halftone-coarse"
                         >
-                          <div style={{ display: "flex" }}>
-                            {/* Cover art */}
-                            <div className="halftone-coarse" style={{ width: 120, height: 160, background: "var(--bg-3)", display: "flex", alignItems: "center", justifyContent: "center", borderRight: "2px solid var(--border)", color: "var(--ink)", flexShrink: 0 }}>
-                              <span className="serif" style={{ fontSize: 80, color: "var(--accent)", fontWeight: 800, lineHeight: 1 }}>{s.kanji}</span>
+                          {item.thumbnail_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={item.thumbnail_url}
+                              alt={item.title}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                display: "block",
+                              }}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "var(--muted)",
+                              }}
+                            >
+                              <Icon name="image" size={32} />
                             </div>
-                            {/* Info */}
-                            <div style={{ flex: 1, padding: 14 }}>
-                              <div className="serif" style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.3 }}>{s.title}</div>
-                              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{s.jp}</div>
-                              <div style={{ display: "flex", gap: 10, marginTop: 10, fontSize: 11, color: "var(--fg-soft)" }}>
-                                <span>📖 {s.chapters} chương</span>
-                                <span>{s.pages} trang</span>
-                              </div>
-                              {/* Progress */}
-                              <div style={{ marginTop: 10 }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted)", marginBottom: 3 }}>
-                                  <span>Đã đọc</span>
-                                  <span className="mono">{Math.round(s.progress * 100)}%</span>
-                                </div>
-                                <div style={{ height: 6, background: "var(--bg-2)", border: "1px solid var(--border)" }}>
-                                  <motion.div 
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${s.progress * 100}%` }}
-                                    transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
-                                    style={{ height: "100%", background: s.progress === 1 ? "var(--jade)" : "var(--accent)" }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Footer */}
-                          <div style={{ padding: "8px 14px", borderTop: "1px dashed var(--border-soft)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: 11, color: "var(--muted)", display: "flex", alignItems: "center", gap: 4 }}>
-                              <Icon name="clock" size={10}/> {s.last}
-                            </span>
-                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                              {s.qaReady && (
-                                <Link href="/qa" style={{ textDecoration: "none" }} onClick={e => e.stopPropagation()}>
-                                  <motion.span whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="chip" style={{ padding: "2px 8px", fontSize: 10, cursor: "pointer" }}>Q&amp;A</motion.span>
-                                </Link>
-                              )}
-                              {s.progress === 1.0 && <span className="chip chip-accent" style={{ padding: "2px 8px", fontSize: 10 }}>✓ Xong</span>}
-                              <Link href="/reader" style={{ textDecoration: "none" }} onClick={e => e.stopPropagation()}>
-                                <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm" style={{ padding: "4px 10px", fontSize: 11 }}>
-                                  <Icon name="book" size={12}/> Đọc
-                                </motion.button>
-                              </Link>
-                            </div>
-                          </div>
-                        </motion.div>
-                      </StaggerItem>
-                    ))}
-                  </StaggerContainer>
-                )}
-
-                {/* List layout */}
-                {layout === "list" && (
-                  <div className="stroke-ink" style={{ background: "var(--panel)" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 120px 100px 140px", padding: "10px 16px", background: "var(--bg-2)", borderBottom: "2px solid var(--border)" }} className="caps-xs">
-                      <span/>
-                      <span>Tên bộ truyện</span>
-                      <span>Chương</span>
-                      <span>Tiến độ</span>
-                      <span>Cập nhật</span>
-                      <span/>
-                    </div>
-                    <StaggerContainer staggerDelay={0.04}>
-                      {filtered.map((s, i) => (
-                        <StaggerItem key={s.title} direction="none">
-                          <motion.div 
-                            whileHover={{ background: "var(--bg-2)" }}
-                            style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 120px 100px 140px", padding: "12px 16px", borderBottom: i < filtered.length - 1 ? "1px dashed var(--border-soft)" : "none", alignItems: "center", fontSize: 13, transition: "background 0.15s" }}
+                          )}
+                          <div
+                            style={{
+                              position: "absolute",
+                              top: 8,
+                              left: 8,
+                            }}
                           >
-                            <span className="serif" style={{ fontSize: 24, color: "var(--accent)", fontWeight: 800 }}>{s.kanji}</span>
-                            <div>
-                              <div style={{ fontWeight: 600 }}>{s.title}</div>
-                              <div style={{ fontSize: 11, color: "var(--muted)" }}>{s.jp}</div>
-                            </div>
-                            <span style={{ color: "var(--muted)", fontSize: 12 }}>{s.chapters} ch · {s.pages} tr</span>
-                            <div>
-                              <div style={{ height: 6, background: "var(--bg-2)", border: "1px solid var(--border)", marginBottom: 3 }}>
-                                <motion.div 
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${s.progress * 100}%` }}
-                                  transition={{ duration: 0.8, ease: "easeOut" }}
-                                  style={{ height: "100%", background: s.progress === 1 ? "var(--jade)" : "var(--accent)" }}
-                                />
-                              </div>
-                              <div className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>{Math.round(s.progress * 100)}%</div>
-                            </div>
-                            <span style={{ fontSize: 11, color: "var(--muted)" }}>{s.last}</span>
-                            <div style={{ display: "flex", gap: 6 }}>
-                              <Link href="/reader"><motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm"><Icon name="book" size={12}/> Đọc</motion.button></Link>
-                              {s.qaReady && <Link href="/qa"><motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost"><Icon name="chat" size={12}/></motion.button></Link>}
-                            </div>
-                          </motion.div>
-                        </StaggerItem>
-                      ))}
-                    </StaggerContainer>
-                  </div>
-                )}
-              </motion.div>
+                            <StatusBadge status={item.status} />
+                          </div>
+                        </div>
+
+                        {/* Info */}
+                        <div style={{ padding: 12, flex: 1 }}>
+                          <div
+                            className="serif"
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 700,
+                              lineHeight: 1.3,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={item.title}
+                          >
+                            {item.title}
+                          </div>
+                          <div
+                            className="mono"
+                            style={{
+                              fontSize: 10,
+                              color: "var(--muted)",
+                              marginTop: 3,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                            title={item.id}
+                          >
+                            {item.id}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "var(--muted)",
+                              marginTop: 8,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            <Icon name="clock" size={10} />
+                            {formatRelativeTime(item.last_accessed)}
+                          </div>
+                        </div>
+
+                        {/* Footer actions */}
+                        <div
+                          style={{
+                            padding: "8px 12px",
+                            borderTop: "1px dashed var(--border-soft)",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          {isReady ? (
+                            <Link
+                              href={`/reader?page=${item.id}`}
+                              style={{ textDecoration: "none" }}
+                            >
+                              <motion.button
+                                whileHover={{ scale: 1.04 }}
+                                whileTap={{ scale: 0.96 }}
+                                className="btn btn-sm"
+                                style={{ padding: "4px 10px", fontSize: 11 }}
+                              >
+                                <Icon name="book" size={12} /> Mở
+                              </motion.button>
+                            </Link>
+                          ) : (
+                            <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                              {meta.tone === "processing"
+                                ? "Đang chờ AI…"
+                                : "Không khả dụng"}
+                            </span>
+                          )}
+                          <motion.button
+                            whileHover={{ scale: 1.04 }}
+                            whileTap={{ scale: 0.96 }}
+                            className="btn btn-sm btn-ghost"
+                            onClick={() => handleDelete(item)}
+                            disabled={isDeleting}
+                            aria-label={`Xoá ${item.title}`}
+                            title="Xoá khỏi lịch sử"
+                            style={{
+                              padding: "4px 8px",
+                              color: "var(--accent)",
+                            }}
+                          >
+                            <Icon name="trash" size={12} />
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    </StaggerItem>
+                  );
+                })}
+              </StaggerContainer>
             )}
           </AnimatePresence>
 
           {/* Stats footer */}
-          <StaggerContainer staggerDelay={0.08} style={{ marginTop: 28, display: "flex", gap: 20, flexWrap: "wrap" }}>
-            {[
-              { label: "Tổng bộ truyện", value: ALL_SERIES.length, icon: "stack" },
-              { label: "Tổng trang đã dịch", value: ALL_SERIES.reduce((a, s) => a + s.pages, 0), icon: "book" },
-              { label: "Hoàn thành", value: ALL_SERIES.filter(s => s.progress === 1).length, icon: "check" },
-              { label: "Sẵn sàng Q&A", value: ALL_SERIES.filter(s => s.qaReady).length, icon: "sparkle" },
-            ].map(stat => (
-              <StaggerItem key={stat.label} direction="up" distance={12}>
-                <motion.div 
-                  whileHover={{ y: -2, boxShadow: "4px 4px 0 0 var(--border)" }}
-                  className="stroke-ink" 
-                  style={{ background: "var(--panel)", padding: "12px 20px", display: "flex", gap: 12, alignItems: "center", transition: "box-shadow 0.2s" }}
-                >
-                  <Icon name={stat.icon} size={18}/>
-                  <div>
-                    <div className="display" style={{ fontSize: 22, lineHeight: 1 }}>{stat.value}</div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{stat.label}</div>
-                  </div>
-                </motion.div>
-              </StaggerItem>
-            ))}
-          </StaggerContainer>
+          {!loading && !error && items.length > 0 && (
+            <StaggerContainer
+              staggerDelay={0.08}
+              style={{ marginTop: 28, display: "flex", gap: 20, flexWrap: "wrap" }}
+            >
+              {[
+                { label: "Tổng số trang đã dịch", value: total, icon: "stack" },
+                { label: "Đã hoàn tất", value: counts.ready, icon: "check" },
+                { label: "Đang xử lý", value: counts.processing, icon: "refresh" },
+                { label: "Thất bại", value: counts.failed, icon: "alert" },
+              ].map(stat => (
+                <StaggerItem key={stat.label} direction="up" distance={12}>
+                  <motion.div
+                    whileHover={{ y: -2, boxShadow: "4px 4px 0 0 var(--border)" }}
+                    className="stroke-ink"
+                    style={{
+                      background: "var(--panel)",
+                      padding: "12px 20px",
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "center",
+                      transition: "box-shadow 0.2s",
+                    }}
+                  >
+                    <Icon name={stat.icon} size={18} />
+                    <div>
+                      <div className="display" style={{ fontSize: 22, lineHeight: 1 }}>
+                        {stat.value}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>
+                        {stat.label}
+                      </div>
+                    </div>
+                  </motion.div>
+                </StaggerItem>
+              ))}
+            </StaggerContainer>
+          )}
         </div>
       </div>
     </AnimatedPage>

@@ -8,20 +8,46 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import date
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from pydantic import BaseModel, Field, field_validator
 
 from app.config import Settings, get_settings
 from app.database import get_supabase
+from app.storage.supabase_storage import delete_avatar, upload_avatar
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,32}$")
+PHONE_RE = re.compile(r"^\+?[0-9\s\-().]{6,20}$")
 ALLOWED_ROLES = {"user", "admin"}
+ALLOWED_GENDERS = {"male", "female", "other", "prefer_not_to_say"}
+ALLOWED_LOCALES = {"vi", "en", "ja", "zh", "ko"}
+ALLOWED_TARGET_LANGS = {"VIN", "ENG", "JPN", "CHS", "KOR"}
+PROFILE_FIELDS = (
+    "user_id",
+    "username",
+    "role",
+    "full_name",
+    "display_name",
+    "avatar_url",
+    "bio",
+    "locale",
+    "timezone",
+    "date_of_birth",
+    "gender",
+    "country",
+    "phone",
+    "preferred_target_lang",
+    "created_at",
+    "updated_at",
+    "last_seen_at",
+)
+AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
 
 class AuthUser(BaseModel):
@@ -29,6 +55,86 @@ class AuthUser(BaseModel):
     username: str
     email: str
     role: str = "user"
+    full_name: str | None = None
+    display_name: str | None = None
+    avatar_url: str | None = None
+    bio: str | None = None
+    locale: str = "vi"
+    timezone: str = "Asia/Ho_Chi_Minh"
+    date_of_birth: date | None = None
+    gender: str | None = None
+    country: str | None = None
+    phone: str | None = None
+    preferred_target_lang: str = "VIN"
+    created_at: str | None = None
+    updated_at: str | None = None
+    last_seen_at: str | None = None
+
+
+class ProfileUpdateRequest(BaseModel):
+    full_name: str | None = Field(default=None, max_length=120)
+    display_name: str | None = Field(default=None, max_length=64)
+    bio: str | None = Field(default=None, max_length=500)
+    locale: str | None = None
+    timezone: str | None = Field(default=None, max_length=64)
+    date_of_birth: date | None = None
+    gender: str | None = None
+    country: str | None = Field(default=None, max_length=64)
+    phone: str | None = Field(default=None, max_length=32)
+    preferred_target_lang: str | None = None
+    avatar_url: str | None = Field(default=None, max_length=1024)
+
+    @field_validator("locale")
+    @classmethod
+    def check_locale(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        v = value.strip().lower()
+        if v not in ALLOWED_LOCALES:
+            raise ValueError(f"Ngôn ngữ không hợp lệ. Hỗ trợ: {', '.join(sorted(ALLOWED_LOCALES))}")
+        return v
+
+    @field_validator("preferred_target_lang")
+    @classmethod
+    def check_target_lang(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        v = value.strip().upper()
+        if v not in ALLOWED_TARGET_LANGS:
+            raise ValueError(f"Ngôn ngữ đích không hợp lệ. Hỗ trợ: {', '.join(sorted(ALLOWED_TARGET_LANGS))}")
+        return v
+
+    @field_validator("gender")
+    @classmethod
+    def check_gender(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        v = value.strip().lower()
+        if v == "":
+            return None
+        if v not in ALLOWED_GENDERS:
+            raise ValueError("Giới tính không hợp lệ.")
+        return v
+
+    @field_validator("phone")
+    @classmethod
+    def check_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        v = value.strip()
+        if v == "":
+            return None
+        if not PHONE_RE.fullmatch(v):
+            raise ValueError("Số điện thoại không hợp lệ.")
+        return v
+
+    @field_validator("full_name", "display_name", "bio", "country", "timezone", "avatar_url")
+    @classmethod
+    def trim_strings(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        v = value.strip()
+        return v or None
 
 
 class AuthResponse(BaseModel):
@@ -148,7 +254,7 @@ def _get_profile(user_id: str) -> dict[str, Any] | None:
         result = (
             get_supabase()
             .table("profiles")
-            .select("username, role")
+            .select(", ".join(PROFILE_FIELDS))
             .eq("user_id", user_id)
             .limit(1)
             .execute()
@@ -158,6 +264,28 @@ def _get_profile(user_id: str) -> dict[str, Any] | None:
     except Exception as exc:
         logger.warning("Failed to load profile for %s: %s", user_id, exc)
     return None
+
+
+def _as_iso(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    try:
+        return value.isoformat()
+    except Exception:
+        return str(value)
+
+
+def _as_date(value: Any) -> date | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except Exception:
+        return None
 
 
 def _get_profile_username(user_id: str) -> str | None:
@@ -210,19 +338,38 @@ def _to_auth_user(payload: dict[str, Any], username: str | None = None) -> AuthU
     user_metadata = payload.get("user_metadata") or {}
     email = str(payload.get("email") or "")
     user_id = str(payload["id"])
-    profile = _get_profile(user_id)
+    profile = _get_profile(user_id) or {}
     resolved_username = (
         username
-        or (profile.get("username") if profile else None)
+        or profile.get("username")
         or user_metadata.get("username")
         or user_metadata.get("name")
         or email.split("@", 1)[0]
         or "user"
     )
-    role = (profile.get("role") if profile else None) or "user"
+    role = profile.get("role") or "user"
     if role not in ALLOWED_ROLES:
         role = "user"
-    return AuthUser(id=user_id, username=str(resolved_username), email=email, role=role)
+    return AuthUser(
+        id=user_id,
+        username=str(resolved_username),
+        email=email,
+        role=role,
+        full_name=profile.get("full_name"),
+        display_name=profile.get("display_name"),
+        avatar_url=profile.get("avatar_url"),
+        bio=profile.get("bio"),
+        locale=profile.get("locale") or "vi",
+        timezone=profile.get("timezone") or "Asia/Ho_Chi_Minh",
+        date_of_birth=_as_date(profile.get("date_of_birth")),
+        gender=profile.get("gender"),
+        country=profile.get("country"),
+        phone=profile.get("phone"),
+        preferred_target_lang=profile.get("preferred_target_lang") or "VIN",
+        created_at=_as_iso(profile.get("created_at")),
+        updated_at=_as_iso(profile.get("updated_at")),
+        last_seen_at=_as_iso(profile.get("last_seen_at")),
+    )
 
 
 def _session_from_payload(payload: dict[str, Any]) -> dict[str, Any] | None:

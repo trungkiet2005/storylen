@@ -1,6 +1,8 @@
 """
 StoryLens Backend - History Router
-GET /history — returns paginated list of processed pages for the current session.
+GET    /history           — paginated list of AI-translated pages for the current user
+DELETE /history/{page_id} — remove a page from the user's translation history
+                            (also cleans up Supabase Storage objects)
 
 Fixes:
 - Handle unknown/invalid status values gracefully (don't crash)
@@ -11,14 +13,16 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
+from app.config import get_settings
 from app.database import get_supabase
 from app.models.schemas import HistoryItem, HistoryResponse, ProcessingStatus
 from app.routers.auth import AuthUser, get_current_user
 
 router = APIRouter(prefix="/history", tags=["history"])
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 @router.get("", response_model=HistoryResponse)
@@ -104,3 +108,79 @@ def get_history(
         )
 
     return HistoryResponse(total=total, items=items)
+
+
+@router.delete("/{page_id}", status_code=204, response_class=Response)
+def delete_history_item(
+    page_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> Response:
+    """
+    Remove a translated page from the current user's history.
+    Deletes the DB row (cascading bubble_data / translation_history via FKs)
+    and best-effort cleanup of the related Supabase Storage objects.
+    """
+    supabase = get_supabase()
+
+    # ── Verify ownership ─────────────────────────────────────────────────────
+    try:
+        page_res = (
+            supabase.table("manga_pages")
+            .select("page_id, user_id, original_image_url, thumbnail_url")
+            .eq("page_id", page_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("Failed to look up page %s for deletion: %s", page_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể truy cập cơ sở dữ liệu.",
+        ) from exc
+
+    if not page_res.data:
+        raise HTTPException(status_code=404, detail="Không tìm thấy trang.")
+    if page_res.data.get("user_id") != user.id:
+        raise HTTPException(status_code=403, detail="Truy cập bị từ chối.")
+
+    # ── Delete the DB row first (FK cascades remove bubble + translation rows)
+    try:
+        supabase.table("manga_pages").delete().eq("page_id", page_id).execute()
+    except Exception as exc:
+        logger.error("Failed to delete manga_pages row %s: %s", page_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Xoá khỏi lịch sử thất bại.",
+        ) from exc
+
+    # ── Best-effort: remove storage objects (don't fail the request) ────────
+    from app.storage.supabase_storage import _storage_path_from_public_url
+
+    originals_bucket = settings.SUPABASE_BUCKET_ORIGINALS
+    thumbs_bucket = settings.SUPABASE_BUCKET_THUMBNAILS
+
+    original_path = _storage_path_from_public_url(
+        originals_bucket, page_res.data.get("original_image_url")
+    )
+    thumbnail_path = _storage_path_from_public_url(
+        thumbs_bucket, page_res.data.get("thumbnail_url")
+    )
+
+    paths_originals = [p for p in (original_path, f"{page_id}/translated.png") if p]
+    if paths_originals:
+        try:
+            supabase.storage.from_(originals_bucket).remove(paths_originals)
+        except Exception as exc:
+            logger.warning(
+                "Storage cleanup (originals) failed for page %s: %s", page_id, exc
+            )
+
+    if thumbnail_path:
+        try:
+            supabase.storage.from_(thumbs_bucket).remove([thumbnail_path])
+        except Exception as exc:
+            logger.warning(
+                "Storage cleanup (thumbnail) failed for page %s: %s", page_id, exc
+            )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

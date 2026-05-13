@@ -97,8 +97,9 @@ export interface HistoryItem {
   id: string;
   type: "page" | "series";
   title: string;
-  thumbnail_url: string;
+  thumbnail_url: string | null;
   last_accessed: string;
+  status: PageStatus["status"];
   progress?: number;
   chapters?: number;
   pages?: number;
@@ -327,6 +328,10 @@ export async function getHistory(params?: {
   if (params?.offset) qs.set("offset", String(params.offset));
   const q = qs.toString();
   return request<HistoryResponse>(`/history${q ? `?${q}` : ""}`);
+}
+
+export async function deleteHistoryItem(pageId: string): Promise<void> {
+  return request<void>(`/history/${pageId}`, { method: "DELETE" });
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
