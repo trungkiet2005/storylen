@@ -78,7 +78,11 @@ def _safe_confidence(conf: Any) -> float:
 
 # ─── Master pipeline ──────────────────────────────────────────────────────────
 
-def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
+def process_page(
+    page_id: str,
+    original_image_url: str,
+    ai_config: dict[str, Any] | None = None,
+) -> list[BubbleResult]:
     """
     Orchestrates the full processing pipeline for one manga page.
     Called in a background task by the upload router.
@@ -91,6 +95,11 @@ def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
         List of BubbleResult for the processed page.
     """
     supabase = get_supabase()
+    translator_name = (
+        ai_config.get("translator")
+        if isinstance(ai_config, dict) and isinstance(ai_config.get("translator"), str)
+        else settings.AI_MODULE_TRANSLATOR
+    )
 
     try:
         # ── Step 1: Notify frontend processing has started ─────────────────
@@ -98,7 +107,7 @@ def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
 
         # ── Step 2: Call HF Space — does all heavy lifting ─────────────────
         logger.info("Delegating page %s to ai_module", page_id)
-        ai_result = call_translate(page_id, original_image_url)
+        ai_result = call_translate(page_id, original_image_url, ai_config)
         raw_bubbles = ai_result.get("bubbles", [])
         rendered_image_bytes = ai_result.get("rendered_image_bytes")
         if not isinstance(rendered_image_bytes, bytes) or not rendered_image_bytes:
@@ -143,7 +152,7 @@ def process_page(page_id: str, original_image_url: str) -> list[BubbleResult]:
                     "bubble_id": bubble_id,
                     "translated_text_vi": translated_text,
                     "translated_at": datetime.now(timezone.utc).isoformat(),
-                    "llm_model_used": f"ai_module:{settings.AI_MODULE_TRANSLATOR}",
+                    "llm_model_used": f"ai_module:{translator_name}",
                 })
 
             embedding = b.get("embedding")

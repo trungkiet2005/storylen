@@ -4,14 +4,14 @@ import { ToastProvider } from "@/components/Toast";
 import { AuthProvider } from "@/contexts/AuthContext";
 
 export const metadata: Metadata = {
-  title: "StoryLens — Đọc Manga Không Rào Cản Ngôn Ngữ",
+  title: "StoryLens — Đọc Truyện Tranh Đa Ngôn Ngữ Bằng AI",
   description:
-    "Nền tảng dịch manga Nhật–Việt thông minh: phát hiện bubble tự động với YOLOv8, dịch ngữ cảnh qua Gemini AI, hỏi đáp RAG về nội dung truyện.",
-  keywords: ["manga", "dịch manga", "OCR manga", "StoryLens", "Gemini AI", "RAG Q&A"],
+    "Nền tảng dịch truyện tranh thông minh: phát hiện bubble tự động, dịch ngữ cảnh sâu rộng qua Gemini AI, hỏi đáp RAG về nội dung truyện.",
+  keywords: ["truyện tranh", "dịch truyện", "OCR truyện tranh", "StoryLens", "Gemini AI", "RAG Q&A", "dịch thuật AI"],
   openGraph: {
-    title: "StoryLens — Đọc Manga Như Người Nhật",
+    title: "StoryLens — Đọc Truyện Không Còn Rào Cản",
     description:
-      "Dịch manga tiếng Nhật sang tiếng Việt bằng AI. Giữ nguyên nhịp điệu, ngữ khí, và giọng văn gốc.",
+      "Dịch truyện tranh đa ngôn ngữ bằng AI tiên tiến. Giữ nguyên ý nghĩa, cảm xúc, và phong cách gốc của tác phẩm.",
     type: "website",
     locale: "vi_VN",
   },

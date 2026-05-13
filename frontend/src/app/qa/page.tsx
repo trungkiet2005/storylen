@@ -27,14 +27,14 @@ interface Session {
 const SAMPLE_SESSIONS: Session[] = [
   {
     id: 1,
-    title: "Tại sao Kenshin không giết ai?",
-    series: "月影の剣",
+    title: "Tại sao Arthur tha mạng đối thủ?",
+    series: "Moonlight Blade",
     messages: [
-      { id: 1, role: "user", content: "Tại sao Kenshin trong chương 12 từ chối giết đối thủ mặc dù đã có cơ hội?" },
+      { id: 1, role: "user", content: "Tại sao Arthur trong chương 12 từ chối kết liễu đối thủ mặc dù đã có cơ hội?" },
       {
         id: 2,
         role: "assistant",
-        content: "Trong chương 12, Kenshin từ chối giết đối thủ vì **lời thề không sát sinh** mà anh đã lập sau kết thúc thời kỳ Bakumatsu. Điều này được thể hiện qua:\n\n1. Thanh **逆刃刀 (sakabatou)** — lưỡi kiếm quay ngược, vật chứng vật lý cho lời thề\n2. Hồi tưởng trong panel 3 về Tomoe (vợ cũ)\n3. Đối thoại với Kaoru ở trang 08: *\"Mình đã giết đủ rồi\"*",
+        content: "Trong chương 12, Arthur từ chối hạ sát đối thủ vì **lời thề bảo vệ hòa bình** mà anh đã lập sau cuộc chiến cổ đại. Điều này được thể hiện qua:\n\n1. Thanh kiếm được cắm xuống đất — hành động vật lý thể hiện mong muốn chấm dứt xung đột\n2. Hồi tưởng trong panel 3 về người thầy quá cố\n3. Đối thoại với Elena ở trang 08: *\"Bạo lực sẽ chỉ đẻ ra bạo lực mà thôi\"*",
         sources: [
           { ch: 12, p: 8, score: 0.94 },
           { ch: 3, p: 22, score: 0.88 },
@@ -43,16 +43,16 @@ const SAMPLE_SESSIONS: Session[] = [
       },
     ],
   },
-  { id: 2, title: "Ý nghĩa của hoa sakura trong ch.3", series: "春の足音", messages: [] },
-  { id: 3, title: "Quan hệ Kaoru và Yahiko", series: "月影の剣", messages: [] },
-  { id: 4, title: "Timeline của cuộc chiến", series: "紅の誓い", messages: [] },
+  { id: 2, title: "Ý nghĩa của biểu tượng cổ trong ch.3", series: "Spring Whispers", messages: [] },
+  { id: 3, title: "Quan hệ Elena và Arthur", series: "Moonlight Blade", messages: [] },
+  { id: 4, title: "Timeline của cuộc chiến", series: "Red Vow", messages: [] },
 ];
 
 const SUGGESTIONS = [
   "Tóm tắt chương này trong 3 câu",
-  "Kenshin là ai? Tính cách thế nào?",
-  "Vì sao Kaoru tin Kenshin?",
-  "Thuật ngữ 逆刃刀 nghĩa là gì?",
+  "Nhân vật chính là ai? Tính cách thế nào?",
+  "Mối quan hệ giữa các nhân vật?",
+  "Ý nghĩa thuật ngữ đặc biệt trong trang?",
 ];
 
 function renderMarkdown(text: string) {
@@ -120,7 +120,7 @@ function QAContent() {
       const newSession: Session = {
         id: Date.now(),
         title: q.length > 40 ? q.slice(0, 40) + "…" : q,
-        series: "月影の剣",
+        series: "Moonlight Blade",
         pageId: pageIdParam ?? undefined,
         messages: [userMsg],
       };
@@ -164,7 +164,7 @@ function QAContent() {
         aiMsg = {
           id: Date.now() + 1,
           role: "assistant",
-          content: `Dựa trên **${Math.floor(Math.random() * 100 + 20)} trang** đã được index từ bộ truyện này, câu trả lời cho "${q}" là:\n\nHệ thống RAG đã tìm được các đoạn văn bản liên quan nhất và tổng hợp câu trả lời dựa trên nội dung thực tế. Không có thông tin được bịa thêm ngoài dữ liệu đã dịch.\n\n*Lưu ý: Đây là demo — để dùng RAG thật, hãy upload trang manga trước.*`,
+          content: `Dựa trên **${Math.floor(Math.random() * 100 + 20)} trang** đã được index từ bộ truyện này, câu trả lời cho "${q}" là:\n\nHệ thống RAG đã tìm được các đoạn văn bản liên quan nhất và tổng hợp câu trả lời dựa trên nội dung thực tế. Không có thông tin được bịa thêm ngoài dữ liệu đã dịch.\n\n*Lưu ý: Đây là demo — để dùng RAG thật, hãy upload trang truyện trước.*`,
           sources: [
             { ch: Math.floor(Math.random() * 12) + 1, p: Math.floor(Math.random() * 30) + 1, score: +(0.8 + Math.random() * 0.18).toFixed(2) },
             { ch: Math.floor(Math.random() * 12) + 1, p: Math.floor(Math.random() * 30) + 1, score: +(0.7 + Math.random() * 0.18).toFixed(2) },
@@ -282,7 +282,7 @@ function QAContent() {
           {/* Header */}
           <div style={{ padding: "14px 28px", borderBottom: "2px solid var(--border)", background: "var(--panel)", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
             <div>
-              <div className="caps-xs" style={{ color: "var(--accent)" }}>RAG Q&amp;A · {activeSession?.series ?? "月影の剣"}</div>
+              <div className="caps-xs" style={{ color: "var(--accent)" }}>RAG Q&amp;A · {activeSession?.series ?? "Moonlight Blade"}</div>
               <div className="display" style={{ fontSize: 18, marginTop: 2 }}>
                 {activeSession ? activeSession.title : "Cuộc trò chuyện mới"}
               </div>
@@ -308,12 +308,12 @@ function QAContent() {
                   boxShadow: "4px 4px 0 var(--border)",
                   marginBottom: 20,
                   fontFamily: "var(--font-serif)", fontSize: 44, fontWeight: 800,
-                }}>問</div>
+                }}>Q</div>
                 <div className="display" style={{ fontSize: 26 }}>Hãy hỏi bất kỳ điều gì về truyện</div>
                 <div style={{ color: "var(--fg-soft)", marginTop: 8, maxWidth: 460, lineHeight: 1.6 }}>
                   {useRealAPI
                     ? "AI sẽ chỉ trả lời dựa trên nội dung đã được index vào vector DB."
-                    : "Demo mode: AI mô phỏng câu trả lời. Upload manga để dùng RAG thật."}
+                    : "Demo mode: AI mô phỏng câu trả lời. Upload truyện để dùng RAG thật."}
                 </div>
                 <StaggerContainer style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 28, maxWidth: 540 }}>
                   {SUGGESTIONS.map(q => (
@@ -362,7 +362,7 @@ function QAContent() {
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: "var(--font-serif)", fontSize: 18, fontWeight: 800,
                     border: "2px solid var(--border)", flexShrink: 0,
-                  }}>問</div>
+                  }}>Q</div>
                 )}
                 <div style={{ maxWidth: 620, flex: msg.role === "user" ? undefined : 1 }}>
                   <div
@@ -408,7 +408,7 @@ function QAContent() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontFamily: "var(--font-serif)", fontSize: 18, fontWeight: 800,
                   border: "2px solid var(--border)", flexShrink: 0,
-                }}>問</div>
+                }}>Q</div>
                 <div className="stroke-ink" style={{ background: "#fff", padding: "14px 18px", display: "flex", gap: 6, alignItems: "center" }}>
                   {[0, 0.2, 0.4].map(delay => (
                     <div key={delay} style={{

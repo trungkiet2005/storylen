@@ -15,11 +15,12 @@ Fixes:
 from __future__ import annotations
 
 import logging
+import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from app.config import get_settings
 from app.database import get_supabase
@@ -64,13 +65,36 @@ def _resolve_content_type(upload: UploadFile) -> str | None:
     return None
 
 
-async def _pipeline_task(page_id: str, original_image_url: str):
+def _parse_ai_config(raw: str | None) -> dict[str, str] | None:
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid ai_module config.") from exc
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Invalid ai_module config.")
+
+    allowed = {"translator", "target_lang", "detector", "ocr", "inpainter", "renderer"}
+    parsed: dict[str, str] = {}
+    for key in allowed:
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            parsed[key] = value.strip()
+    return parsed or None
+
+
+async def _pipeline_task(
+    page_id: str,
+    original_image_url: str,
+    ai_config: dict[str, str] | None = None,
+):
     """
     Background task: calls HF Space AI worker with the Supabase Storage URL.
     HF Space downloads the image directly — no raw bytes transferred.
     """
     try:
-        process_page(page_id, original_image_url)
+        process_page(page_id, original_image_url, ai_config)
     except Exception:
         logger.exception("Background pipeline error for page %s", page_id)
 
@@ -79,6 +103,7 @@ async def _pipeline_task(page_id: str, original_image_url: str):
 async def upload_manga_images(
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
+    ai_config: str | None = Form(default=None),
 ):
     """
     Upload one or more manga images (JPG / PNG / WebP, max 10 MB each).
@@ -86,6 +111,7 @@ async def upload_manga_images(
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files provided.")
+    ai_config_data = _parse_ai_config(ai_config)
 
     # Validate ALL files before processing any (fail fast)
     validated: list[tuple[UploadFile, bytes, str]] = []
@@ -161,7 +187,7 @@ async def upload_manga_images(
         page_ids.append(page_id)
 
         # ── Kick off background pipeline (calls HF Space) ─────────────────
-        background_tasks.add_task(_pipeline_task, page_id, original_url)
+        background_tasks.add_task(_pipeline_task, page_id, original_url, ai_config_data)
 
     return UploadResponse(
         message=(

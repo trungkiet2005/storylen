@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import history, pages, qa, status, upload
+from app.routers import ai_module, history, pages, qa, status, upload
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -100,6 +100,7 @@ app.add_middleware(
 API_PREFIX = "/v1"
 
 app.include_router(upload.router,  prefix=API_PREFIX)
+app.include_router(ai_module.router, prefix=API_PREFIX)
 app.include_router(status.router,  prefix=API_PREFIX)
 app.include_router(pages.router,   prefix=API_PREFIX)
 app.include_router(qa.router,      prefix=API_PREFIX)

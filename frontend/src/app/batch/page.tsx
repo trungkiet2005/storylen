@@ -21,15 +21,15 @@ export default function BatchPage() {
     <div className="paper-grain" style={{ minHeight: "100vh" }}>
       <TopBar active="batch" />
       <div style={{ padding: "40px 56px" }}>
-        <SectionHeader kanji="束" label="Batch Upload · Content Creator" title="Tải nguyên chương truyện"
+        <SectionHeader kanji="B" label="Batch Upload · Content Creator" title="Tải nguyên chương truyện"
                        subtitle="Xử lý tuần tự nhiều trang để tiết kiệm quota Gemini (500 RPD/key × 4 keys)."
-                       stamp="一括"/>
+                       stamp="BATCH"/>
 
         {/* Progress header */}
         <div className="stroke-ink-thick panel-shadow" style={{ background: "var(--panel)", padding: 24, marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
             <div>
-              <div className="caps-sm" style={{ color: "var(--accent)" }}>月影の剣 · Chapter 12</div>
+              <div className="caps-sm" style={{ color: "var(--accent)" }}>Moonlight Blade · Chapter 12</div>
               <div className="display" style={{ fontSize: 24, marginTop: 4 }}>{done} / {files.length} trang đã xử lý</div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>

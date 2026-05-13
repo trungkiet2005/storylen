@@ -16,21 +16,21 @@ import { Suspense } from 'react';
 const FEATURES = [
   {
     icon: "eye",
-    kanji: "視",
+    kanji: "O",
     title: "OCR phát hiện bubble",
     desc: "YOLOv8 fine-tuned, mAP ≥ 90%",
     href: "/upload",
   },
   {
     icon: "translate",
-    kanji: "訳",
+    kanji: "T",
     title: "Dịch có ngữ cảnh",
     desc: "Vector context + Gemini LLM",
     href: "/reader",
   },
   {
     icon: "chat",
-    kanji: "問",
+    kanji: "Q",
     title: "Q&A grounded RAG",
     desc: "Top-k=5 chunks, BM25 + semantic",
     href: "/qa",
@@ -40,8 +40,8 @@ const FEATURES = [
 const STEPS = [
   {
     n: "01",
-    title: "Tải trang manga gốc",
-    desc: "Hệ thống tự động phát hiện văn bản tiếng Nhật với độ chính xác cao.",
+    title: "Tải truyện tranh gốc",
+    desc: "Hệ thống tự động phát hiện văn bản đa ngôn ngữ với độ chính xác cao.",
     href: "/upload",
     icon: "upload",
   },
@@ -67,7 +67,7 @@ function SearchParamsHandler() {
 
   useEffect(() => {
     if (searchParams?.get('demo') === '1') {
-      toast('Đăng nhập demo thành công! Chào mừng đến StoryLens 🎌', 'success');
+      toast('Đăng nhập demo thành công! Chào mừng đến StoryLens ✨', 'success');
       // Clean up URL without reload
       window.history.replaceState({}, '', '/');
     }
@@ -90,14 +90,14 @@ export default function Home() {
         <FadeIn duration={0.7} direction="none">
           <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "var(--bg-2)", position: "relative", overflow: "hidden", padding: "80px 56px", minHeight: 620 }}>
             
-            {/* Giant kanji bg */}
+            {/* Giant letter bg */}
             <motion.div 
               initial={{ opacity: 0, scale: 1.1 }} 
               animate={{ opacity: 0.14, scale: 1 }} 
               transition={{ duration: 1.5, ease: "easeOut" }}
               style={{ position: "absolute", right: -40, top: -60, fontFamily: "var(--font-serif)", fontSize: 520, fontWeight: 800, color: "var(--accent)", lineHeight: 0.8, pointerEvents: "none" }}
             >
-              物
+              S
             </motion.div>
             
             {/* Halftone corner */}
@@ -106,15 +106,15 @@ export default function Home() {
             <div style={{ position: "relative", maxWidth: 700 }}>
               <FadeIn delay={0.2} direction="right">
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "var(--ink)", color: "var(--paper)", fontSize: 11, letterSpacing: "0.2em", fontWeight: 700 }}>
-                  ストーリーレンズ · STORYLENS VOL. 1
+                  XÓA NHÒA RÀO CẢN NGÔN NGỮ · STORYLENS VOL. 1
                 </div>
               </FadeIn>
               
               <FadeIn delay={0.3} direction="up" distance={30}>
-                <h1 className="display" style={{ fontSize: 110, margin: "18px 0 0", lineHeight: 0.92 }}>
-                  MANGA,<br/>
-                  ĐỌC NHƯ<br/>
-                  <span style={{ color: "var(--accent)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>người Nhật.</span>
+                <h1 className="display" style={{ fontSize: 100, margin: "18px 0 0", lineHeight: 0.92 }}>
+                  ĐỌC TRUYỆN,<br/>
+                  KHÔNG CÒN<br/>
+                  <span style={{ color: "var(--accent)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>rào cản.</span>
                 </h1>
               </FadeIn>
 
@@ -154,20 +154,7 @@ export default function Home() {
               </div>
             </FadeIn>
 
-            {/* Fuji floating */}
-            <motion.div 
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 1.2, delay: 0.4 }}
-              style={{ position: "absolute", right: 60, top: 140, width: 320, color: "var(--ink)" }}
-            >
-              <motion.div
-                animate={{ y: [0, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-              >
-                <FujiArt variant="compact"/>
-              </motion.div>
-            </motion.div>
+
 
             {/* Barcode strip */}
             <FadeIn delay={1} direction="none">
@@ -217,7 +204,7 @@ export default function Home() {
       <div style={{ padding: "20px 56px 40px", display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 48, alignItems: "center" }}>
         <div>
           <FadeIn>
-            <KanjiDivider kanji="流" label="Quy trình · Process"/>
+            <KanjiDivider kanji="★" label="Quy trình · Process"/>
           </FadeIn>
           
           <FadeIn delay={0.1}>
@@ -228,7 +215,7 @@ export default function Home() {
           
           <FadeIn delay={0.2}>
             <p className="serif" style={{ fontSize: 18, lineHeight: 1.6, color: "var(--fg-soft)", marginBottom: 32 }}>
-              Sử dụng công nghệ AI tiên tiến, StoryLens giữ nguyên ý nghĩa sâu xa đằng sau mỗi câu thoại. Bạn không chỉ đọc manga, bạn đang giao tiếp với tác phẩm.
+              Sử dụng công nghệ AI tiên tiến, StoryLens giúp xóa nhòa mọi rào cản ngôn ngữ. Bạn không chỉ đọc, bạn đang đắm chìm hoàn toàn vào tác phẩm.
             </p>
           </FadeIn>
 
@@ -265,7 +252,7 @@ export default function Home() {
               >
                 <Image
                   src="/manga_panel_samurai.png"
-                  alt="Manga Panel"
+                  alt="Comic Panel"
                   fill
                   style={{ objectFit: "cover" }}
                   onError={() => {}} 
@@ -280,8 +267,8 @@ export default function Home() {
                 style={{ position: "absolute", bottom: 40, left: -20, maxWidth: 220 }}
               >
                 <div className="bubble" style={{ background: "#fff" }}>
-                  <div style={{ fontSize: 13, color: "var(--ink)" }}>「雨の中の孤独、お前には分かるか？」</div>
-                  <div style={{ fontSize: 12, color: "var(--beni-deep)", marginTop: 4, fontFamily: "var(--font-serif)" }}>— Sự cô độc trong màn mưa, ngươi có hiểu được không?</div>
+                  <div style={{ fontSize: 13, color: "var(--ink)" }}>"A whole new world of stories to explore..."</div>
+                  <div style={{ fontSize: 12, color: "var(--beni-deep)", marginTop: 4, fontFamily: "var(--font-serif)" }}>— Cả một thế giới truyện tranh hoàn toàn mới để khám phá...</div>
                 </div>
               </motion.div>
             </div>
@@ -292,15 +279,15 @@ export default function Home() {
       {/* ── Stats Section ── */}
       <div style={{ padding: "0 56px 60px" }}>
         <FadeIn>
-          <KanjiDivider kanji="数" label="Thống kê · Stats"/>
+          <KanjiDivider kanji="⚡" label="Thống kê · Stats"/>
         </FadeIn>
         
         <StaggerContainer staggerDelay={0.1} style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginTop: 24 }}>
           {[
-            { label: "Bubbles detected", value: "10k+", kanji: "泡", icon: "eye" },
-            { label: "Trang đã dịch", value: "2,400+", kanji: "頁", icon: "book" },
-            { label: "Accuracy mAP", value: "≥90%", kanji: "精", icon: "check" },
-            { label: "AI Model", value: "Gemini", kanji: "知", icon: "sparkle" },
+            { label: "Bubbles detected", value: "10k+", kanji: "🔍", icon: "eye" },
+            { label: "Trang đã dịch", value: "2,400+", kanji: "📖", icon: "book" },
+            { label: "Accuracy mAP", value: "≥90%", kanji: "✓", icon: "check" },
+            { label: "AI Model", value: "Gemini", kanji: "🤖", icon: "sparkle" },
           ].map(stat => (
             <StaggerItem key={stat.label}>
               <motion.div 
@@ -344,21 +331,21 @@ export default function Home() {
                 className="caps-xs" 
                 style={{ color: "var(--accent)", marginBottom: 16 }}
               >
-                はじめましょう · LET&apos;S START
+                LET&apos;S START
               </motion.div>
               <h2 className="display" style={{ fontSize: 64, color: "var(--paper)", marginBottom: 20 }}>
-                Sẵn sàng đọc<br/>
+                Sẵn sàng trải nghiệm<br/>
                 <motion.span 
                   initial={{ color: "var(--paper)" }}
                   whileInView={{ color: "var(--d-beni)" }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.5, duration: 0.8 }}
                 >
-                  manga chưa?
+                  ngay chưa?
                 </motion.span>
               </h2>
               <p style={{ fontSize: 16, color: "rgba(242,234,216,0.7)", marginBottom: 32, maxWidth: 480, margin: "0 auto 32px" }}>
-                Tải lên trang đầu tiên và trải nghiệm dịch thuật AI ngay bây giờ — hoàn toàn miễn phí.
+                Tải lên tập truyện đầu tiên và trải nghiệm dịch thuật AI ngay bây giờ — hoàn toàn miễn phí.
               </p>
               <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
                 <Link href="/upload">

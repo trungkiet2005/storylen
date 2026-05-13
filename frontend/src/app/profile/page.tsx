@@ -19,7 +19,7 @@ export default function ProfilePage() {
       <div className="paper-grain" style={{ minHeight: "100vh" }}>
         <TopBar active="" />
         <div style={{ padding: "80px 40px", textAlign: "center" }}>
-          <div className="serif" style={{ fontSize: 48, color: "var(--accent)", marginBottom: 16 }}>鍵</div>
+          <div className="serif" style={{ fontSize: 48, color: "var(--accent)", marginBottom: 16 }}>🔒</div>
           <h1 className="display" style={{ fontSize: 32, marginBottom: 16 }}>Vui lòng đăng nhập</h1>
           <p style={{ color: "var(--fg-soft)", marginBottom: 28 }}>
             Bạn cần đăng nhập để truy cập trang hồ sơ.
@@ -61,7 +61,7 @@ export default function ProfilePage() {
         {/* Page header */}
         <div style={{ marginBottom: 32 }}>
           <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 8 }}>
-            プロフィール · HỒ SƠ
+            HỒ SƠ
           </div>
           <h1 className="display" style={{ fontSize: 40 }}>Tài khoản của tôi</h1>
         </div>
@@ -199,9 +199,9 @@ export default function ProfilePage() {
                   <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 16 }}>THỐNG KÊ SỬ DỤNG</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
                     {[
-                      { label: "Trang đã dịch", value: "0", kanji: "頁" },
-                      { label: "Câu hỏi Q&A", value: "0", kanji: "問" },
-                      { label: "Batch upload", value: "0", kanji: "束" },
+                      { label: "Trang đã dịch", value: "0", kanji: "P" },
+                      { label: "Câu hỏi Q&A", value: "0", kanji: "Q" },
+                      { label: "Batch upload", value: "0", kanji: "B" },
                     ].map(stat => (
                       <div key={stat.label} style={{ padding: "14px", background: "var(--bg-2)", border: "1.5px solid var(--border-soft)", textAlign: "center" }}>
                         <div style={{ fontSize: 28, fontFamily: "var(--font-serif)", color: "var(--accent)", marginBottom: 4 }}>{stat.kanji}</div>
@@ -219,7 +219,7 @@ export default function ProfilePage() {
                 <h2 className="display" style={{ fontSize: 24, marginBottom: 24 }}>Cài đặt</h2>
                 <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                   {[
-                    { label: "Ngôn ngữ dịch mặc định", desc: "Chọn ngôn ngữ đích cho bản dịch manga", value: "Tiếng Việt" },
+                    { label: "Ngôn ngữ dịch mặc định", desc: "Chọn ngôn ngữ đích cho bản dịch truyện", value: "Tiếng Việt" },
                     { label: "Số trang mỗi batch", desc: "Giới hạn số trang xử lý trong một lần", value: "10" },
                     { label: "Chất lượng OCR", desc: "Cân bằng giữa tốc độ và độ chính xác", value: "Cao" },
                   ].map(setting => (

@@ -31,6 +31,25 @@ class UploadResponse(BaseModel):
     batch_id: Optional[str] = None
 
 
+class AIModuleCurrentConfig(BaseModel):
+    translator: str
+    target_lang: str
+    detector: str
+    ocr: str
+    inpainter: str
+    renderer: str
+
+
+class AIModuleOptionsResponse(BaseModel):
+    current: AIModuleCurrentConfig
+    translators: list[str]
+    target_languages: list[str]
+    detectors: list[str]
+    ocr_models: list[str]
+    inpainters: list[str]
+    renderers: list[str]
+
+
 # ─── Status ────────────────────────────────────────────────────────────────────
 
 class PageStatusResponse(BaseModel):

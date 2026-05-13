@@ -41,7 +41,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(username.trim(), email.trim(), password);
-      toast("Tạo tài khoản thành công! Chào mừng đến StoryLens 🎌", "success");
+      toast("Tạo tài khoản thành công! Chào mừng đến StoryLens ✨", "success");
       router.push("/");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Đăng ký thất bại";
@@ -91,7 +91,7 @@ export default function RegisterPage() {
             userSelect: "none",
           }}
         >
-          登
+          S
         </div>
 
         <div style={{ position: "relative" }}>
@@ -100,7 +100,7 @@ export default function RegisterPage() {
 
         <div style={{ position: "relative", marginTop: "auto", paddingBottom: 40 }}>
           <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 12 }}>
-            アカウント作成 · TẠO TÀI KHOẢN
+            TẠO TÀI KHOẢN
           </div>
           <h1 className="display" style={{ fontSize: 52, lineHeight: 0.92, color: "var(--paper)", marginBottom: 20 }}>
             THAM GIA<br />
@@ -117,7 +117,7 @@ export default function RegisterPage() {
               { icon: "history", text: "Lịch sử dịch không giới hạn" },
               { icon: "chat", text: "Q&A thông minh với RAG" },
               { icon: "stack", text: "Batch upload nhiều trang" },
-              { icon: "book", text: "Đọc manga mọi thiết bị" },
+              { icon: "book", text: "Đọc truyện mọi thiết bị" },
             ].map(f => (
               <div key={f.icon} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "rgba(242,234,216,0.7)" }}>
                 <div style={{ color: "var(--accent)" }}><Icon name={f.icon} size={13} /></div>
@@ -134,7 +134,7 @@ export default function RegisterPage() {
           {/* Header */}
           <div style={{ marginBottom: 32 }}>
             <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 10 }}>
-              新規登録 · ĐĂNG KÝ
+              ĐĂNG KÝ
             </div>
             <h2 className="display" style={{ fontSize: 32, marginBottom: 8 }}>
               Tạo tài khoản mới
@@ -168,7 +168,7 @@ export default function RegisterPage() {
                 required
                 value={username}
                 onChange={e => { setUsername(e.target.value); setFieldErrors(p => ({ ...p, username: "" })); }}
-                placeholder="manhkiet, suzuki_manga..."
+                placeholder="manhkiet, story_reader..."
                 style={{
                   width: "100%",
                   padding: "11px 14px",

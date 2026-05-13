@@ -26,7 +26,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      toast("Đăng nhập thành công! Chào mừng trở lại 🎌", "success");
+      toast("Đăng nhập thành công! Chào mừng trở lại ✨", "success");
       router.push("/");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Đăng nhập thất bại";
@@ -84,7 +84,7 @@ export default function LoginPage() {
             userSelect: "none",
           }}
         >
-          入
+          S
         </div>
 
         {/* Logo */}
@@ -98,16 +98,16 @@ export default function LoginPage() {
             className="caps-xs"
             style={{ color: "var(--accent)", marginBottom: 16 }}
           >
-            ようこそ · CHÀO MỪNG TRỞ LẠI
+            CHÀO MỪNG TRỞ LẠI
           </div>
           <h1
             className="display"
             style={{ fontSize: 64, lineHeight: 0.92, color: "var(--paper)", marginBottom: 20 }}
           >
             ĐỌC<br/>
-            MANGA<br/>
-            <span style={{ color: "var(--d-beni)", fontStyle: "italic" }}>NHƯ</span><br/>
-            NGƯỜI NHẬT.
+            TRUYỆN<br/>
+            <span style={{ color: "var(--d-beni)", fontStyle: "italic" }}>KHÔNG</span><br/>
+            RÀO CẢN.
           </h1>
           <p
             className="serif"
@@ -132,17 +132,14 @@ export default function LoginPage() {
               maxWidth: 280,
             }}
           >
-            <div className="serif" style={{ fontSize: 14 }}>「また会えて嬉しい」</div>
+            <div className="serif" style={{ fontSize: 14 }}>"Welcome back to StoryLens!"</div>
             <div style={{ fontSize: 12, color: "rgba(242,234,216,0.5)", marginTop: 4 }}>
               — Thật vui khi gặp lại bạn
             </div>
           </div>
         </div>
 
-        {/* Fuji art */}
-        <div style={{ position: "absolute", top: 120, right: 20, width: 180, opacity: 0.3 }}>
-          <FujiArt variant="compact" />
-        </div>
+
       </div>
 
       {/* ── Right: Login form ── */}
@@ -162,7 +159,7 @@ export default function LoginPage() {
               className="caps-xs"
               style={{ color: "var(--accent)", marginBottom: 10 }}
             >
-              ログイン · ĐĂNG NHẬP
+              ĐĂNG NHẬP
             </div>
             <h2 className="display" style={{ fontSize: 36, marginBottom: 8 }}>
               Chào mừng trở lại

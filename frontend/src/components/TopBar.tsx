@@ -11,11 +11,11 @@ export const Logo = ({ size = 22 }: { size?: number }) => (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
       <svg viewBox="0 0 40 40" width={size + 10} height={size + 10} aria-hidden="true">
         <rect x="2" y="2" width="36" height="36" fill="var(--accent)" stroke="var(--border)" strokeWidth="2.5" transform="rotate(-4 20 20)"/>
-        <text x="20" y="28" textAnchor="middle" fontSize="22" fontFamily="'Shippori Mincho', serif" fontWeight={800} fill="var(--paper)" transform="rotate(-4 20 20)">物</text>
+        <text x="20" y="29" textAnchor="middle" fontSize="24" fontFamily="var(--font-serif)" fontWeight={800} fill="var(--paper)" transform="rotate(-4 20 20)">S</text>
       </svg>
       <div style={{ lineHeight: 1 }}>
         <div className="display" style={{ fontSize: size, letterSpacing: "-0.02em" }}>StoryLens</div>
-        <div className="caps-xs" style={{ color: "var(--muted)", marginTop: 3 }}>物語 · ストーリーレンズ</div>
+        <div className="caps-xs" style={{ color: "var(--muted)", marginTop: 3 }}>XÓA NHÒA RÀO CẢN NGÔN NGỮ</div>
       </div>
     </div>
   </Link>

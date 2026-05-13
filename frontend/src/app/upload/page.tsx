@@ -5,42 +5,29 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { Icon } from '@/components/Icons';
 import { MangaPage } from '@/components/MangaPage';
 import { useToast } from '@/components/Toast';
-import { uploadImages, pollUntilDone, PageStatus, APIError, healthCheck } from '@/lib/api';
+import {
+  uploadImages,
+  pollUntilDone,
+  PageStatus,
+  APIError,
+  healthCheck,
+  getAIModuleOptions,
+  AIModuleCurrentConfig,
+  AIModuleOptions,
+} from '@/lib/api';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { StaggerContainer, StaggerItem } from '@/components/Animations';
+const DEFAULT_AI_CONFIG: AIModuleCurrentConfig = {
+  translator: "gemini",
+  target_lang: "VIN",
+  detector: "default",
+  ocr: "48px",
+  inpainter: "lama_large",
+  renderer: "default",
+};
 
 type UploadState = "idle" | "dragging" | "uploading" | "processing" | "done" | "error";
-
-interface ProcessingStep {
-  step: string;
-  done: boolean;
-  active: boolean;
-  time: string;
-}
-
-const PIPELINE_STEPS: ProcessingStep[] = [
-  { step: "Upload image", done: false, active: false, time: "-" },
-  { step: "ai_module text detection", done: false, active: false, time: "-" },
-  { step: "ai_module OCR", done: false, active: false, time: "-" },
-  { step: "ai_module translation to Vietnamese", done: false, active: false, time: "-" },
-  { step: "Save reader data", done: false, active: false, time: "-" },
-];
-
-const AI_MODULE_TIMINGS = ["done", "running", "running", "running", "done"];
-
-function deriveStepsFromStatus(status: PageStatus): ProcessingStep[] {
-  // Map progress percentage to which steps are done/active
-  const progress = status.progress ?? 0;
-  const stepThresholds = [20, 40, 60, 85, 100]; // each step completes at %
-
-  return PIPELINE_STEPS.map((s, i) => ({
-    ...s,
-    done: progress >= stepThresholds[i],
-    active: progress >= (stepThresholds[i - 1] ?? 0) && progress < stepThresholds[i],
-    time: progress >= stepThresholds[i] ? AI_MODULE_TIMINGS[i] : progress >= (stepThresholds[i - 1] ?? 0) && progress < stepThresholds[i] ? "..." : "-",
-  }));
-}
+type AIModuleConfigKey = keyof AIModuleCurrentConfig;
 
 export default function UploadPage() {
   const { toast } = useToast();
@@ -48,18 +35,14 @@ export default function UploadPage() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedSeries, setSelectedSeries] = useState(0);
   const [pageId, setPageId] = useState<string | null>(null);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
-  const [steps, setSteps] = useState<ProcessingStep[]>(PIPELINE_STEPS.map(s => ({ ...s })));
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [options, setOptions] = useState({
-    glossary: true,
-    onyomi: true,
-    indexVector: true,
-    sfx: false,
-  });
+  const [aiOptions, setAiOptions] = useState<AIModuleOptions | null>(null);
+  const [aiOptionsError, setAiOptionsError] = useState<string | null>(null);
+  const [translationConfig, setTranslationConfig] =
+    useState<AIModuleCurrentConfig>(DEFAULT_AI_CONFIG);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null); // null = checking
@@ -80,6 +63,34 @@ export default function UploadPage() {
     check();
     const id = setInterval(check, 15_000);
     return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadOptions = async () => {
+      try {
+        const data = await getAIModuleOptions();
+        if (cancelled) return;
+        setAiOptions(data);
+        setTranslationConfig(data.current);
+        setAiOptionsError(null);
+      } catch (err) {
+        if (cancelled) return;
+        const msg =
+          err instanceof APIError
+            ? err.message
+            : err instanceof Error
+            ? err.message
+            : "Không thể tải tùy chọn ai_module.";
+        setAiOptionsError(msg);
+      }
+    };
+
+    loadOptions();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleFiles = useCallback(async (files: FileList | null) => {
@@ -105,7 +116,6 @@ export default function UploadPage() {
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     setProgress(0);
-    setSteps(PIPELINE_STEPS.map(s => ({ ...s })));
     setState("uploading");
 
     // ── OFFLINE DEMO MODE ──────────────────────────────────────────────────
@@ -121,13 +131,6 @@ export default function UploadPage() {
       for (const pct of thresholds) {
         await new Promise(r => setTimeout(r, 900));
         setProgress(pct);
-        const fakeStatus: PageStatus = {
-          page_id: fakePid,
-          status: pct === 100 ? "completed" : "pending",
-          progress: pct,
-          error: null,
-        };
-        setSteps(deriveStepsFromStatus(fakeStatus));
       }
       setState("done");
       toast("✅ Demo hoàn tất! (backend offline — dữ liệu giả lập)", "success");
@@ -136,7 +139,7 @@ export default function UploadPage() {
 
     try {
       // ── 1. Upload to backend ────────────────────────────────────────────
-      const response = await uploadImages([file]);
+      const response = await uploadImages([file], translationConfig);
       const pid = response.page_ids[0];
       setPageId(pid);
       setBatchId(response.batch_id);
@@ -148,7 +151,6 @@ export default function UploadPage() {
         pid,
         (status: PageStatus) => {
           setProgress(status.progress);
-          setSteps(deriveStepsFromStatus(status));
         },
         2000, // poll every 2s
         90,   // max 3 min
@@ -171,7 +173,7 @@ export default function UploadPage() {
       setState("error");
       toast(msg, "error");
     }
-  }, [toast, backendOnline]);
+  }, [toast, backendOnline, translationConfig]);
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -188,24 +190,62 @@ export default function UploadPage() {
     setBatchId(null);
     setProgress(0);
     setErrorMsg(null);
-    setSteps(PIPELINE_STEPS.map(s => ({ ...s })));
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
-  const series = ["月影の剣", "春の足音", "+ Tạo mới"];
   const isUploading = state === "uploading";
   const isProcessing = state === "processing";
+  const aiOptionFields: Array<{
+    key: AIModuleConfigKey;
+    label: string;
+    values: string[];
+  }> = [
+    {
+      key: "translator",
+      label: "Translator",
+      values: aiOptions?.translators ?? [translationConfig.translator],
+    },
+    {
+      key: "target_lang",
+      label: "Ngôn ngữ đích",
+      values: aiOptions?.target_languages ?? [translationConfig.target_lang],
+    },
+    {
+      key: "detector",
+      label: "Text detector",
+      values: aiOptions?.detectors ?? [translationConfig.detector],
+    },
+    {
+      key: "ocr",
+      label: "OCR",
+      values: aiOptions?.ocr_models ?? [translationConfig.ocr],
+    },
+    {
+      key: "inpainter",
+      label: "Inpainting",
+      values: aiOptions?.inpainters ?? [translationConfig.inpainter],
+    },
+    {
+      key: "renderer",
+      label: "Renderer",
+      values: aiOptions?.renderers ?? [translationConfig.renderer],
+    },
+  ];
+
+  const updateTranslationConfig = (key: AIModuleConfigKey, value: string) => {
+    setTranslationConfig(config => ({ ...config, [key]: value }));
+  };
 
   return (
     <div className="paper-grain" style={{ minHeight: "100vh" }}>
       <TopBar active="upload" />
       <div style={{ padding: "40px 56px" }}>
         <SectionHeader
-          kanji="入"
+          kanji="U"
           label="Upload · Tải lên"
-          title="Tải trang manga để dịch"
+          title="Tải trang truyện để dịch"
           subtitle="Hỗ trợ JPG, PNG, WEBP. Tối đa 20MB / ảnh. Xử lý qua ai_module để phát hiện chữ, OCR, dịch và lưu dữ liệu đọc."
-          stamp="入稿"
+          stamp="LIVE"
         />
 
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr", gap: 24 }}>
@@ -231,7 +271,7 @@ export default function UploadPage() {
               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
               style={{ display: "none" }}
               onChange={e => handleFiles(e.target.files)}
-              aria-label="Chọn file ảnh manga"
+              aria-label="Chọn file ảnh truyện"
             />
 
             <AnimatePresence mode="wait">
@@ -268,7 +308,7 @@ export default function UploadPage() {
                       <Icon name="upload" size={42} stroke={2.5}/>
                     </motion.div>
                     <div className="display" style={{ fontSize: 26 }}>
-                      {state === "dragging" ? "Thả file vào đây" : "Kéo thả trang manga vào đây"}
+                      {state === "dragging" ? "Thả file vào đây" : "Kéo thả trang truyện vào đây"}
                     </div>
                     <div style={{ color: "var(--fg-soft)", marginTop: 8, marginBottom: 24 }}>hoặc</div>
                     <motion.button
@@ -344,7 +384,7 @@ export default function UploadPage() {
                       <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>Ảnh gốc</div>
                       <div className="stroke-ink" style={{ background: "#fff", overflow: "hidden" }}>
                         {previewUrl ? (
-                          <motion.img initial={{ filter: "blur(4px)" }} animate={{ filter: "blur(0px)" }} src={previewUrl} alt="Ảnh manga gốc" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}/>
+                          <motion.img initial={{ filter: "blur(4px)" }} animate={{ filter: "blur(0px)" }} src={previewUrl} alt="Ảnh truyện gốc" style={{ width: "100%", height: 200, objectFit: "cover", display: "block" }}/>
                         ) : (
                           <MangaPage w={280} h={200} panels="default" showBubbles={true} showOverlay={false}/>
                         )}
@@ -370,39 +410,6 @@ export default function UploadPage() {
                     </div>
                   </div>
 
-                  {/* Pipeline steps */}
-                  <StaggerContainer staggerDelay={0.05} className="mt-6" style={{ marginTop: 24, borderTop: "2px solid var(--border-soft)", paddingTop: 16 }}>
-                    {steps.map((s, i) => (
-                      <StaggerItem key={i}>
-                        <div style={{
-                          display: "flex", alignItems: "center", gap: 12,
-                          padding: "8px 0",
-                          borderBottom: i < steps.length - 1 ? "1px dashed var(--border-soft)" : "none",
-                        }}>
-                          <motion.div 
-                            animate={{ 
-                              scale: s.active ? [1, 1.1, 1] : 1,
-                              backgroundColor: s.done ? "var(--accent)" : "rgba(0,0,0,0)"
-                            }}
-                            transition={s.active ? { repeat: Infinity, duration: 1.5 } : { duration: 0.2 }}
-                            style={{
-                              width: 22, height: 22, borderRadius: "50%",
-                              border: "2px solid var(--border)",
-                              color: "#fff",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {s.done && <Icon name="check" size={11} stroke={3}/>}
-                          </motion.div>
-                          <span style={{ flex: 1, fontSize: 13, fontWeight: s.active ? 700 : 500, color: s.done ? "var(--muted)" : "var(--fg)", transition: "color 0.2s" }}>
-                            {s.step}
-                          </span>
-                          <span className="mono" style={{ fontSize: 11, color: s.done ? "var(--accent)" : "var(--muted)" }}>{s.time}</span>
-                        </div>
-                      </StaggerItem>
-                    ))}
-                  </StaggerContainer>
                 </motion.div>
               )}
 
@@ -495,80 +502,42 @@ export default function UploadPage() {
 
           {/* ── Right: Settings panel ── */}
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {/* Series selector */}
-            <div className="stroke-ink" style={{ background: "var(--panel)", padding: 20 }}>
-              <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 10 }}>Gắn vào bộ truyện</div>
-              <div style={{ position: "relative" }}>
-                <input
-                  placeholder="Chọn hoặc tạo bộ truyện mới…"
-                  style={{
-                    width: "100%", padding: "10px 12px",
-                    border: "2px solid var(--border)",
-                    background: "var(--bg)", fontSize: 13,
-                    fontFamily: "inherit", color: "var(--fg)",
-                    boxSizing: "border-box",
-                  }}
-                  aria-label="Tên bộ truyện"
-                />
-              </div>
-              <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {series.map((t, i) => (
-                  <div
-                    key={t}
-                    className={`chip ${selectedSeries === i ? "chip-accent" : ""}`}
-                    style={{ cursor: "pointer" }}
-                    onClick={() => setSelectedSeries(i)}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    {t}
-                  </div>
-                ))}
-              </div>
-            </div>
-
             {/* Translation options */}
             <div className="stroke-ink" style={{ background: "var(--panel)", padding: 20 }}>
               <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 10 }}>Tùy chọn dịch</div>
-              {(Object.entries(options) as [keyof typeof options, boolean][]).map(([key, val]) => {
-                const labels: Record<keyof typeof options, string> = {
-                  glossary: "Dùng glossary đã lưu",
-                  onyomi: "Giữ âm danh từ riêng (onyomi)",
-                  indexVector: "Index vào vector DB",
-                  sfx: "Phát hiện SFX / onomatopoeia",
-                };
-                return (
-                  <div
-                    key={key}
-                    style={{
-                      display: "flex", justifyContent: "space-between", alignItems: "center",
-                      padding: "10px 0", borderBottom: "1px dashed var(--border-soft)",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => setOptions(o => ({ ...o, [key]: !o[key] }))}
-                    role="switch"
-                    aria-checked={val}
-                    tabIndex={0}
-                  >
-                    <span style={{ fontSize: 13 }}>{labels[key]}</span>
-                    <div style={{
-                      width: 36, height: 20,
-                      background: val ? "var(--accent)" : "var(--bg-3)",
-                      border: "2px solid var(--border)",
-                      borderRadius: 999, position: "relative",
-                      transition: "background 0.15s",
-                    }}>
-                      <div style={{
-                        position: "absolute", top: 1, left: val ? 17 : 1,
-                        width: 14, height: 14,
-                        background: "var(--paper)", border: "1.5px solid var(--border)",
-                        borderRadius: "50%",
-                        transition: "left 0.15s",
-                      }}/>
-                    </div>
-                  </div>
-                );
-              })}
+              <div style={{ display: "grid", gap: 12 }}>
+                {aiOptionFields.map(field => (
+                  <label key={field.key} style={{ display: "grid", gap: 6 }}>
+                    <span className="caps-xs" style={{ color: "var(--muted)" }}>{field.label}</span>
+                    <select
+                      value={translationConfig[field.key]}
+                      onChange={event => updateTranslationConfig(field.key, event.target.value)}
+                      disabled={!aiOptions}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "2px solid var(--border)",
+                        background: "var(--bg)",
+                        color: "var(--fg)",
+                        fontFamily: "inherit",
+                        fontSize: 13,
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {field.values.map(value => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+              {aiOptionsError && (
+                <div style={{ marginTop: 12, fontSize: 12, color: "var(--accent)", lineHeight: 1.5 }}>
+                  {aiOptionsError}
+                </div>
+              )}
             </div>
 
             {/* Tip box */}

@@ -17,12 +17,12 @@ interface Series {
 }
 
 const ALL_SERIES: Series[] = [
-  { kanji: "月", title: "Kiếm Nguyệt Ảnh",   jp: "月影の剣",   chapters: 12, pages: 124, progress: 0.78, last: "2 giờ trước",    qaReady: true },
-  { kanji: "春", title: "Bước Chân Mùa Xuân", jp: "春の足音",   chapters: 4,  pages: 78,  progress: 0.42, last: "hôm qua",       qaReady: true },
-  { kanji: "紅", title: "Lời Thề Son Đỏ",     jp: "紅の誓い",   chapters: 21, pages: 210, progress: 1.0,  last: "3 ngày trước", qaReady: true },
-  { kanji: "海", title: "Biển Lặng",           jp: "静かな海",   chapters: 7,  pages: 56,  progress: 0.28, last: "1 tuần trước", qaReady: false },
-  { kanji: "風", title: "Ký Ức Của Gió",       jp: "風の記憶",   chapters: 9,  pages: 92,  progress: 0.64, last: "1 tuần trước", qaReady: true },
-  { kanji: "影", title: "Bóng Của Người",       jp: "影法師",     chapters: 15, pages: 150, progress: 0.12, last: "2 tuần trước", qaReady: false },
+  { kanji: "M", title: "Kiếm Nguyệt Ảnh",   jp: "Moonlight Blade",   chapters: 12, pages: 124, progress: 0.78, last: "2 giờ trước",    qaReady: true },
+  { kanji: "S", title: "Bước Chân Mùa Xuân", jp: "Spring Whispers",   chapters: 4,  pages: 78,  progress: 0.42, last: "hôm qua",       qaReady: true },
+  { kanji: "R", title: "Lời Thề Son Đỏ",     jp: "Red Vow",           chapters: 21, pages: 210, progress: 1.0,  last: "3 ngày trước", qaReady: true },
+  { kanji: "S", title: "Biển Lặng",           jp: "Silent Sea",        chapters: 7,  pages: 56,  progress: 0.28, last: "1 tuần trước", qaReady: false },
+  { kanji: "W", title: "Ký Ức Của Gió",       jp: "Wind Memories",     chapters: 9,  pages: 92,  progress: 0.64, last: "1 tuần trước", qaReady: true },
+  { kanji: "S", title: "Bóng Của Người",       jp: "Shadow Person",     chapters: 15, pages: 150, progress: 0.12, last: "2 tuần trước", qaReady: false },
 ];
 
 type Filter = "all" | "reading" | "done";
@@ -49,11 +49,11 @@ export default function HistoryPage() {
       <TopBar active="history" />
       <div style={{ padding: "40px 56px" }}>
         <SectionHeader
-          kanji="歴"
+          kanji="H"
           label="Lịch Sử · History"
           title="Bộ truyện đã đọc"
-          subtitle="Tất cả manga bạn đã upload, dịch, và thảo luận với AI. Dữ liệu lưu trong session hoặc tài khoản."
-          stamp="歴"
+          subtitle="Tất cả truyện tranh bạn đã upload, dịch, và thảo luận với AI. Dữ liệu lưu trong session hoặc tài khoản."
+          stamp="ARCHIVE"
         />
 
         {/* Filter bar */}
@@ -64,7 +64,7 @@ export default function HistoryPage() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Tìm theo tên bộ truyện hoặc tiếng Nhật…"
+              placeholder="Tìm theo tên bộ truyện…"
               style={{ border: "none", background: "transparent", flex: 1, fontSize: 13, outline: "none", color: "var(--fg)" }}
               aria-label="Tìm kiếm bộ truyện"
             />
@@ -111,7 +111,7 @@ export default function HistoryPage() {
         {/* Empty search result */}
         {filtered.length === 0 && (
           <div style={{ textAlign: "center", padding: "60px 20px", color: "var(--muted)" }}>
-            <div className="serif" style={{ fontSize: 48, opacity: 0.3 }}>空</div>
+            <div className="serif" style={{ fontSize: 48, opacity: 0.3 }}>∅</div>
             <div style={{ marginTop: 8 }}>Không tìm thấy bộ truyện nào phù hợp</div>
           </div>
         )}

@@ -22,8 +22,8 @@ export const MangaPage = ({ w = 360, h = 520, panels = "default", showBubbles = 
     ],
   };
   const ls = layouts[panels] || layouts.default;
-  const jp = [
-    "待って…まさか", "これが運命なのか", "俺は…もう戻れない", "逃げるな！", "行くぞ！",
+  const eng = [
+    "Wait... no way", "Is this fate?", "I... can't go back", "Don't run away!", "Let's go!",
   ];
   const vn = [
     "Khoan đã… không lẽ", "Đây là định mệnh sao?", "Mình… không thể quay lại nữa", "Đừng chạy trốn!", "Tiến lên!",
@@ -76,7 +76,7 @@ export const MangaPage = ({ w = 360, h = 520, panels = "default", showBubbles = 
       })}
       {showBubbles && ls.map((p: any, i: number) => {
         if (i >= 4) return null;
-        const text = showOverlay ? (overlayLang === "vn" ? vn[i] : jp[i]) : jp[i];
+        const text = showOverlay ? (overlayLang === "vn" ? vn[i] : eng[i]) : eng[i];
         const bw = Math.min(p.w - 30, 110 + text.length * 4);
         const bh = 34;
         const bx = p.x + 12;

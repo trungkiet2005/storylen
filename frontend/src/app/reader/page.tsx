@@ -15,14 +15,14 @@ type ViewMode = "overlay" | "sidebyside" | "tap";
 const TOTAL_PAGES = 8;
 
 const CHARACTERS = [
-  { jp: "剣心", vn: "Kenshin", role: "Nhân vật chính", color: "var(--accent)" },
-  { jp: "薫", vn: "Kaoru", role: "Đồng minh", color: "var(--jade)" },
+  { original: "Arthur", vn: "Arthur", role: "Nhân vật chính", color: "var(--accent)" },
+  { original: "Elena", vn: "Elena", role: "Đồng minh", color: "var(--jade)" },
 ];
 
 const GLOSSARY = [
-  { jp: "運命", vn: "Định mệnh", note: "Dùng trong ngữ cảnh số phận không thể tránh" },
-  { jp: "誓い", vn: "Lời thề", note: "Thường gắn với danh dự samurai" },
-  { jp: "逆刃刀", vn: "Sakabatou", note: "Kiếm lưỡi ngược — biểu tượng lời thề không sát sinh" },
+  { original: "Destiny", vn: "Định mệnh", note: "Dùng trong ngữ cảnh số phận không thể tránh" },
+  { original: "Oath", vn: "Lời thề", note: "Lời hứa danh dự thiêng liêng" },
+  { original: "Excalibur", vn: "Thánh kiếm", note: "Biểu trưng cho công lý và hy vọng" },
 ];
 
 // ── Overlay bubble renderer using real bbox data ────────────────────────────
@@ -160,7 +160,7 @@ function BubbleOverlays({
                 fontSize: 12,
                 boxShadow: "3px 3px 0 #111",
               }}>
-                <div style={{ fontSize: 10, color: "#888", marginBottom: 3 }}>JA → VI</div>
+                <div style={{ fontSize: 10, color: "#888", marginBottom: 3 }}>GỐC → VIỆT</div>
                 <div style={{ fontFamily: "var(--font-serif)", lineHeight: 1.4 }}>{b.translated_text}</div>
               </div>
             </motion.foreignObject>
@@ -258,7 +258,7 @@ function ReaderContent() {
           staggerDelay={0.05}
           style={{ background: "var(--bg-2)", borderRight: "2px solid var(--border)", padding: "14px 8px", display: "flex", flexDirection: "column", gap: 8, overflowY: "auto" }}
         >
-          <div className="caps-xs" style={{ color: "var(--muted)", textAlign: "center", marginBottom: 4 }}>頁</div>
+          <div className="caps-xs" style={{ color: "var(--muted)", textAlign: "center", marginBottom: 4 }}>P</div>
           {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
             <StaggerItem key={i} direction="right" distance={10}>
               <motion.button
@@ -297,7 +297,7 @@ function ReaderContent() {
             style={{ background: "var(--panel)", padding: "8px 14px", display: "flex", gap: 6, alignItems: "center", width: "100%", maxWidth: 840, flexWrap: "wrap" }}
           >
             <span className="caps-xs" style={{ color: "var(--accent)", marginRight: 6 }}>
-              {pageData ? `Trang đã dịch · ${pageData.page_id.slice(0, 8)}…` : `月影の剣 · Ch. 12 · P.${String(page + 1).padStart(2, "0")}`}
+              {pageData ? `Trang đã dịch · ${pageData.page_id.slice(0, 8)}…` : `Moonlight Blade · Ch. 12 · P.${String(page + 1).padStart(2, "0")}`}
             </span>
             <div style={{ flex: 1 }}/>
 
@@ -369,7 +369,7 @@ function ReaderContent() {
               {mode === "sidebyside" ? (
                 <div style={{ display: "flex", gap: 20 }}>
                   <div>
-                    <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>原文 · Gốc</div>
+                    <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>BẢN GỐC</div>
                     <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", width: SIDE_W, height: computedSideH, position: "relative" }}>
                       {pageData?.original_image_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -389,7 +389,7 @@ function ReaderContent() {
                     </div>
                   </div>
                   <div>
-                    <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>訳 · Dịch tiếng Việt</div>
+                    <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>BẢN DỊCH</div>
                     <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", position: "relative", width: SIDE_W, height: computedSideH }}>
                       {pageData?.original_image_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -415,7 +415,7 @@ function ReaderContent() {
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={mainImageUrl}
-                        alt="Manga page"
+                        alt="Trang truyện"
                         style={{ width: "100%", height: "100%", display: "block" }}
                         onLoad={(e) => {
                           if (!imgNaturalSize) {
@@ -505,15 +505,15 @@ function ReaderContent() {
                 {CHARACTERS.map(c => (
                   <motion.div 
                     whileHover={{ x: 4 }}
-                    key={c.jp} 
+                    key={c.original} 
                     className="stroke-ink" 
                     style={{ background: "var(--panel)", padding: 10, display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}
                   >
                     <div style={{ width: 36, height: 36, background: c.color, color: "var(--paper)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "var(--font-serif)", fontWeight: 800, fontSize: 18, border: "2px solid var(--border)", flexShrink: 0 }}>
-                      {c.jp.charAt(0)}
+                      {c.vn.charAt(0)}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>{c.vn} <span style={{ fontWeight: 400, color: "var(--muted)" }}>· {c.jp}</span></div>
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>{c.vn} <span style={{ fontWeight: 400, color: "var(--muted)" }}>· {c.original}</span></div>
                       <div style={{ fontSize: 11, color: "var(--muted)" }}>{c.role}</div>
                     </div>
                   </motion.div>
@@ -524,9 +524,9 @@ function ReaderContent() {
               <div style={{ marginBottom: 20 }}>
                 <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 8 }}>Thuật ngữ</div>
                 {GLOSSARY.map(g => (
-                  <div key={g.jp} style={{ padding: "10px 0", borderBottom: "1px dashed var(--border-soft)" }}>
+                  <div key={g.original} style={{ padding: "10px 0", borderBottom: "1px dashed var(--border-soft)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <span className="serif" style={{ fontSize: 14, fontWeight: 700 }}>{g.jp}</span>
+                      <span className="serif" style={{ fontSize: 14, fontWeight: 700 }}>{g.original}</span>
                       <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 600 }}>{g.vn}</span>
                     </div>
                     <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{g.note}</div>

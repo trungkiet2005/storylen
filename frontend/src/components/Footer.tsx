@@ -6,8 +6,8 @@ const FOOTER_LINKS = [
   {
     section: "Sản phẩm",
     links: [
-      { label: "Tải lên manga", href: "/upload" },
-      { label: "Đọc manga", href: "/reader" },
+      { label: "Tải lên truyện", href: "/upload" },
+      { label: "Đọc truyện tranh", href: "/reader" },
       { label: "Hỏi đáp Q&A", href: "/qa" },
       { label: "Batch upload", href: "/batch" },
     ],
@@ -63,7 +63,7 @@ export function Footer() {
           userSelect: "none",
         }}
       >
-        語
+        S
       </div>
 
       {/* Main content */}
@@ -74,15 +74,15 @@ export function Footer() {
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
               <svg viewBox="0 0 40 40" width={36} height={36} aria-hidden="true">
                 <rect x="2" y="2" width="36" height="36" fill="var(--accent)" stroke="rgba(242,234,216,0.5)" strokeWidth="2.5" transform="rotate(-4 20 20)"/>
-                <text x="20" y="28" textAnchor="middle" fontSize="22" fontFamily="'Shippori Mincho', serif" fontWeight={800} fill="var(--paper)" transform="rotate(-4 20 20)">物</text>
+                <text x="20" y="29" textAnchor="middle" fontSize="24" fontFamily="var(--font-serif)" fontWeight={800} fill="var(--paper)" transform="rotate(-4 20 20)">S</text>
               </svg>
               <div>
                 <div className="display" style={{ fontSize: 18, color: "var(--paper)" }}>StoryLens</div>
-                <div className="caps-xs" style={{ color: "rgba(242,234,216,0.4)", marginTop: 2 }}>物語 · ストーリーレンズ</div>
+                <div className="caps-xs" style={{ color: "rgba(242,234,216,0.4)", marginTop: 2 }}>XÓA NHÒA RÀO CẢN NGÔN NGỮ</div>
               </div>
             </div>
             <p className="serif" style={{ fontSize: 14, color: "rgba(242,234,216,0.55)", lineHeight: 1.7, maxWidth: 240 }}>
-              Dịch manga Nhật–Việt bằng AI. Giữ nguyên nhịp điệu, ngữ khí và giọng văn gốc.
+              Dịch truyện tranh đa ngôn ngữ bằng AI. Giữ nguyên ý nghĩa, cảm xúc và phong cách gốc.
             </p>
             {/* Social / GitHub placeholder */}
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
@@ -145,7 +145,7 @@ export function Footer() {
             © {year} StoryLens · Được xây dựng với ❤️ và Gemini AI
           </div>
           <div style={{ display: "flex", gap: 20, fontSize: 11, color: "rgba(242,234,216,0.3)", fontFamily: "var(--font-mono)" }}>
-            <span>YOLOv8 · Manga-OCR · Gemini · RAG</span>
+            <span>YOLOv8 · Cloud-OCR · Gemini · RAG</span>
           </div>
           {/* Barcode decorative */}
           <svg width="80" height="28" style={{ opacity: 0.25 }}>

@@ -1,4 +1,4 @@
-export const KanjiDivider = ({ kanji = "第", label = "" }: { kanji?: string, label?: string }) => (
+export const KanjiDivider = ({ kanji = "✦", label = "" }: { kanji?: string, label?: string }) => (
   <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "32px 0" }}>
     <div style={{ flex: 1, height: 2, background: "var(--border)" }}/>
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>

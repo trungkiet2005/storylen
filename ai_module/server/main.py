@@ -19,6 +19,8 @@ from pathlib import Path
 
 from server.nonce_storage import _server_nonce, set_nonce
 from manga_translator import Config
+from manga_translator.config import Detector, Inpainter, Ocr, Renderer, Translator
+from manga_translator.translators import VALID_LANGUAGES
 from server.instance import ExecutorInstance, executor_instances
 from server.myqueue import task_queue
 from server.request_extraction import get_ctx, while_streaming, TranslateRequest, BatchTranslateRequest, get_batch_ctx
@@ -42,6 +44,19 @@ app.add_middleware(
 # 添加result文件夹静态文件服务
 if RESULT_ROOT.exists():
     app.mount("/result", StaticFiles(directory=str(RESULT_ROOT)), name="result")
+
+
+@app.get("/config/options", tags=["api", "config"])
+async def config_options():
+    return {
+        "translators": [item.value for item in Translator],
+        "target_languages": list(VALID_LANGUAGES),
+        "detectors": [item.value for item in Detector],
+        "ocr_models": [item.value for item in Ocr],
+        "inpainters": [item.value for item in Inpainter],
+        "renderers": [item.value for item in Renderer],
+    }
+
 
 @app.post("/register", response_description="no response", tags=["internal-api"])
 async def register_instance(instance: ExecutorInstance, req: Request, req_nonce: str = Header(alias="X-Nonce")):

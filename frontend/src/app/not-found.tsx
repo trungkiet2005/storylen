@@ -52,29 +52,29 @@ export default function NotFound() {
               textShadow: "3px 3px 0 var(--border)",
             }}
           >
-            迷
+            ?
           </div>
         </div>
       </div>
 
       {/* Title */}
       <div className="caps-sm" style={{ color: "var(--accent)", marginBottom: 10 }}>
-        エラー · LỖII KHÔNG TÌM THẤY
+        LỖI KHÔNG TÌM THẤY
       </div>
       <h1 className="display" style={{ fontSize: 40, margin: "0 0 16px" }}>
         Trang không tồn tại
       </h1>
       <p style={{ color: "var(--fg-soft)", maxWidth: 440, lineHeight: 1.6, marginBottom: 36 }}>
-        Trang bạn đang tìm kiếm đã bị di chuyển, xóa, hoặc chưa bao giờ tồn tại — giống như những trang manga chưa được dịch.
+        Trang bạn đang tìm kiếm đã bị di chuyển, xóa, hoặc chưa bao giờ tồn tại — giống như những trang truyện chưa được dịch.
       </p>
 
       {/* Bubble with error message */}
       <div className="bubble" style={{ maxWidth: 320, marginBottom: 36, background: "#fff" }}>
         <span className="serif" style={{ fontSize: 14 }}>
-          「ここには何もない…」
+          "Lost in translation..."
         </span>
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, fontFamily: "var(--font-serif)" }}>
-          — Nơi này không có gì cả…
+          — Lạc lối giữa những dòng dịch…
         </div>
       </div>
 
@@ -87,7 +87,7 @@ export default function NotFound() {
         </Link>
         <Link href="/upload">
           <button className="btn" style={{ padding: "14px 28px" }}>
-            Tải manga lên
+            Tải truyện lên
           </button>
         </Link>
       </div>
