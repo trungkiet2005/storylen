@@ -31,12 +31,22 @@ const DEFAULT_AI_CONFIG: AIModuleCurrentConfig = {
 type UploadState = "idle" | "dragging" | "uploading" | "processing" | "done" | "error";
 type AIModuleConfigKey = keyof AIModuleCurrentConfig;
 
+const IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_PDF_BYTES = 100 * 1024 * 1024;
+const PDF_RENDER_MAX_WIDTH = 2200;
+const PDF_RENDER_MAX_HEIGHT = 3200;
+const PDF_RENDER_QUALITY = 0.92;
+
 interface FileItem {
   id: string;
   file: File;
   name: string;
   size: string;
   previewUrl: string;
+  sourceName?: string;
+  sourcePage?: number;
   pageId?: string;
   progress: number;
   status: PageStatus["status"] | "queued" | "uploading";
@@ -50,12 +60,115 @@ interface LogMessage {
   type: 'info' | 'success' | 'warning' | 'error' | 'system';
 }
 
+function formatFileSize(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getExtension(name: string): string {
+  return name.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function getBaseName(name: string): string {
+  return name.replace(/\.[^/.]+$/, "") || "document";
+}
+
+function isImageFile(file: File): boolean {
+  return IMAGE_TYPES.has(file.type.toLowerCase()) || IMAGE_EXTENSIONS.has(getExtension(file.name));
+}
+
+function isPdfFile(file: File): boolean {
+  return file.type.toLowerCase() === "application/pdf" || getExtension(file.name) === "pdf";
+}
+
+function createFileItem(file: File, source?: { name: string; page: number }): FileItem {
+  return {
+    id: Math.random().toString(36).slice(2, 11),
+    file,
+    name: file.name,
+    size: formatFileSize(file.size),
+    previewUrl: URL.createObjectURL(file),
+    sourceName: source?.name,
+    sourcePage: source?.page,
+    progress: 0,
+    status: "queued",
+  };
+}
+
+async function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      blob => {
+        if (blob) {
+          resolve(blob);
+          return;
+        }
+        reject(new Error("Không thể xuất trang PDF thành ảnh."));
+      },
+      "image/jpeg",
+      PDF_RENDER_QUALITY,
+    );
+  });
+}
+
+async function convertPdfToImageFiles(
+  file: File,
+  onPageDone?: (page: number, total: number) => void,
+): Promise<File[]> {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/legacy/build/pdf.worker.mjs",
+    import.meta.url,
+  ).toString();
+
+  const documentData = new Uint8Array(await file.arrayBuffer());
+  const pdf = await pdfjs.getDocument({ data: documentData }).promise;
+  const baseName = getBaseName(file.name);
+  const pages: File[] = [];
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(
+      2,
+      PDF_RENDER_MAX_WIDTH / baseViewport.width,
+      PDF_RENDER_MAX_HEIGHT / baseViewport.height,
+    );
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+
+    if (!context) {
+      throw new Error("Trình duyệt không hỗ trợ canvas để render PDF.");
+    }
+
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+
+    await page.render({ canvasContext: context, viewport }).promise;
+    const blob = await canvasToJpeg(canvas);
+    const generatedName = `${baseName}-page-${String(pageNumber).padStart(3, "0")}.jpg`;
+
+    pages.push(new File([blob], generatedName, {
+      type: "image/jpeg",
+      lastModified: file.lastModified,
+    }));
+
+    canvas.width = 0;
+    canvas.height = 0;
+    onPageDone?.(pageNumber, pdf.numPages);
+  }
+
+  return pages;
+}
+
 export default function UploadPage() {
   const { toast } = useToast();
   const [state, setState] = useState<UploadState>("idle");
   const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([]);
+  const selectedFilesRef = useRef<FileItem[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isPreparingFiles, setIsPreparingFiles] = useState(false);
   
   const [aiOptions, setAiOptions] = useState<AIModuleOptions | null>(null);
   const [aiOptionsError, setAiOptionsError] = useState<string | null>(null);
@@ -75,10 +188,14 @@ export default function UploadPage() {
 
   // Cleanup object URLs on unmount
   useEffect(() => {
+    selectedFilesRef.current = selectedFiles;
+  }, [selectedFiles]);
+
+  useEffect(() => {
     return () => {
-      selectedFiles.forEach(f => URL.revokeObjectURL(f.previewUrl));
+      selectedFilesRef.current.forEach(f => URL.revokeObjectURL(f.previewUrl));
     };
-  }, []); // Run once on unmount if needed, but file-specific cleanup is better
+  }, []);
 
   const addLog = useCallback((text: string, type: LogMessage["type"] = 'info') => {
     const time = new Date().toLocaleTimeString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -115,40 +232,67 @@ export default function UploadPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const handleFiles = useCallback((files: FileList | null) => {
+  const handleFiles = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const validTypes = ["image/jpeg", "image/png", "image/webp"];
     const newItems: FileItem[] = [];
+    setIsPreparingFiles(true);
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      if (!validTypes.includes(file.type)) {
-        toast(`Bỏ qua "${file.name}": Chỉ chấp nhận JPG, PNG, WEBP.`, "error");
-        continue;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+
+        if (isImageFile(file)) {
+          if (file.size > MAX_IMAGE_BYTES) {
+            toast(`Bỏ qua "${file.name}": Vượt quá kích thước 20 MB.`, "error");
+            continue;
+          }
+
+          newItems.push(createFileItem(file));
+          continue;
+        }
+
+        if (isPdfFile(file)) {
+          if (file.size > MAX_PDF_BYTES) {
+            toast(`Bỏ qua "${file.name}": PDF vượt quá kích thước 100 MB.`, "error");
+            continue;
+          }
+
+          addLog(`Đang cắt PDF "${file.name}" thành từng trang ảnh...`, "info");
+          try {
+            const pageFiles = await convertPdfToImageFiles(file, (page, total) => {
+              addLog(`PDF "${file.name}": đã chuyển trang ${page}/${total}.`, "info");
+            });
+
+            pageFiles.forEach((pageFile, index) => {
+              if (pageFile.size > MAX_IMAGE_BYTES) {
+                toast(`Bỏ qua "${pageFile.name}": trang PDF sau khi chuyển vượt quá 20 MB.`, "error");
+                return;
+              }
+              newItems.push(createFileItem(pageFile, { name: file.name, page: index + 1 }));
+            });
+            addLog(`Đã cắt xong "${file.name}" thành ${pageFiles.length} trang ảnh.`, "success");
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Không thể đọc PDF.";
+            addLog(`Lỗi PDF "${file.name}": ${msg}`, "error");
+            toast(`Không thể xử lý PDF "${file.name}".`, "error");
+          }
+          continue;
+        }
+
+        toast(`Bỏ qua "${file.name}": Chỉ chấp nhận JPG, PNG, WEBP hoặc PDF.`, "error");
       }
-      if (file.size > 20 * 1024 * 1024) {
-        toast(`Bỏ qua "${file.name}": Vượt quá kích thước 20 MB.`, "error");
-        continue;
+
+      if (newItems.length > 0) {
+        setSelectedFiles(prev => [...prev, ...newItems]);
+        setState("idle");
+        toast(`Đã thêm ${newItems.length} trang vào hàng chờ.`, "success");
       }
-
-      newItems.push({
-        id: Math.random().toString(36).slice(2, 11),
-        file,
-        name: file.name,
-        size: (file.size / (1024 * 1024)).toFixed(1) + " MB",
-        previewUrl: URL.createObjectURL(file),
-        progress: 0,
-        status: "queued"
-      });
+    } finally {
+      setIsPreparingFiles(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-
-    if (newItems.length > 0) {
-      setSelectedFiles(prev => [...prev, ...newItems]);
-      setState("idle");
-      toast(`Đã thêm ${newItems.length} trang vào hàng chờ.`, "success");
-    }
-  }, [toast]);
+  }, [addLog, toast]);
 
   const removeFile = useCallback((id: string) => {
     setSelectedFiles(prev => {
@@ -161,63 +305,25 @@ export default function UploadPage() {
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setState("idle");
-    handleFiles(e.dataTransfer.files);
+    void handleFiles(e.dataTransfer.files);
   }, [handleFiles]);
 
   const startProcessing = async () => {
-    if (selectedFiles.length === 0) return;
+    if (selectedFiles.length === 0 || isPreparingFiles) return;
+
+    if (!backendOnline) {
+      const msg = "Backend đang offline. Vui lòng kiểm tra kết nối và thử lại.";
+      setErrorMsg(msg);
+      setState("error");
+      addLog(`LỖI: ${msg}`, 'error');
+      toast(msg, "error");
+      return;
+    }
 
     setState("uploading");
     setLogs([]);
     addLog(`Khởi tạo phiên batch với ${selectedFiles.length} files...`, 'system');
 
-    // ── OFFLINE DEMO SIMULATION ─────────────────────────────────────────────
-    if (!backendOnline) {
-      toast("ⓘ Backend offline — chạy demo mô phỏng", "info");
-      addLog("Đang kết nối kênh xử lý (chế độ DEMO)...", 'info');
-      
-      // Simulate upload
-      await new Promise(r => setTimeout(r, 1200));
-      setState("processing");
-      addLog("Đã tải lên các tệp thành công. Bắt đầu chuỗi AI...", 'success');
-      
-      // Mark all as pending
-      setSelectedFiles(prev => prev.map(f => ({ ...f, status: 'pending' })));
-
-      // Simulate sequential processing
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const fileId = selectedFiles[i].id;
-        const fileName = selectedFiles[i].name;
-
-        addLog(`[${i+1}/${selectedFiles.length}] ● Đang quét chữ: ${fileName}`, 'info');
-        
-        // Progress tracking
-        setSelectedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'ocr_running', progress: 20 } : f));
-        await new Promise(r => setTimeout(r, 800));
-        
-        setSelectedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'translating', progress: 60 } : f));
-        addLog(`[${i+1}/${selectedFiles.length}] → Đang dịch ngữ cảnh: ${fileName}`, 'info');
-        await new Promise(r => setTimeout(r, 900));
-
-        // 5% chance to fail for realism in large batches
-        const isError = Math.random() < 0.05;
-        if (isError) {
-          setSelectedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'failed', progress: 60, error: "AI module exhausted" } : f));
-          addLog(`[${i+1}/${selectedFiles.length}] ✕ Thất bại: ${fileName} - Lỗi định dạng AI`, 'error');
-        } else {
-          setSelectedFiles(prev => prev.map(f => f.id === fileId ? { ...f, status: 'completed', progress: 100 } : f));
-          addLog(`[${i+1}/${selectedFiles.length}] ✓ Hoàn thành: ${fileName}`, 'success');
-        }
-        await new Promise(r => setTimeout(r, 300));
-      }
-
-      setState("done");
-      addLog("=== TẤT CẢ TÁC VỤ ĐÃ HOÀN TẤT ===", 'system');
-      toast("✅ Demo Batch hoàn tất! (Dữ liệu giả lập)", "success");
-      return;
-    }
-
-    // ── REAL BACKEND FLOW ───────────────────────────────────────────────────
     try {
       addLog("Đang tải các tệp lên bộ lưu trữ...", 'info');
       const rawFiles = selectedFiles.map(f => f.file);
@@ -372,7 +478,7 @@ export default function UploadPage() {
               kanji="B"
               label="Upload & Batch · Xử lý hàng loạt"
               title="Tải trang truyện & Dịch thuật AI"
-              subtitle="Hỗ trợ nhiều ảnh cùng lúc. Tối đa 20MB / ảnh. Pipeline tích hợp bóc tách OCR và phủ văn bản dịch tự động."
+              subtitle="Hỗ trợ nhiều ảnh cùng lúc hoặc 1 file PDF; PDF sẽ được cắt từng trang thành ảnh rồi đưa vào batch dịch. Tối đa 20MB / ảnh."
               stamp="BATCH"
             />
           </FadeIn>
@@ -401,9 +507,9 @@ export default function UploadPage() {
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                  accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
                   style={{ display: "none" }}
-                  onChange={e => handleFiles(e.target.files)}
+                  onChange={e => void handleFiles(e.target.files)}
                 />
 
                 <AnimatePresence mode="wait">
@@ -430,22 +536,26 @@ export default function UploadPage() {
                               margin: "0 auto 20px",
                               border: "3px solid var(--border)",
                               boxShadow: "4px 4px 0 var(--border)",
-                              cursor: "pointer",
+                              cursor: isPreparingFiles ? "wait" : "pointer",
+                              opacity: isPreparingFiles ? 0.72 : 1,
                             }}
-                            onClick={() => fileInputRef.current?.click()}
+                            onClick={() => {
+                              if (!isPreparingFiles) fileInputRef.current?.click();
+                            }}
                           >
                             <Icon name="upload" size={42} stroke={2.5}/>
                           </motion.div>
-                          <div className="display" style={{ fontSize: 26 }}>Kéo thả trang truyện vào đây</div>
-                          <div style={{ color: "var(--fg-soft)", marginTop: 8, marginBottom: 24 }}>Hỗ trợ chọn nhiều file cùng lúc</div>
+                          <div className="display" style={{ fontSize: 26 }}>Kéo thả ảnh hoặc PDF vào đây</div>
+                          <div style={{ color: "var(--fg-soft)", marginTop: 8, marginBottom: 24 }}>Chọn nhiều ảnh, hoặc chọn PDF để tự cắt từng trang</div>
                           <motion.button
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.97 }}
                             className="btn btn-primary"
+                            disabled={isPreparingFiles}
                             onClick={() => fileInputRef.current?.click()}
                             style={{ padding: "14px 28px" }}
                           >
-                            <Icon name="folder" size={14}/> Chọn tệp tin
+                            <Icon name="folder" size={14}/> {isPreparingFiles ? "Đang cắt PDF..." : "Chọn tệp tin"}
                           </motion.button>
                         </div>
                       ) : (
@@ -457,8 +567,8 @@ export default function UploadPage() {
                               <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Đã xếp {selectedFiles.length} tệp vào hàng đợi</div>
                             </div>
                             <div style={{ display: "flex", gap: 10 }}>
-                              <motion.button whileHover={{ scale: 1.02 }} className="btn btn-sm" onClick={() => fileInputRef.current?.click()}>
-                                <Icon name="plus" size={12}/> Thêm ảnh
+                              <motion.button whileHover={{ scale: 1.02 }} className="btn btn-sm" disabled={isPreparingFiles} onClick={() => fileInputRef.current?.click()}>
+                                <Icon name="plus" size={12}/> {isPreparingFiles ? "Đang cắt PDF..." : "Thêm ảnh/PDF"}
                               </motion.button>
                               <motion.button whileHover={{ scale: 1.02 }} className="btn btn-sm btn-ghost" style={{ color: "var(--accent)" }} onClick={resetUpload}>
                                 Xóa tất cả
@@ -475,7 +585,14 @@ export default function UploadPage() {
                               <div key={item.id} style={{ display: "grid", gridTemplateColumns: "40px 60px 1fr 100px 60px", padding: "8px 16px", borderBottom: "1px dashed var(--border-soft)", alignItems: "center", fontSize: 13, background: "var(--panel)" }}>
                                 <span className="mono" style={{ color: "var(--muted)" }}>{String(index + 1).padStart(2, "0")}</span>
                                 <img src={item.previewUrl} alt="Preview" style={{ width: 36, height: 48, objectFit: "cover", border: "1.5px solid var(--border)" }}/>
-                                <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 10 }}>{item.name}</span>
+                                <div style={{ overflow: "hidden", paddingRight: 10 }}>
+                                  <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                                  {item.sourceName && (
+                                    <div className="mono" style={{ color: "var(--muted)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                      PDF trang {item.sourcePage}: {item.sourceName}
+                                    </div>
+                                  )}
+                                </div>
                                 <span className="mono" style={{ color: "var(--muted)" }}>{item.size}</span>
                                 <button className="btn btn-sm btn-ghost" onClick={() => removeFile(item.id)} style={{ color: "var(--accent)", padding: 4 }}>
                                   <Icon name="trash" size={13}/>
@@ -490,9 +607,10 @@ export default function UploadPage() {
                             whileTap={{ scale: 0.99 }}
                             className="btn btn-primary btn-lg"
                             style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "18px 0", fontSize: 16 }}
+                            disabled={isPreparingFiles}
                             onClick={startProcessing}
                           >
-                            <Icon name="sparkle" size={18}/> BẮT ĐẦU DỊCH THUẬT ({selectedFiles.length} TRANG TRUYỆN)
+                            <Icon name="sparkle" size={18}/> {isPreparingFiles ? "ĐANG CẮT PDF..." : `BẮT ĐẦU DỊCH THUẬT (${selectedFiles.length} TRANG TRUYỆN)`}
                           </motion.button>
                         </div>
                       )}
@@ -530,6 +648,12 @@ export default function UploadPage() {
                         </div>
                       </div>
 
+                      {state === "error" && errorMsg && (
+                        <div className="stroke-ink" style={{ background: "var(--bg-2)", color: "var(--accent)", padding: "10px 12px", fontSize: 12, marginBottom: 16 }}>
+                          {errorMsg}
+                        </div>
+                      )}
+
                       {/* Global Bar */}
                       <div style={{ height: 18, border: "2px solid var(--border)", background: "var(--bg-2)", position: "relative", overflow: "hidden", marginBottom: 20 }}>
                         <motion.div
@@ -551,7 +675,7 @@ export default function UploadPage() {
                         </div>
                         <StaggerContainer staggerDelay={0.02}>
                           {selectedFiles.map((f, i) => {
-                            const statusMap: any = {
+                            const statusMap: Record<FileItem["status"], { label: string; color: string }> = {
                               queued: { label: "Chờ", color: "var(--muted)" },
                               uploading: { label: "Tải lên...", color: "var(--fg-soft)" },
                               pending: { label: "Chờ AI", color: "var(--muted)" },
@@ -632,7 +756,7 @@ export default function UploadPage() {
                         <select
                           value={translationConfig[field.key]}
                           onChange={event => updateTranslationConfig(field.key, event.target.value)}
-                          disabled={!aiOptions || state !== "idle"}
+                          disabled={!aiOptions || state !== "idle" || isPreparingFiles}
                           style={{
                             width: "100%",
                             padding: "10px 12px",
@@ -643,7 +767,7 @@ export default function UploadPage() {
                             fontSize: 13,
                             boxSizing: "border-box",
                             transition: "border-color 0.15s",
-                            cursor: state !== "idle" ? "not-allowed" : "pointer",
+                            cursor: state !== "idle" || isPreparingFiles ? "not-allowed" : "pointer",
                           }}
                         >
                           {field.values.map(value => (
@@ -705,7 +829,7 @@ export default function UploadPage() {
                   <div style={{ display: "flex", gap: 10 }}>
                     <div style={{ marginTop: 2 }}><Icon name="sparkle" size={14}/></div>
                     <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--fg-soft)" }}>
-                      <strong>Gộp Batch & Upload:</strong> Bạn có thể đọc trực tiếp các trang đã hoàn tất ngay cả khi các trang khác trong lô vẫn đang được AI xử lý.
+                      <strong>Gộp Batch & Upload:</strong> PDF được chuyển thành từng ảnh trong trình duyệt, sau đó xử lý như batch ảnh bình thường.
                     </div>
                   </div>
                 </div>

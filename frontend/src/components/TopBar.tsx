@@ -187,6 +187,7 @@ function UserMenu() {
 export const TopBar = ({ active, compact = false }: { active: string, compact?: boolean }) => {
   const [theme, setTheme] = useState("light");
   const [mounted, setMounted] = useState(false);
+  const { isAdmin } = useAuth();
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -211,6 +212,7 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
     { id: "reader",  label: "Đọc",       icon: "book",    href: "/reader" },
     { id: "qa",      label: "Hỏi AI",    icon: "chat",    href: "/qa" },
     { id: "history", label: "Lịch sử",   icon: "history", href: "/history" },
+    ...(isAdmin ? [{ id: "admin", label: "Quản trị", icon: "key", href: "/admin" }] : []),
   ];
 
   return (

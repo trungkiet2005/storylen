@@ -21,12 +21,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,32}$")
+ALLOWED_ROLES = {"user", "admin"}
 
 
 class AuthUser(BaseModel):
     id: str
     username: str
     email: str
+    role: str = "user"
 
 
 class AuthResponse(BaseModel):
@@ -141,21 +143,26 @@ def _request_auth(
         ) from exc
 
 
-def _get_profile_username(user_id: str) -> str | None:
+def _get_profile(user_id: str) -> dict[str, Any] | None:
     try:
         result = (
             get_supabase()
             .table("profiles")
-            .select("username")
+            .select("username, role")
             .eq("user_id", user_id)
             .limit(1)
             .execute()
         )
         if result.data:
-            return result.data[0].get("username")
+            return result.data[0]
     except Exception as exc:
         logger.warning("Failed to load profile for %s: %s", user_id, exc)
     return None
+
+
+def _get_profile_username(user_id: str) -> str | None:
+    profile = _get_profile(user_id)
+    return profile.get("username") if profile else None
 
 
 def _username_available(username: str) -> bool:
@@ -202,15 +209,20 @@ def _ensure_profile(user_id: str, username: str | None = None) -> str | None:
 def _to_auth_user(payload: dict[str, Any], username: str | None = None) -> AuthUser:
     user_metadata = payload.get("user_metadata") or {}
     email = str(payload.get("email") or "")
+    user_id = str(payload["id"])
+    profile = _get_profile(user_id)
     resolved_username = (
         username
-        or _get_profile_username(str(payload["id"]))
+        or (profile.get("username") if profile else None)
         or user_metadata.get("username")
         or user_metadata.get("name")
         or email.split("@", 1)[0]
         or "user"
     )
-    return AuthUser(id=str(payload["id"]), username=str(resolved_username), email=email)
+    role = (profile.get("role") if profile else None) or "user"
+    if role not in ALLOWED_ROLES:
+        role = "user"
+    return AuthUser(id=user_id, username=str(resolved_username), email=email, role=role)
 
 
 def _session_from_payload(payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -307,6 +319,16 @@ def get_current_user(
 
     session = _refresh_session(refresh_token, response, settings)
     return _to_auth_user(session["user"])
+
+
+def get_current_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
+    """Require the caller to be an admin. Returns the user or 403."""
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cần quyền quản trị để thực hiện thao tác này.",
+        )
+    return user
 
 
 @router.post("/register", response_model=AuthResponse)

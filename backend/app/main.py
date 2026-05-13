@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import ai_module, auth, history, pages, qa, status, upload
+from app.routers import admin, ai_module, auth, history, pages, qa, status, upload
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -106,6 +106,7 @@ app.include_router(status.router,  prefix=API_PREFIX)
 app.include_router(pages.router,   prefix=API_PREFIX)
 app.include_router(qa.router,      prefix=API_PREFIX)
 app.include_router(history.router, prefix=API_PREFIX)
+app.include_router(admin.router,   prefix=API_PREFIX)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────

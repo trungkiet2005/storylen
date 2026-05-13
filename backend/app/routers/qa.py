@@ -14,10 +14,11 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_supabase
 from app.models.schemas import QARequest, QAResponse
+from app.routers.auth import AuthUser, get_current_user
 from app.services.rag import answer_question
 
 router = APIRouter(prefix="/qa", tags=["qa"])
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("", response_model=QAResponse)
-def ask_question(payload: QARequest):
+def ask_question(payload: QARequest, user: AuthUser = Depends(get_current_user)):
     """
     Ask a question about a manga page or series.
     Uses RAG (vector search + Gemini) to generate a grounded answer.
@@ -48,6 +49,7 @@ def ask_question(payload: QARequest):
         supabase.table("qa_history").insert({
             "qa_id": str(uuid.uuid4()),
             "page_id": payload.page_id,
+            "user_id": user.id,
             "user_question": question,
             "ai_answer": response.answer,
             "asked_at": datetime.now(timezone.utc).isoformat(),

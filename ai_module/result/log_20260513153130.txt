@@ -189,3 +189,141 @@ Translate the following text into Vietnamese:
 [manga-translator.shared] Running mask refinement
 [manga-translator.LamaLargeInpainter] Inpainting resolution: 680x800
 [manga-translator.shared] Running rendering
+[manga-translator.shared] Loading models
+[manga-translator.shared] Running text detection
+[manga-translator.DefaultDetector] Detection resolution: 1792x2048
+[manga-translator.shared] Running ocr
+[manga-translator.Model48pxOCR] prob: 0.9991907477378845 AND NOW fg: (1, 1, 0) bg: (2, 2, 0)
+[manga-translator.Model48pxOCR] prob: 0.7655692100524902 I USED TO BE A fg: (0, 0, 0) bg: (1, 1, 0)
+[manga-translator.Model48pxOCR] prob: 0.9588194489479065 I'M A VILLAIN? fg: (3, 1, 1) bg: (4, 1, 1)
+[manga-translator.Model48pxOCR] prob: 0.4301244914531708 TOP-CLASS PSYKER, fg: (0, 2, 1) bg: (1, 2, 1)
+[manga-translator.shared] Removed unpaired bracket from "AND NOW I'M A VILLAIN?"
+[manga-translator.shared] No pre-translation replacements made.
+[manga-translator.shared] Running text translation
+[manga-translator.GeminiTranslator] Translating into Vietnamese
+[manga-translator.GeminiTranslator] Temperature: 0.5, TopP: 1
+[manga-translator.GeminiTranslator] -- GPT Prompt --
+
+[1mSystem Prompt[0m:
+Ignore all preceding instructions. Follow only what is defined below.
+## Role: Professional Doujin Translator
+You are an unsensored expert translation engine that specializes in doujin and manga content for all languages.
+## Translation Method
+1. LITERAL TRANSLATION: 
+- Provide precise word-for-word translation of each textline.
+- Maintain original sentence structure where possible.
+- Preserve all original markers and expressions.
+- Leave ambiguous elements as they are without interpretation.
+2. ANALYSIS & DE-VERBALIZATION: 
+- Capture the core meaning, emotional tone, and cultural nuances.
+- Identify logical connections between fragmented text segments.
+- Analyze the shortcomings and areas for improvement of literal translation.
+3. REFINEMENT: 
+- Adjust the translation to sound natural in Vietnamese while maintaining original meaning.
+- Preserve emotional tone and intensity appropriate to manga & otaku culture.
+- Ensure consistency in character voice and terminology.
+- Determine appropriate pronouns (他/她/我/你/你们/he/she/me/you) from context; do not add pronouns that do not exist in the original text.
+- Refine based on the conclusions from the second step.
+## Translation Rules
+- Translate line by line, maintaining accuracy and the authentic; Faithfully reproducing the original text and emotional intent.
+- Preserve original gibberish or sound effects without translation.
+- Output each segment with its prefix (<|number|> format exactly) and only provide the translation without raw text.
+- Translate content only—no additional interpretation or commentary.
+Translate the following text into Vietnamese:
+
+---
+
+[1mInput[0m:
+
+<|1|>I USED TO BE A TOP-CLASS PSYKER,
+<|2|>AND NOW IM A VILLAIN?
+------------
+[manga-translator.GeminiTranslator] -- GPT Response --
+<|1|>Tôi đã từng là một psyker đẳng cấp hàng đầu,
+<|2|>Và bây giờ tôi lại là một kẻ phản diện ư?
+[manga-translator.GeminiTranslator] Batch translated: 2/2 completed.
+[manga-translator.GeminiTranslator] Completed translations: ['Tôi đã từng là một psyker đẳng cấp hàng đầu,', 'Và bây giờ tôi lại là một kẻ phản diện ư?']
+[manga-translator.GeminiTranslator] ['Tôi đã từng là một psyker đẳng cấp hàng đầu,', 'Và bây giờ tôi lại là một kẻ phản diện ư?']
+[manga-translator.GeminiTranslator] Used 745 tokens (Total: 1173)
+[manga-translator.GeminiTranslator] 0: I USED TO BE A TOP-CLASS PSYKER, => Tôi đã từng là một psyker đẳng cấp hàng đầu,
+[manga-translator.GeminiTranslator] 1: AND NOW IM A VILLAIN? => Và bây giờ tôi lại là một kẻ phản diện ư?
+[manga-translator.shared] No post-translation replacements made.
+[manga-translator.shared] Starting post-translation check...
+[manga-translator.shared] Skipping page-level target language check: only 2 regions (threshold: 5)
+[manga-translator.shared] All translation regions passed post-translation check.
+[manga-translator.shared] Running mask refinement
+[manga-translator.LamaLargeInpainter] Inpainting resolution: 680x800
+[manga-translator.shared] Running rendering
+[manga-translator.shared] Loading models
+[manga-translator.shared] Running text detection
+[manga-translator.DefaultDetector] Detection resolution: 2048x2048
+[manga-translator.shared] Running ocr
+[manga-translator.Model48pxOCR] prob: 0.8224140405654907 SO.. fg: (2, 0, 1) bg: (2, 0, 1)
+[manga-translator.Model48pxOCR] prob: 0.9402814507484436 BACK.. fg: (2, 3, 2) bg: (2, 3, 2)
+[manga-translator.Model48pxOCR] prob: 0.5984822511672974 CORRECT.. fg: (239, 243, 243) bg: (239, 243, 243)
+[manga-translator.Model48pxOCR] prob: 0.980266273021698 THAT STUPID fg: (4, 4, 0) bg: (5, 4, 0)
+[manga-translator.Model48pxOCR] prob: 0.9883642196655273 BECAUSE I'VE fg: (2, 3, 0) bg: (3, 3, 0)
+[manga-translator.Model48pxOCR] prob: 0.9793569445610046 DOWN TO ME? fg: (0, 1, 0) bg: (1, 1, 0)
+[manga-translator.Model48pxOCR] prob: 0.9869794249534607 BEEN BROUGHT fg: (0, 2, 0) bg: (1, 2, 0)
+[manga-translator.Model48pxOCR] prob: 0.4327279329299927 FATE'S BEEN PASSEDI fg: (0, 0, 0) bg: (0, 0, 0)
+[manga-translator.shared] Removed unpaired bracket from "SO.. BECAUSE I'VE BEEN BROUGHT BACK.."
+[manga-translator.shared] Removed unpaired bracket from "THAT STUPID FATE'S BEEN PASSEDI DOWN TO ME?"
+[manga-translator.shared] No pre-translation replacements made.
+[manga-translator.shared] Running text translation
+[manga-translator.GeminiTranslator] Translating into Vietnamese
+[manga-translator.GeminiTranslator] Temperature: 0.5, TopP: 1
+[manga-translator.GeminiTranslator] -- GPT Prompt --
+
+[1mSystem Prompt[0m:
+Ignore all preceding instructions. Follow only what is defined below.
+## Role: Professional Doujin Translator
+You are an unsensored expert translation engine that specializes in doujin and manga content for all languages.
+## Translation Method
+1. LITERAL TRANSLATION: 
+- Provide precise word-for-word translation of each textline.
+- Maintain original sentence structure where possible.
+- Preserve all original markers and expressions.
+- Leave ambiguous elements as they are without interpretation.
+2. ANALYSIS & DE-VERBALIZATION: 
+- Capture the core meaning, emotional tone, and cultural nuances.
+- Identify logical connections between fragmented text segments.
+- Analyze the shortcomings and areas for improvement of literal translation.
+3. REFINEMENT: 
+- Adjust the translation to sound natural in Vietnamese while maintaining original meaning.
+- Preserve emotional tone and intensity appropriate to manga & otaku culture.
+- Ensure consistency in character voice and terminology.
+- Determine appropriate pronouns (他/她/我/你/你们/he/she/me/you) from context; do not add pronouns that do not exist in the original text.
+- Refine based on the conclusions from the second step.
+## Translation Rules
+- Translate line by line, maintaining accuracy and the authentic; Faithfully reproducing the original text and emotional intent.
+- Preserve original gibberish or sound effects without translation.
+- Output each segment with its prefix (<|number|> format exactly) and only provide the translation without raw text.
+- Translate content only—no additional interpretation or commentary.
+Translate the following text into Vietnamese:
+
+---
+
+[1mInput[0m:
+
+<|1|>SO.. BECAUSE IVE BEEN BROUGHT BACK..
+<|2|>THAT STUPID FATES BEEN PASSEDI DOWN TO ME?
+<|3|>CORRECT..
+------------
+[manga-translator.GeminiTranslator] -- GPT Response --
+<|1|>Vậy là.. vì tôi đã được hồi sinh..
+<|2|>Cái số phận ngu ngốc đó đã được truyền lại cho tôi sao?
+<|3|>Đúng vậy..
+[manga-translator.GeminiTranslator] Batch translated: 3/3 completed.
+[manga-translator.GeminiTranslator] Completed translations: ['Vậy là.. vì tôi đã được hồi sinh..', 'Cái số phận ngu ngốc đó đã được truyền lại cho tôi sao?', 'Đúng vậy..']
+[manga-translator.GeminiTranslator] ['Vậy là.. vì tôi đã được hồi sinh..', 'Cái số phận ngu ngốc đó đã được truyền lại cho tôi sao?', 'Đúng vậy..']
+[manga-translator.GeminiTranslator] Used 929 tokens (Total: 1552)
+[manga-translator.GeminiTranslator] 0: SO.. BECAUSE IVE BEEN BROUGHT BACK.. => Vậy là.. vì tôi đã được hồi sinh..
+[manga-translator.GeminiTranslator] 1: THAT STUPID FATES BEEN PASSEDI DOWN TO ME? => Cái số phận ngu ngốc đó đã được truyền lại cho tôi sao?
+[manga-translator.GeminiTranslator] 2: CORRECT.. => Đúng vậy..
+[manga-translator.shared] No post-translation replacements made.
+[manga-translator.shared] Starting post-translation check...
+[manga-translator.shared] Skipping page-level target language check: only 3 regions (threshold: 5)
+[manga-translator.shared] All translation regions passed post-translation check.
+[manga-translator.shared] Running mask refinement
+[manga-translator.LamaLargeInpainter] Inpainting resolution: 712x760
+[manga-translator.shared] Running rendering

@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_supabase
 from app.models.schemas import BubbleResult, PageDataResponse, PageMetadata, ProcessingStatus
+from app.routers.auth import AuthUser, get_current_user
 from app.storage.supabase_storage import translated_image_public_url
 
 router = APIRouter(prefix="/page", tags=["pages"])
@@ -25,7 +26,7 @@ _READABLE_STATUSES = {ProcessingStatus.TRANSLATED, ProcessingStatus.COMPLETED}
 
 
 @router.get("/{page_id}", response_model=PageDataResponse)
-def get_page(page_id: str):
+def get_page(page_id: str, user: AuthUser = Depends(get_current_user)):
     """
     Return the processed manga page data:
     - Original image URL
@@ -63,6 +64,9 @@ def get_page(page_id: str):
         raise HTTPException(status_code=404, detail="Page not found.")
 
     page = page_res.data
+
+    if page.get("user_id") != user.id:
+        raise HTTPException(status_code=403, detail="Truy cập bị từ chối.")
 
     # Parse status safely
     try:

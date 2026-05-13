@@ -14,6 +14,7 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  role: "user" | "admin";
 }
 
 export interface AuthResult {
@@ -27,6 +28,7 @@ interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<AuthResult>;
   register: (username: string, email: string, password: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
@@ -139,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isLoading,
       isAuthenticated: Boolean(user),
+      isAdmin: user?.role === "admin",
       login,
       register,
       logout,

@@ -10,23 +10,25 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_supabase
 from app.models.schemas import BatchStatusResponse, PageStatusResponse, ProcessingStatus
+from app.routers.auth import AuthUser, get_current_user
 
 router = APIRouter(prefix="/status", tags=["status"])
 logger = logging.getLogger(__name__)
 
 
 @router.get("/batch/{batch_id}", response_model=BatchStatusResponse)
-def get_batch_status(batch_id: str):
-    """Return aggregated processing status for all pages in a batch."""
+def get_batch_status(batch_id: str, user: AuthUser = Depends(get_current_user)):
+    """Return aggregated processing status for all pages in a batch (owner only)."""
     supabase = get_supabase()
     result = (
         supabase.table("manga_pages")
         .select("page_id, status, progress, error, original_image_url, thumbnail_url")
         .eq("batch_id", batch_id)
+        .eq("user_id", user.id)
         .order("uploaded_at", desc=False)  # Order by upload sequence to keep logical order!
         .execute()
     )
@@ -69,12 +71,12 @@ def get_batch_status(batch_id: str):
 
 
 @router.get("/{page_id}", response_model=PageStatusResponse)
-def get_page_status(page_id: str):
-    """Return the current processing status for a single manga page."""
+def get_page_status(page_id: str, user: AuthUser = Depends(get_current_user)):
+    """Return the current processing status for a single manga page (owner only)."""
     supabase = get_supabase()
     result = (
         supabase.table("manga_pages")
-        .select("page_id, status, progress, error, original_image_url, thumbnail_url")
+        .select("page_id, status, progress, error, original_image_url, thumbnail_url, user_id")
         .eq("page_id", page_id)
         .maybe_single()
         .execute()
@@ -84,6 +86,9 @@ def get_page_status(page_id: str):
         raise HTTPException(status_code=404, detail="Page not found.")
 
     row = result.data
+
+    if row.get("user_id") != user.id:
+        raise HTTPException(status_code=403, detail="Truy cập bị từ chối.")
     try:
         status = ProcessingStatus(row["status"])
     except ValueError:

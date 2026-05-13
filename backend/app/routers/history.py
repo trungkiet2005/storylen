@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.database import get_supabase
 from app.models.schemas import HistoryItem, HistoryResponse, ProcessingStatus
+from app.routers.auth import AuthUser, get_current_user
 
 router = APIRouter(prefix="/history", tags=["history"])
 logger = logging.getLogger(__name__)
@@ -24,19 +25,20 @@ logger = logging.getLogger(__name__)
 def get_history(
     limit: int = Query(10, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    user: AuthUser = Depends(get_current_user),
 ):
     """
-    Return paginated history of processed manga pages.
+    Return paginated history of manga pages uploaded by the current user.
     Sorted by upload date (newest first).
-    No auth required for MVP — returns all pages.
     """
     supabase = get_supabase()
 
-    # Count total (Supabase returns count in .count attribute)
+    # Count total for this user
     try:
         count_res = (
             supabase.table("manga_pages")
             .select("page_id", count="exact")
+            .eq("user_id", user.id)
             .execute()
         )
         total = count_res.count or 0
@@ -44,7 +46,7 @@ def get_history(
         logger.error("Failed to count manga_pages: %s", exc)
         total = 0
 
-    # Fetch page records with pagination
+    # Fetch page records with pagination (filtered by user)
     try:
         data_res = (
             supabase.table("manga_pages")
@@ -52,6 +54,7 @@ def get_history(
                 "page_id, original_image_url, thumbnail_url, status, "
                 "uploaded_at, page_number, chapter_id"
             )
+            .eq("user_id", user.id)
             .order("uploaded_at", desc=True)
             .range(offset, offset + limit - 1)
             .execute()

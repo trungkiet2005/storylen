@@ -153,32 +153,62 @@ BEGIN
 END;
 $$;
 
+-- ─── User roles ───────────────────────────────────────────────────────────────
+-- Role-based access control: 'user' (default) and 'admin'.
+-- Bootstrap your first admin manually:
+--   UPDATE public.profiles SET role = 'admin' WHERE user_id = '<uuid>';
+ALTER TABLE public.profiles
+    ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'
+    CHECK (role IN ('user', 'admin'));
+
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
+
+-- ─── User ownership columns ───────────────────────────────────────────────────
+-- Run this block after the initial schema is in place.
+ALTER TABLE public.manga_pages
+    ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.profiles(user_id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_manga_pages_user ON public.manga_pages(user_id);
+
+ALTER TABLE public.qa_history
+    ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES public.profiles(user_id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_qa_history_user ON public.qa_history(user_id);
+
 -- ─── Row-Level Security (RLS) ─────────────────────────────────────────────────
--- For MVP: service-role key bypasses RLS.
--- Enable RLS on sensitive tables and add policies when adding user auth.
+-- Backend uses the service_role key which bypasses RLS automatically.
+-- These policies govern direct Supabase client / anon-key access.
 ALTER TABLE public.manga_pages    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bubble_data    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.embeddings     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.qa_history     ENABLE ROW LEVEL SECURITY;
 
--- Allow service-role full access (backend uses service_role key)
--- Public read access for pages (anyone can read processed pages for MVP):
-CREATE POLICY "Allow service role full access on manga_pages"
+-- Drop old open-access policies if they exist from a previous migration run.
+DROP POLICY IF EXISTS "Allow service role full access on manga_pages" ON public.manga_pages;
+DROP POLICY IF EXISTS "Allow service role full access on bubble_data" ON public.bubble_data;
+DROP POLICY IF EXISTS "Allow service role full access on embeddings"  ON public.embeddings;
+DROP POLICY IF EXISTS "Allow service role full access on qa_history"  ON public.qa_history;
+
+-- manga_pages: each row is visible/editable only by its owner.
+-- NULL user_id rows (uploaded before auth was enforced) are not exposed.
+CREATE POLICY "manga_pages_owner"
     ON public.manga_pages FOR ALL
-    USING (true)
-    WITH CHECK (true);
+    USING  (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Allow service role full access on bubble_data"
+-- bubble_data / embeddings inherit ownership through their parent page.
+CREATE POLICY "bubble_data_owner"
     ON public.bubble_data FOR ALL
-    USING (true)
-    WITH CHECK (true);
+    USING  (page_id IN (SELECT page_id FROM public.manga_pages WHERE user_id = auth.uid()))
+    WITH CHECK (page_id IN (SELECT page_id FROM public.manga_pages WHERE user_id = auth.uid()));
 
-CREATE POLICY "Allow service role full access on embeddings"
+CREATE POLICY "embeddings_owner"
     ON public.embeddings FOR ALL
-    USING (true)
-    WITH CHECK (true);
+    USING  (page_id IN (SELECT page_id FROM public.manga_pages WHERE user_id = auth.uid()))
+    WITH CHECK (page_id IN (SELECT page_id FROM public.manga_pages WHERE user_id = auth.uid()));
 
-CREATE POLICY "Allow service role full access on qa_history"
+-- qa_history: each row belongs to the user who asked the question.
+CREATE POLICY "qa_history_owner"
     ON public.qa_history FOR ALL
-    USING (true)
-    WITH CHECK (true);
+    USING  (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);

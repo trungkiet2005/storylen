@@ -20,11 +20,12 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 
 from app.config import get_settings
 from app.database import get_supabase
 from app.models.schemas import ProcessingStatus, UploadResponse
+from app.routers.auth import AuthUser, get_current_user
 from app.services.ai_pipeline import process_page
 from app.storage.supabase_storage import upload_original, upload_thumbnail
 
@@ -104,6 +105,7 @@ async def upload_manga_images(
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
     ai_config: str | None = Form(default=None),
+    user: AuthUser = Depends(get_current_user),
 ):
     """
     Upload one or more manga images (JPG / PNG / WebP, max 10 MB each).
@@ -171,6 +173,7 @@ async def upload_manga_images(
             supabase.table("manga_pages").insert({
                 "page_id": page_id,
                 "batch_id": batch_id,
+                "user_id": user.id,
                 "original_image_url": original_url,
                 "thumbnail_url": thumbnail_url,
                 "status": ProcessingStatus.PENDING.value,
