@@ -26,10 +26,10 @@ services:
       - key: GEMINI_API_KEY
         sync: false
 
-      # ─── HuggingFace Space AI Worker ───────────────────────────────────
-      - key: HF_SPACE_URL
-        sync: false    # e.g. https://your-username-storylens-ai-worker.hf.space
-      - key: HF_SPACE_TOKEN
+      # ─── ai_module (Image Translation Worker on HuggingFace Space) ─────
+      - key: AI_MODULE_URL
+        sync: false    # e.g. https://huynhtrungkiet09032005-ai-storylen.hf.space
+      - key: AI_MODULE_TOKEN
         sync: false    # optional: HF read token if Space is private
 
       # ─── App ───────────────────────────────────────────────────────────
