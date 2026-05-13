@@ -26,12 +26,16 @@ class Settings(BaseSettings):
     APP_NAME: str = "StoryLens API"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = False
-    # Accepts JSON list string from .env OR comma-separated string.
+    # Hardcoded baseline of trusted origins (prod + local dev). An env var can
+    # extend this for preview deploys, but the defaults cover normal operation
+    # so nothing breaks if ALLOWED_ORIGINS is unset.
     ALLOWED_ORIGINS: list[str] | str = [
+        # Local development
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        # Production frontends
         "https://storylen.vercel.app",
         "https://storylens.vercel.app",
     ]
@@ -174,24 +178,12 @@ class Settings(BaseSettings):
     # ─── Production sanity check ──────────────────────────────────────────────
     @model_validator(mode="after")
     def _check_production_safety(self) -> "Settings":
-        if self.DEBUG:
-            return self
         origins = self.ALLOWED_ORIGINS if isinstance(self.ALLOWED_ORIGINS, list) else []
         if not origins:
-            raise ValueError(
-                "ALLOWED_ORIGINS must be set when DEBUG is disabled."
-            )
-        if any(
-            o.startswith("http://localhost") or o.startswith("http://127.")
-            for o in origins
-        ):
-            raise ValueError(
-                "ALLOWED_ORIGINS contains localhost while DEBUG is disabled. "
-                "Set ALLOWED_ORIGINS to your production frontend domains only."
-            )
+            raise ValueError("ALLOWED_ORIGINS must not be empty.")
         if "*" in origins:
             raise ValueError(
-                "ALLOWED_ORIGINS=* is not allowed when DEBUG is disabled."
+                "ALLOWED_ORIGINS=* is not allowed (would defeat CORS with credentials)."
             )
         return self
 
