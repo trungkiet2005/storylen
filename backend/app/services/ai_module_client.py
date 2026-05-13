@@ -6,6 +6,7 @@ Delegates manga image rendering to the local/remote ai_module FastAPI service.
 from __future__ import annotations
 
 import logging
+import base64
 import time
 from typing import Any
 
@@ -189,7 +190,7 @@ def call_translate(
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
             logger.info(
-                "Calling ai_module /translate/image for page %s target=%s translator=%s (attempt %d/%d)",
+                "Calling ai_module /translate/storylens for page %s target=%s translator=%s (attempt %d/%d)",
                 page_id,
                 payload["config"]["translator"]["target_lang"],
                 payload["config"]["translator"]["translator"],
@@ -198,16 +199,54 @@ def call_translate(
             )
             with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
                 resp = client.post(
-                    _ai_module_url("/translate/image"),
+                    _ai_module_url("/translate/storylens"),
                     json=payload,
                     headers=headers,
                 )
 
             if resp.status_code == 200:
+                data = resp.json()
+                rendered_base64 = str(data.get("rendered_image_base64") or "")
+                if rendered_base64.startswith("data:"):
+                    rendered_base64 = rendered_base64.split(",", 1)[-1]
+                try:
+                    rendered_image_bytes = base64.b64decode(rendered_base64, validate=True)
+                except Exception as exc:
+                    raise RuntimeError("ai_module returned invalid rendered_image_base64") from exc
+
+                bubbles = []
+                for item in data.get("bubbles") or []:
+                    if not isinstance(item, dict):
+                        continue
+                    bubbles.append({
+                        "bbox": item.get("bbox") or [0, 0, 0, 0],
+                        "original_text": item.get("original_text") or "",
+                        "translated_text": item.get("translated_text") or "",
+                        "confidence": item.get("confidence") or 0.0,
+                    })
+
+                return {
+                    "bubbles": bubbles,
+                    "rendered_image_url": None,
+                    "rendered_image_bytes": rendered_image_bytes,
+                }
+
+            if resp.status_code == 404:
+                logger.warning(
+                    "ai_module has no /translate/storylens endpoint; falling back to image-only translation for page %s",
+                    page_id,
+                )
+                with httpx.Client(timeout=_HTTP_TIMEOUT) as client:
+                    image_resp = client.post(
+                        _ai_module_url("/translate/image"),
+                        json=payload,
+                        headers=headers,
+                    )
+                image_resp.raise_for_status()
                 return {
                     "bubbles": [],
                     "rendered_image_url": None,
-                    "rendered_image_bytes": resp.content,
+                    "rendered_image_bytes": image_resp.content,
                 }
 
             if resp.status_code in (502, 503, 504):

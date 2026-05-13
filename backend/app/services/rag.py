@@ -1,15 +1,9 @@
 """
-StoryLens Backend — RAG Q&A Service (Render version)
-No Sentence Transformers on Render — delegates embedding to HF Space.
-Vector search runs directly against Supabase pgvector via RPC.
-Answer generation via Gemini API (lightweight HTTP call).
+StoryLens Backend - RAG Q&A Service.
 
-Fixes:
-- Thread-safe Gemini client rotation (no global mutable state)
-- Lazy initialization of Gemini clients (not at module import time)
-- Handle missing GEMINI_API_KEY gracefully
-- Proper key rotation on quota exhaustion
-- Handle empty/malformed chunks from vector search
+Vector search runs against Supabase pgvector. If a freshly translated page has
+not produced vector chunks yet, Q&A falls back to the extracted translation
+context stored in bubble_data + translation_history and asks Gemini directly.
 """
 from __future__ import annotations
 
@@ -29,7 +23,8 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 QA_PROMPT = """Bạn là trợ lý hỏi đáp cho độc giả manga. Chỉ trả lời dựa trên đoạn trích sau.
-Nếu không có đủ thông tin, hãy nói rõ là bạn không biết — tuyệt đối không bịa thêm.
+Nếu không có đủ thông tin, hãy nói rõ là bạn không biết, tuyệt đối không bịa thêm.
+Trả lời bằng tiếng Việt, ngắn gọn, và nêu chi tiết nào trong context đã dẫn tới kết luận.
 
 --- NỘI DUNG TRUYỆN ---
 {context}
@@ -38,8 +33,6 @@ Nếu không có đủ thông tin, hãy nói rõ là bạn không biết — tuy
 Câu hỏi: {question}
 Trả lời:"""
 
-
-# ─── Thread-safe Gemini client pool ──────────────────────────────────────────
 
 class _GeminiPool:
     """Thread-safe round-robin pool of Gemini clients."""
@@ -56,8 +49,7 @@ class _GeminiPool:
         with self._lock:
             if self._initialized:
                 return
-            raw_key = settings.GEMINI_API_KEY
-            keys = [k.strip() for k in raw_key.split(",") if k.strip()]
+            keys = [k.strip() for k in settings.GEMINI_API_KEY.split(",") if k.strip()]
             self._clients = [genai.Client(api_key=k) for k in keys]
             self._iterator = itertools.cycle(self._clients) if self._clients else None
             self._initialized = True
@@ -66,7 +58,7 @@ class _GeminiPool:
     @property
     def available(self) -> bool:
         self._ensure_initialized()
-        return len(self._clients) > 0
+        return bool(self._clients)
 
     def next_client(self) -> genai.Client | None:
         self._ensure_initialized()
@@ -83,94 +75,71 @@ class _GeminiPool:
 _pool = _GeminiPool()
 
 
-# ─── Main Q&A function ────────────────────────────────────────────────────────
-
-def answer_question(
-    question: str,
-    page_id: str | None = None,
-    series_id: str | None = None,
-) -> QAResponse:
-    """
-    1. Embed question via HF Space /embed.
-    2. Vector search in Supabase pgvector (match_embeddings RPC).
-    3. Generate answer with Gemini (key rotation on quota errors).
-    """
-    supabase = get_supabase()
-
-    # 1. Embed question (via HF Space — no ST on Render)
+def _latest_translation(translations: list[dict]) -> str:
+    if not translations:
+        return ""
     try:
-        q_vector = call_embed(question)
-    except Exception as exc:
-        logger.error("Embedding failed: %s", exc)
-        return QAResponse(
-            question=question,
-            answer="Không thể tạo embedding cho câu hỏi. Vui lòng thử lại sau.",
+        translations = sorted(
+            translations,
+            key=lambda item: item.get("translated_at") or "",
+            reverse=True,
         )
+    except Exception:
+        pass
+    return str(translations[0].get("translated_text_vi") or "")
 
-    if not q_vector:
-        return QAResponse(
-            question=question,
-            answer="HF Space trả về embedding rỗng. Vui lòng thử lại.",
-        )
 
-    # 2. Vector search
-    rpc_params: dict = {
-        "query_embedding": q_vector,
-        "match_count": settings.RAG_TOP_K,
-    }
-    if page_id:
-        rpc_params["filter_page_id"] = page_id
-    if series_id:
-        rpc_params["filter_series_id"] = series_id
-
+def _page_context_from_db(supabase, page_id: str) -> tuple[str, list[str]]:
+    """
+    Fallback context for pages that have extracted text but no vector chunks yet.
+    """
     try:
-        result = supabase.rpc("match_embeddings", rpc_params).execute()
-        chunks = result.data or []
-    except Exception as exc:
-        logger.error("Vector search failed: %s", exc)
-        chunks = []
-
-    if not chunks:
-        return QAResponse(
-            question=question,
-            answer="Xin lỗi, tôi không tìm thấy thông tin liên quan trong nội dung truyện.",
-            source_chunks=[],
+        result = (
+            supabase.table("bubble_data")
+            .select(
+                "bubble_id, x, y, original_text_jp, "
+                "translation_history(translated_text_vi, translated_at)"
+            )
+            .eq("page_id", page_id)
+            .execute()
         )
+    except Exception as exc:
+        logger.error("Page context lookup failed for %s: %s", page_id, exc)
+        return "", []
 
-    # Safely extract content from chunks
-    context_parts = []
-    source_ids = []
-    for c in chunks:
-        if not isinstance(c, dict):
+    rows = result.data or []
+    try:
+        rows = sorted(rows, key=lambda row: (row.get("y") or 0, row.get("x") or 0))
+    except Exception:
+        pass
+
+    context_parts: list[str] = []
+    source_ids: list[str] = []
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
             continue
-        content = c.get("content", "")
-        if content:
-            context_parts.append(str(content))
-        chunk_id = c.get("id")
-        if chunk_id:
-            source_ids.append(str(chunk_id))
+        original_text = str(row.get("original_text_jp") or "").strip()
+        translated_text = _latest_translation(row.get("translation_history") or []).strip()
+        if not original_text and not translated_text:
+            continue
 
-    if not context_parts:
-        return QAResponse(
-            question=question,
-            answer="Xin lỗi, không trích xuất được nội dung từ kết quả tìm kiếm.",
-            source_chunks=source_ids,
+        bubble_id = str(row.get("bubble_id") or index)
+        source_ids.append(f"page:{page_id}:bubble:{bubble_id}")
+        context_parts.append(
+            f"[{index}] Gốc: {original_text or '(không có)'}\n"
+            f"[{index}] Dịch: {translated_text or '(không có)'}"
         )
 
-    context = "\n\n".join(context_parts)
+    return "\n\n".join(context_parts), source_ids
 
-    # 3. Generate answer with Gemini
+
+def _generate_answer(question: str, context: str) -> str:
     if not _pool.available:
-        return QAResponse(
-            question=question,
-            answer="Hệ thống chưa được cấu hình GEMINI_API_KEY.",
-            source_chunks=source_ids,
-        )
+        return "Hệ thống chưa được cấu hình GEMINI_API_KEY."
 
     answer_text = "Đã xảy ra lỗi khi tạo câu trả lời. Vui lòng thử lại."
     prompt = QA_PROMPT.format(context=context, question=question)
 
-    # Try each key once; rotate on quota errors
     for _ in range(_pool.client_count()):
         client = _pool.next_client()
         if client is None:
@@ -183,19 +152,110 @@ def answer_question(
             answer_text = (response.text or "").strip()
             if not answer_text:
                 answer_text = "Gemini trả về phản hồi rỗng. Vui lòng thử lại."
-            break  # Success
+            break
         except Exception as exc:
             err_msg = str(exc).lower()
             if any(kw in err_msg for kw in ("429", "quota", "exhausted", "rate_limit", "403", "permission", "leaked")):
                 logger.warning("Gemini key invalid or exhausted, rotating to next key. Error: %s", exc)
-                # continue loop to try next key
-            else:
-                logger.error("Unexpected Gemini generation failure: %s", exc)
-                answer_text = "Lỗi khi gọi Gemini API. Vui lòng thử lại."
-                break
+                continue
+            logger.error("Unexpected Gemini generation failure: %s", exc)
+            answer_text = "Lỗi khi gọi Gemini API. Vui lòng thử lại."
+            break
+
+    return answer_text
+
+
+def answer_question(
+    question: str,
+    page_id: str | None = None,
+    series_id: str | None = None,
+) -> QAResponse:
+    """
+    1. Embed question via HF Space when available.
+    2. Vector search in Supabase pgvector.
+    3. Fall back to extracted page context when no vector chunks exist.
+    4. Generate answer with Gemini 2.5 Flash or the configured GEMINI_MODEL.
+    """
+    supabase = get_supabase()
+
+    q_vector: list[float] = []
+    try:
+        q_vector = call_embed(question)
+    except Exception as exc:
+        logger.error("Embedding failed: %s", exc)
+        if not page_id:
+            return QAResponse(
+                question=question,
+                answer="Không thể tạo embedding cho câu hỏi. Vui lòng thử lại sau.",
+            )
+
+    if not q_vector and not page_id:
+        return QAResponse(
+            question=question,
+            answer="HF Space trả về embedding rỗng. Vui lòng thử lại.",
+        )
+
+    chunks = []
+    if q_vector:
+        rpc_params: dict = {
+            "query_embedding": q_vector,
+            "match_count": settings.RAG_TOP_K,
+        }
+        if page_id:
+            rpc_params["filter_page_id"] = page_id
+        if series_id:
+            rpc_params["filter_series_id"] = series_id
+
+        try:
+            result = supabase.rpc("match_embeddings", rpc_params).execute()
+            chunks = result.data or []
+        except Exception as exc:
+            logger.error("Vector search failed: %s", exc)
+
+    if not chunks:
+        if page_id:
+            page_context, page_sources = _page_context_from_db(supabase, page_id)
+            if page_context:
+                return QAResponse(
+                    question=question,
+                    answer=_generate_answer(question, page_context),
+                    source_chunks=page_sources,
+                )
+        return QAResponse(
+            question=question,
+            answer="Xin lỗi, tôi không tìm thấy thông tin liên quan trong nội dung truyện.",
+            source_chunks=[],
+        )
+
+    context_parts: list[str] = []
+    source_ids: list[str] = []
+    for chunk in chunks:
+        if not isinstance(chunk, dict):
+            continue
+        content = chunk.get("content")
+        if content:
+            context_parts.append(str(content))
+        chunk_id = chunk.get("id")
+        if chunk_id:
+            source_ids.append(str(chunk_id))
+
+    if not context_parts:
+        if page_id:
+            page_context, page_sources = _page_context_from_db(supabase, page_id)
+            if page_context:
+                return QAResponse(
+                    question=question,
+                    answer=_generate_answer(question, page_context),
+                    source_chunks=page_sources,
+                )
+        return QAResponse(
+            question=question,
+            answer="Xin lỗi, không trích xuất được nội dung từ kết quả tìm kiếm.",
+            source_chunks=source_ids,
+        )
 
     return QAResponse(
         question=question,
-        answer=answer_text,
+        answer=_generate_answer(question, "\n\n".join(context_parts)),
         source_chunks=source_ids,
     )

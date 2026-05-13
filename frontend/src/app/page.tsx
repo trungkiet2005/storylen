@@ -304,8 +304,8 @@ function FloatingMangaStack() {
           transition={{ duration: 0.3 }}
           style={{
             position: 'absolute',
-            width: 240, height: 330,
-            top: 85,
+            width: 300, height: 410,
+            top: 100,
             left: 20,
             background: 'var(--bg-2)',
             border: '2.5px solid var(--border)',
@@ -323,7 +323,7 @@ function FloatingMangaStack() {
               fill 
               style={{ objectFit: 'cover', filter: 'grayscale(100%) contrast(1.1)', opacity: 0.85 }} 
             />
-            <div style={{ position: 'absolute', top: 20, left: -35, background: 'var(--border)', color: 'var(--paper)', padding: '3px 40px', fontSize: 8, fontFamily: 'var(--font-mono)', transform: 'rotate(-45deg)', letterSpacing: '0.2em', fontWeight: 700 }}>
+            <div style={{ position: 'absolute', top: 24, left: -40, background: 'var(--border)', color: 'var(--paper)', padding: '4px 48px', fontSize: 9, fontFamily: 'var(--font-mono)', transform: 'rotate(-45deg)', letterSpacing: '0.2em', fontWeight: 700 }}>
               RAW_SCAN
             </div>
           </div>
@@ -338,8 +338,8 @@ function FloatingMangaStack() {
           className="panel-shadow-lg"
           style={{
             position: 'absolute',
-            width: 260, height: 360,
-            top: 70,
+            width: 330, height: 450,
+            top: 50,
             right: 20,
             background: 'var(--panel)',
             border: '3px solid var(--border)',
@@ -360,32 +360,32 @@ function FloatingMangaStack() {
             <div className="halftone" style={{ position: 'absolute', inset: 0, opacity: 0.15, zIndex: 1 }} />
             
             {/* Magazine Title Deco */}
-            <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', flexDirection: 'column', zIndex: 5 }}>
-              <span className="display" style={{ fontSize: 30, color: 'var(--paper)', textShadow: '2px 2px 0 var(--border)', lineHeight: 0.95 }}>
+            <div style={{ position: 'absolute', top: 16, left: 16, display: 'flex', flexDirection: 'column', zIndex: 5 }}>
+              <span className="display" style={{ fontSize: 38, color: 'var(--paper)', textShadow: '2px 2px 0 var(--border)', lineHeight: 0.95 }}>
                 STORY
               </span>
-              <span className="display" style={{ fontSize: 30, color: 'var(--accent)', textShadow: '2px 2px 0 var(--paper)', lineHeight: 0.9 }}>
+              <span className="display" style={{ fontSize: 38, color: 'var(--accent)', textShadow: '2px 2px 0 var(--paper)', lineHeight: 0.9 }}>
                 LENS
               </span>
             </div>
 
             {/* Volume Stamp */}
-            <div className="seal seal-circle" style={{ position: 'absolute', top: 10, right: 10, width: 40, height: 40, fontSize: 11, zIndex: 5, transform: 'rotate(8deg)' }}>
+            <div className="seal seal-circle" style={{ position: 'absolute', top: 14, right: 14, width: 52, height: 52, fontSize: 13, zIndex: 5, transform: 'rotate(8deg)' }}>
               VOL.1
             </div>
 
             {/* Translated Overlay Text */}
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, var(--border) 0%, rgba(0,0,0,0) 100%)', padding: '40px 10px 10px', zIndex: 5, color: 'var(--paper)', textAlign: 'center' }}>
-              <div className="mono" style={{ fontSize: 8, opacity: 0.8, letterSpacing: '0.15em', marginBottom: 4 }}>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(to top, var(--border) 0%, rgba(0,0,0,0) 100%)', padding: '50px 12px 12px', zIndex: 5, color: 'var(--paper)', textAlign: 'center' }}>
+              <div className="mono" style={{ fontSize: 9, opacity: 0.8, letterSpacing: '0.15em', marginBottom: 6 }}>
                 AI TRANSLATED VERSION
               </div>
-              <div className="serif" style={{ fontSize: 14, fontWeight: 900, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+              <div className="serif" style={{ fontSize: 18, fontWeight: 900, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
                 KỶ NGUYÊN MỚI
               </div>
             </div>
 
             {/* AI Badge */}
-            <div style={{ position: 'absolute', bottom: '35%', right: 6, writingMode: 'vertical-rl', background: 'var(--panel)', color: 'var(--fg)', border: '1.5px solid var(--border)', padding: '6px 4px', fontSize: 8, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.1em', zIndex: 5 }}>
+            <div style={{ position: 'absolute', bottom: '35%', right: 8, writingMode: 'vertical-rl', background: 'var(--panel)', color: 'var(--fg)', border: '1.5px solid var(--border)', padding: '8px 5px', fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700, letterSpacing: '0.1em', zIndex: 5 }}>
               POWERED BY GEMINI
             </div>
           </div>
