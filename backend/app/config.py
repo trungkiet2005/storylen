@@ -1,7 +1,7 @@
 """
 StoryLens Backend — Configuration
-Centralizes all settings. Heavy AI settings (ST model, YOLO path)
-live in ai_service/ — Render only needs Supabase + Gemini + HF Space URL.
+Centralizes all settings. Heavy AI runs on the HF Space worker;
+Render only needs Supabase + Gemini + HF Space URL.
 """
 from __future__ import annotations
 

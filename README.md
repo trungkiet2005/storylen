@@ -23,7 +23,6 @@ StoryLens is a modern, professional-grade web application that combines an immer
 storylen/
 ├── backend/            # FastAPI server, Database models, API endpoints
 ├── frontend/           # Next.js web application, UI components, pages
-├── ai_service/         # AI pipelines, RAG implementations, Gemini integration
 ├── docs/               # Project documentation and specifications
 └── render.yaml         # Render deployment configuration
 ```
@@ -60,7 +59,6 @@ Local ports:
 *   Frontend: `http://localhost:3000`
 *   Backend API: `http://127.0.0.1:8000`
 *   AI Module image translator: `http://127.0.0.1:8001`
-*   AI Service / HF worker: `http://127.0.0.1:7860`
 
 ### 2. Frontend Setup
 
@@ -74,14 +72,7 @@ npm run dev  # or yarn dev / pnpm dev
 ```
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### 3. AI Service Setup (If running separately)
-```bash
-cd ai_service
-pip install -r requirements.txt
-uvicorn app:app --host 127.0.0.1 --port 7860 --reload
-```
-
-### 4. AI Module Setup (If running image translation locally)
+### 3. AI Module Setup (If running image translation locally)
 ```bash
 cd ai_module
 pip install -r requirements.txt

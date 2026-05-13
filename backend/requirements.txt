@@ -20,5 +20,5 @@ httpx>=0.27.0
 python-multipart>=0.0.9   # FastAPI file uploads
 python-dotenv>=1.0.0
 
-# NOTE: sentence-transformers, torch, ultralytics, manga-ocr are NOT here.
-# They live in ai_service/requirements.txt and run on HuggingFace Spaces (16 GB RAM).
+# NOTE: Heavy ML deps (sentence-transformers, torch, ultralytics, manga-ocr) are NOT here.
+# They run on HuggingFace Spaces (16 GB RAM).

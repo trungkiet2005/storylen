@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" ls-files ai_service)",
+      "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" submodule status)",
+      "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" ls-files --stage ai_service)",
+      "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" rm --cached ai_service)",
+      "Bash(git -C \"d:/AI_PROJECT/Storylen_WEB/storylen\" status)"
+    ]
+  }
+}
