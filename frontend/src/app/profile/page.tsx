@@ -72,13 +72,13 @@ function toFormState(user: User): FormState {
     full_name: user.full_name ?? "",
     display_name: user.display_name ?? "",
     bio: user.bio ?? "",
-    locale: user.locale,
-    timezone: user.timezone,
+    locale: user.locale ?? "vi",
+    timezone: user.timezone ?? "UTC",
     date_of_birth: user.date_of_birth ?? "",
     gender: user.gender ?? "",
     country: user.country ?? "",
     phone: user.phone ?? "",
-    preferred_target_lang: user.preferred_target_lang,
+    preferred_target_lang: user.preferred_target_lang ?? "VIN",
   };
 }
 

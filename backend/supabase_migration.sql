@@ -239,11 +239,15 @@ ALTER TABLE public.bubble_data    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.embeddings     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.qa_history     ENABLE ROW LEVEL SECURITY;
 
--- Drop old open-access policies if they exist from a previous migration run.
+-- Drop old policies if they exist from a previous migration run.
 DROP POLICY IF EXISTS "Allow service role full access on manga_pages" ON public.manga_pages;
 DROP POLICY IF EXISTS "Allow service role full access on bubble_data" ON public.bubble_data;
 DROP POLICY IF EXISTS "Allow service role full access on embeddings"  ON public.embeddings;
 DROP POLICY IF EXISTS "Allow service role full access on qa_history"  ON public.qa_history;
+DROP POLICY IF EXISTS "manga_pages_owner" ON public.manga_pages;
+DROP POLICY IF EXISTS "bubble_data_owner" ON public.bubble_data;
+DROP POLICY IF EXISTS "embeddings_owner"  ON public.embeddings;
+DROP POLICY IF EXISTS "qa_history_owner"  ON public.qa_history;
 
 -- manga_pages: each row is visible/editable only by its owner.
 -- NULL user_id rows (uploaded before auth was enforced) are not exposed.
