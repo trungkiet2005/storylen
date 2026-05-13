@@ -10,12 +10,13 @@ import {
   getBatchStatus,
   getTranslationHistory,
   updateBubbleTranslation,
-  askQuestion,
+  getHistory,
   PageData,
   PageStatus,
   BubbleData,
   APIError,
   TranslationHistoryItem,
+  HistoryItem,
 } from '@/lib/api';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,6 +30,268 @@ interface ChatMessage {
   content: string;
   sources?: { ch: number; p: number; score: number }[];
   isError?: boolean;
+}
+
+// ── Empty state when no page is selected ────────────────────────────────────
+function EmptyReaderState() {
+  const [recentItems, setRecentItems] = useState<HistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  useEffect(() => {
+    getHistory({ type: "page", limit: 4 })
+      .then(res => setRecentItems(res.items.filter(i => i.status === "completed" || i.status === "translated")))
+      .catch(() => setRecentItems([]))
+      .finally(() => setLoadingHistory(false));
+  }, []);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.07 } },
+  } as const;
+  const itemVariants = {
+    hidden: { opacity: 0, y: 16 },
+    visible: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 280, damping: 24 } },
+  } as const;
+
+  return (
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "flex-start", padding: "40px 20px 60px",
+        maxWidth: 640, margin: "0 auto", width: "100%",
+      }}
+    >
+      {/* Hero */}
+      <motion.div variants={itemVariants} style={{ textAlign: "center", marginBottom: 36 }}>
+        {/* Decorative comic panels */}
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 20 }}>
+          {[
+            { w: 52, h: 72, rotate: -4, delay: 0 },
+            { w: 64, h: 88, rotate: 0, delay: 0.05 },
+            { w: 52, h: 72, rotate: 4, delay: 0.1 },
+          ].map((p, i) => (
+            <motion.div
+              key={i}
+              initial={{ opacity: 0, y: 20, rotate: p.rotate }}
+              animate={{ opacity: 1, y: 0, rotate: p.rotate }}
+              transition={{ delay: p.delay, type: "spring", stiffness: 200, damping: 18 }}
+              style={{
+                width: p.w, height: p.h,
+                background: i === 1 ? "var(--accent)" : "var(--panel)",
+                border: "2.5px solid var(--border)",
+                boxShadow: "3px 3px 0 var(--border)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexDirection: "column", gap: 6, overflow: "hidden",
+              }}
+            >
+              {i === 1 ? (
+                <>
+                  <div style={{ width: "60%", height: 3, background: "rgba(255,255,255,0.6)", borderRadius: 2 }}/>
+                  <div style={{ width: "80%", height: 3, background: "rgba(255,255,255,0.4)", borderRadius: 2 }}/>
+                  <div style={{ width: "50%", height: 3, background: "rgba(255,255,255,0.3)", borderRadius: 2 }}/>
+                </>
+              ) : (
+                <>
+                  <div style={{ width: "70%", height: 2, background: "var(--border-soft)", borderRadius: 2 }}/>
+                  <div style={{ width: "50%", height: 2, background: "var(--border-soft)", borderRadius: 2 }}/>
+                </>
+              )}
+            </motion.div>
+          ))}
+        </div>
+
+        <h2 style={{
+          fontFamily: "var(--font-serif)", fontSize: 22, fontWeight: 800,
+          color: "var(--fg)", marginBottom: 8, letterSpacing: "-0.02em",
+        }}>
+          Chọn trang truyện để đọc
+        </h2>
+        <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, maxWidth: 340, margin: "0 auto" }}>
+          Tải lên ảnh manga/manhwa mới hoặc chọn từ lịch sử đã dịch của bạn.
+        </p>
+      </motion.div>
+
+      {/* CTA Cards */}
+      <motion.div
+        variants={itemVariants}
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, width: "100%", marginBottom: 32 }}
+      >
+        <Link href="/upload" style={{ textDecoration: "none" }}>
+          <motion.div
+            whileHover={{ y: -3, boxShadow: "6px 6px 0 var(--accent)" }}
+            whileTap={{ scale: 0.97 }}
+            style={{
+              background: "var(--accent)", color: "#fff",
+              border: "2.5px solid var(--border)",
+              boxShadow: "4px 4px 0 var(--border)",
+              padding: "22px 18px", cursor: "pointer",
+              transition: "box-shadow 0.15s, transform 0.15s",
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, background: "rgba(255,255,255,0.2)",
+              border: "2px solid rgba(255,255,255,0.4)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 12,
+            }}>
+              <Icon name="upload" size={20}/>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4, fontFamily: "var(--font-serif)" }}>
+              Tải lên ảnh mới
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.85, lineHeight: 1.5 }}>
+              Upload manga, manhwa hoặc manhua để dịch tự động bằng AI
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 14, fontSize: 11, fontWeight: 700, opacity: 0.9 }}>
+              Bắt đầu ngay <Icon name="arrow-right" size={12}/>
+            </div>
+          </motion.div>
+        </Link>
+
+        <Link href="/history" style={{ textDecoration: "none" }}>
+          <motion.div
+            whileHover={{ y: -3, boxShadow: "6px 6px 0 var(--border)" }}
+            whileTap={{ scale: 0.97 }}
+            style={{
+              background: "var(--panel)", color: "var(--fg)",
+              border: "2.5px solid var(--border)",
+              boxShadow: "4px 4px 0 var(--border)",
+              padding: "22px 18px", cursor: "pointer",
+              transition: "box-shadow 0.15s, transform 0.15s",
+            }}
+          >
+            <div style={{
+              width: 40, height: 40, background: "var(--bg)",
+              border: "2px solid var(--border)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 12,
+            }}>
+              <Icon name="history" size={20}/>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4, fontFamily: "var(--font-serif)", color: "var(--fg)" }}>
+              Lịch sử đọc
+            </div>
+            <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
+              Xem lại các trang đã dịch trước đó, tiếp tục từ nơi đã dừng
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 14, fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>
+              Xem tất cả <Icon name="arrow-right" size={12}/>
+            </div>
+          </motion.div>
+        </Link>
+      </motion.div>
+
+      {/* Recent history */}
+      <motion.div variants={itemVariants} style={{ width: "100%" }}>
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          marginBottom: 12,
+        }}>
+          <span className="caps-xs" style={{ color: "var(--muted)" }}>Gần đây</span>
+          <Link href="/history" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
+            Xem tất cả →
+          </Link>
+        </div>
+
+        {loadingHistory ? (
+          <div style={{ display: "flex", gap: 10 }}>
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} style={{
+                flex: 1, height: 100,
+                background: "var(--panel)", border: "2px solid var(--border-soft)",
+                animation: "pulse 1.5s ease-in-out infinite",
+              }}/>
+            ))}
+          </div>
+        ) : recentItems.length === 0 ? (
+          <div style={{
+            background: "var(--panel)", border: "2px dashed var(--border-soft)",
+            padding: "24px 16px", textAlign: "center",
+          }}>
+            <Icon name="image" size={28} stroke={1.5}/>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
+              Chưa có trang nào được dịch.{" "}
+              <Link href="/upload" style={{ color: "var(--accent)", fontWeight: 600 }}>Tải lên ngay</Link>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${recentItems.length}, 1fr)`, gap: 10 }}>
+            {recentItems.map((item, idx) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + idx * 0.06, type: "spring", stiffness: 300, damping: 24 }}
+              >
+                <Link href={`/reader?page=${item.id}`} style={{ textDecoration: "none" }}>
+                  <motion.div
+                    whileHover={{ y: -3, boxShadow: "4px 4px 0 var(--accent)" }}
+                    whileTap={{ scale: 0.96 }}
+                    style={{
+                      background: "#fff", border: "2px solid var(--border)",
+                      boxShadow: "3px 3px 0 var(--border)",
+                      overflow: "hidden", cursor: "pointer",
+                      transition: "box-shadow 0.15s",
+                    }}
+                  >
+                    <div style={{ height: 90, background: "var(--panel)", position: "relative", overflow: "hidden" }}>
+                      {item.thumbnail_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={item.thumbnail_url}
+                          alt={item.title}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: "100%", height: "100%",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "var(--border-soft)",
+                        }}>
+                          <Icon name="image" size={24} stroke={1.5}/>
+                        </div>
+                      )}
+                      <div style={{
+                        position: "absolute", bottom: 4, right: 4,
+                        background: "var(--accent)", color: "#fff",
+                        fontSize: 9, fontWeight: 800, padding: "2px 5px",
+                        fontFamily: "var(--font-mono)",
+                      }}>
+                        DONE
+                      </div>
+                    </div>
+                    <div style={{ padding: "7px 8px" }}>
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: "var(--fg)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        fontFamily: "var(--font-serif)",
+                      }}>
+                        {item.title || `Trang ${item.id.slice(0, 6)}`}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2, fontFamily: "var(--font-mono)" }}>
+                        {new Date(item.last_accessed).toLocaleDateString("vi-VN")}
+                      </div>
+                    </div>
+                  </motion.div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Keyboard hint */}
+      <motion.div
+        variants={itemVariants}
+        style={{ marginTop: 32, fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)", textAlign: "center", lineHeight: 1.7 }}
+      >
+        <div>Sau khi chọn trang: <kbd style={{ background: "var(--panel)", border: "1px solid var(--border)", padding: "1px 5px", borderRadius: 2 }}>O</kbd> toggle overlay · <kbd style={{ background: "var(--panel)", border: "1px solid var(--border)", padding: "1px 5px", borderRadius: 2 }}>+/-</kbd> zoom</div>
+      </motion.div>
+    </motion.div>
+  );
 }
 
 // ── Overlay bubble renderer using real bbox data ────────────────────────────
@@ -370,24 +633,32 @@ function ReaderContent() {
     setChatMessages(prev => [...prev, { id: Date.now(), role: "user", content: q }]);
 
     try {
-      const response = await askQuestion({
-        question: q,
-        page_id: pageIdParam ?? undefined,
+      const context = (pageData?.processed_data ?? [])
+        .map((b, i) =>
+          `[${i + 1}] Gốc: ${b.original_text || "(không có)"}\n[${i + 1}] Dịch: ${b.translated_text || "(không có)"}`,
+        )
+        .join("\n\n");
+
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q, context }),
       });
 
-      const sources = (response.source_chunks ?? []).map((chunk: string) => {
-        const match = chunk.match(/ch(\d+).*p(\d+)/i);
-        return match ? { ch: parseInt(match[1]), p: parseInt(match[2]), score: 0.9 } : null;
-      }).filter(Boolean) as { ch: number; p: number; score: number }[];
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.answer ?? errData?.error ?? `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
 
       setChatMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: "assistant",
-        content: response.answer,
-        sources,
+        content: data.answer ?? "Không có câu trả lời.",
       }]);
     } catch (err) {
-      const msg = err instanceof APIError ? err.message : "Đã xảy ra lỗi khi trả lời.";
+      const msg = err instanceof Error ? err.message : "Đã xảy ra lỗi khi trả lời.";
       setChatMessages(prev => [...prev, {
         id: Date.now() + 2,
         role: "assistant",
@@ -397,7 +668,7 @@ function ReaderContent() {
     } finally {
       setIsChatLoading(false);
     }
-  }, [chatInput, isChatLoading, pageIdParam]);
+  }, [chatInput, isChatLoading, pageData]);
 
   return (
     <AnimatedPage>
@@ -530,9 +801,18 @@ function ReaderContent() {
             </motion.button>
           </motion.div>
 
+          {/* Empty state when no page selected */}
+          <AnimatePresence mode="wait">
+            {!pageIdParam && !isLoadingPage && (
+              <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ width: "100%" }}>
+                <EmptyReaderState />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Loading state */}
           <AnimatePresence mode="wait">
-            {isLoadingPage ? (
+            {pageIdParam && isLoadingPage ? (
               <motion.div
                 key="loading"
                 initial={{ opacity: 0 }}
@@ -543,7 +823,7 @@ function ReaderContent() {
                 <div style={{ width: 40, height: 40, border: "3px solid var(--border-soft)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }}/>
                 <span style={{ fontSize: 13, color: "var(--muted)" }}>Đang tải dữ liệu trang…</span>
               </motion.div>
-            ) : (
+            ) : pageIdParam ? (
               <motion.div
                 key={pageIdParam || "no-page"}
                 initial={{ opacity: 0, y: 15, scale: 0.98 }}
@@ -626,7 +906,7 @@ function ReaderContent() {
                   )}
                 </div>
               </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
 
           {/* ── Bottom Navigation (conditional) ── */}
@@ -967,7 +1247,7 @@ function ReaderContent() {
                       </button>
                     </div>
                     <div style={{ fontSize: 10, color: "var(--muted)", textAlign: "right", marginTop: 4, fontFamily: "var(--font-mono)" }}>
-                      Ctrl+Enter · {pageIdParam ? "RAG thật" : "Demo"}
+                      Ctrl+Enter · {pageIdParam ? "Gemini 2.5 Flash" : "Demo"}
                     </div>
                   </div>
                 </div>

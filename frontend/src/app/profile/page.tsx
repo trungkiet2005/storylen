@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/TopBar";
@@ -14,6 +14,114 @@ import { useToast } from "@/components/Toast";
 import { Icon } from "@/components/Icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem, ScaleIn } from "@/components/Animations";
+import Cropper, { type Area } from "react-easy-crop";
+
+async function createImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.addEventListener("load", () => resolve(img));
+    img.addEventListener("error", reject);
+    img.src = url;
+  });
+}
+
+const AVATAR_SIZE = 400;
+
+async function getCroppedBlob(imageSrc: string, pixelCrop: Area): Promise<Blob> {
+  const image = await createImage(imageSrc);
+  const canvas = document.createElement("canvas");
+  canvas.width = AVATAR_SIZE;
+  canvas.height = AVATAR_SIZE;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(
+    image,
+    pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height,
+    0, 0, AVATAR_SIZE, AVATAR_SIZE,
+  );
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Canvas empty"))), "image/webp", 0.92);
+  });
+}
+
+function AvatarCropModal({
+  src,
+  onConfirm,
+  onCancel,
+}: {
+  src: string;
+  onConfirm: (blob: Blob) => void;
+  onCancel: () => void;
+}) {
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedArea, setCroppedArea] = useState<Area | null>(null);
+
+  const onCropComplete = useCallback((_: Area, pixels: Area) => {
+    setCroppedArea(pixels);
+  }, []);
+
+  async function handleConfirm() {
+    if (!croppedArea) return;
+    const blob = await getCroppedBlob(src, croppedArea);
+    onConfirm(blob);
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.75)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+    >
+      <div
+        className="stroke-ink panel-shadow"
+        style={{ background: "var(--panel)", width: 400, maxWidth: "calc(100vw - 32px)", borderRadius: "var(--radius)" }}
+      >
+        <div style={{ padding: "18px 20px 12px", borderBottom: "1px solid var(--border-soft)" }}>
+          <div className="display" style={{ fontSize: 18 }}>Chỉnh avatar</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>Kéo để chọn vùng, cuộn để zoom</div>
+        </div>
+
+        <div style={{ position: "relative", height: 320, background: "#111" }}>
+          <Cropper
+            image={src}
+            crop={crop}
+            zoom={zoom}
+            aspect={1}
+            cropShape="round"
+            showGrid={false}
+            onCropChange={setCrop}
+            onZoomChange={setZoom}
+            onCropComplete={onCropComplete}
+          />
+        </div>
+
+        <div style={{ padding: "12px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, color: "var(--fg-soft)", whiteSpace: "nowrap" }}>Zoom</span>
+            <input
+              type="range" min={1} max={3} step={0.05}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              style={{ flex: 1, accentColor: "var(--accent)" }}
+            />
+          </div>
+        </div>
+
+        <div style={{ padding: "0 20px 18px", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+          <motion.button whileTap={{ scale: 0.95 }} className="btn btn-sm" onClick={onCancel}>
+            Hủy
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.95 }} className="btn btn-sm btn-primary" onClick={handleConfirm}>
+            Xác nhận
+          </motion.button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type TabId = "profile" | "preferences" | "security";
 
@@ -90,6 +198,7 @@ export default function ProfilePage() {
   const [form, setForm] = useState<FormState | null>(() => (user ? toFormState(user) : null));
   const [saving, setSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Keep form synced when the user object changes (e.g. after avatar upload).
@@ -169,18 +278,25 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleAvatarFile(file: File) {
+  function handleAvatarFile(file: File) {
     if (!file) return;
     if (!/^image\/(jpeg|jpg|png|webp)$/.test(file.type)) {
       toast("Avatar phải là JPG, PNG hoặc WebP.", "error");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast("Avatar không vượt quá 5 MB.", "error");
+    if (file.size > 20 * 1024 * 1024) {
+      toast("File không vượt quá 20 MB.", "error");
       return;
     }
+    const objectUrl = URL.createObjectURL(file);
+    setCropSrc(objectUrl);
+  }
+
+  async function handleCropConfirm(blob: Blob) {
+    setCropSrc((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
     setAvatarBusy(true);
     try {
+      const file = new File([blob], "avatar.webp", { type: "image/webp" });
       await uploadAvatar(file);
       toast("Đã cập nhật avatar.", "success");
     } catch (err) {
@@ -188,6 +304,10 @@ export default function ProfilePage() {
     } finally {
       setAvatarBusy(false);
     }
+  }
+
+  function handleCropCancel() {
+    setCropSrc((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
   }
 
   async function handleAvatarRemove() {
@@ -644,6 +764,13 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+      {cropSrc && (
+        <AvatarCropModal
+          src={cropSrc}
+          onConfirm={handleCropConfirm}
+          onCancel={handleCropCancel}
+        />
+      )}
     </AnimatedPage>
   );
 }

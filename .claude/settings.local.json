@@ -18,7 +18,10 @@
       "PowerShell(psql --version 2>&1)",
       "PowerShell(supabase --version 2>&1)",
       "PowerShell(npx supabase --version 2>&1)",
-      "PowerShell(npx supabase login --token *)"
+      "PowerShell(npx supabase login --token *)",
+      "Bash(findstr /i \"crop\\\\|image\")",
+      "Bash(findstr /i \"crop\")",
+      "Bash(npm install *)"
     ]
   }
 }
