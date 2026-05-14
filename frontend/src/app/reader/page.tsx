@@ -11,12 +11,14 @@ import {
   getTranslationHistory,
   updateBubbleTranslation,
   getHistory,
+  listSeries,
   PageData,
   PageStatus,
   BubbleData,
   APIError,
   TranslationHistoryItem,
   HistoryItem,
+  SeriesListItem,
 } from '@/lib/api';
 import { AddToSeriesModal } from '@/components/AddToSeriesModal';
 import Link from 'next/link';
@@ -37,12 +39,18 @@ interface ChatMessage {
 function EmptyReaderState() {
   const [recentItems, setRecentItems] = useState<HistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [seriesItems, setSeriesItems] = useState<SeriesListItem[]>([]);
+  const [loadingSeries, setLoadingSeries] = useState(true);
 
   useEffect(() => {
     getHistory({ type: "page", limit: 4 })
       .then(res => setRecentItems(res.items.filter(i => i.status === "completed" || i.status === "translated")))
       .catch(() => setRecentItems([]))
       .finally(() => setLoadingHistory(false));
+    listSeries({ limit: 6 })
+      .then(res => setSeriesItems(res.items))
+      .catch(() => setSeriesItems([]))
+      .finally(() => setLoadingSeries(false));
   }, []);
 
   const containerVariants = {
@@ -111,14 +119,14 @@ function EmptyReaderState() {
           Chọn trang truyện để đọc
         </h2>
         <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6, maxWidth: 340, margin: "0 auto" }}>
-          Tải lên ảnh manga/manhwa mới hoặc chọn từ lịch sử đã dịch của bạn.
+          Tải lên ảnh mới, duyệt bộ truyện hoặc xem lịch sử đã dịch của bạn.
         </p>
       </motion.div>
 
       {/* CTA Cards */}
       <motion.div
         variants={itemVariants}
-        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, width: "100%", marginBottom: 32 }}
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, width: "100%", marginBottom: 32 }}
       >
         <Link href="/upload" style={{ textDecoration: "none" }}>
           <motion.div
@@ -128,26 +136,58 @@ function EmptyReaderState() {
               background: "var(--accent)", color: "#fff",
               border: "2.5px solid var(--border)",
               boxShadow: "4px 4px 0 var(--border)",
-              padding: "22px 18px", cursor: "pointer",
+              padding: "18px 14px", cursor: "pointer",
               transition: "box-shadow 0.15s, transform 0.15s",
             }}
           >
             <div style={{
-              width: 40, height: 40, background: "rgba(255,255,255,0.2)",
+              width: 36, height: 36, background: "rgba(255,255,255,0.2)",
               border: "2px solid rgba(255,255,255,0.4)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              marginBottom: 12,
+              marginBottom: 10,
             }}>
-              <Icon name="upload" size={20}/>
+              <Icon name="upload" size={18}/>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4, fontFamily: "var(--font-serif)" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, fontFamily: "var(--font-serif)" }}>
               Tải lên ảnh mới
             </div>
-            <div style={{ fontSize: 11, opacity: 0.85, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, opacity: 0.85, lineHeight: 1.5 }}>
               Upload manga, manhwa hoặc manhua để dịch tự động bằng AI
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 14, fontSize: 11, fontWeight: 700, opacity: 0.9 }}>
-              Bắt đầu ngay <Icon name="arrow-right" size={12}/>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 12, fontSize: 10, fontWeight: 700, opacity: 0.9 }}>
+              Bắt đầu ngay <Icon name="arrow-right" size={11}/>
+            </div>
+          </motion.div>
+        </Link>
+
+        <Link href="/series" style={{ textDecoration: "none" }}>
+          <motion.div
+            whileHover={{ y: -3, boxShadow: "6px 6px 0 var(--border)" }}
+            whileTap={{ scale: 0.97 }}
+            style={{
+              background: "var(--panel)", color: "var(--fg)",
+              border: "2.5px solid var(--border)",
+              boxShadow: "4px 4px 0 var(--border)",
+              padding: "18px 14px", cursor: "pointer",
+              transition: "box-shadow 0.15s, transform 0.15s",
+            }}
+          >
+            <div style={{
+              width: 36, height: 36, background: "var(--bg)",
+              border: "2px solid var(--border)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              marginBottom: 10,
+            }}>
+              <Icon name="book" size={18}/>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, fontFamily: "var(--font-serif)", color: "var(--fg)" }}>
+              Bộ truyện
+            </div>
+            <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.5 }}>
+              Quản lý và đọc toàn bộ series đã được tổ chức theo chương
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 12, fontSize: 10, fontWeight: 700, color: "var(--accent)" }}>
+              Xem tất cả <Icon name="arrow-right" size={11}/>
             </div>
           </motion.div>
         </Link>
@@ -160,29 +200,132 @@ function EmptyReaderState() {
               background: "var(--panel)", color: "var(--fg)",
               border: "2.5px solid var(--border)",
               boxShadow: "4px 4px 0 var(--border)",
-              padding: "22px 18px", cursor: "pointer",
+              padding: "18px 14px", cursor: "pointer",
               transition: "box-shadow 0.15s, transform 0.15s",
             }}
           >
             <div style={{
-              width: 40, height: 40, background: "var(--bg)",
+              width: 36, height: 36, background: "var(--bg)",
               border: "2px solid var(--border)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              marginBottom: 12,
+              marginBottom: 10,
             }}>
-              <Icon name="history" size={20}/>
+              <Icon name="history" size={18}/>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 4, fontFamily: "var(--font-serif)", color: "var(--fg)" }}>
+            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4, fontFamily: "var(--font-serif)", color: "var(--fg)" }}>
               Lịch sử đọc
             </div>
-            <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.5 }}>
               Xem lại các trang đã dịch trước đó, tiếp tục từ nơi đã dừng
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 14, fontSize: 11, fontWeight: 700, color: "var(--accent)" }}>
-              Xem tất cả <Icon name="arrow-right" size={12}/>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 12, fontSize: 10, fontWeight: 700, color: "var(--accent)" }}>
+              Xem tất cả <Icon name="arrow-right" size={11}/>
             </div>
           </motion.div>
         </Link>
+      </motion.div>
+
+      {/* Series picker */}
+      <motion.div variants={itemVariants} style={{ width: "100%", marginBottom: 32 }}>
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          marginBottom: 12,
+        }}>
+          <span className="caps-xs" style={{ color: "var(--muted)" }}>Bộ truyện</span>
+          <Link href="/series" style={{ fontSize: 11, color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
+            Xem tất cả →
+          </Link>
+        </div>
+
+        {loadingSeries ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{
+                height: 130, background: "var(--panel)", border: "2px solid var(--border-soft)",
+                animation: "pulse 1.5s ease-in-out infinite",
+              }}/>
+            ))}
+          </div>
+        ) : seriesItems.length === 0 ? (
+          <div style={{
+            background: "var(--panel)", border: "2px dashed var(--border-soft)",
+            padding: "20px 16px", textAlign: "center",
+          }}>
+            <Icon name="book" size={26} stroke={1.5}/>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
+              Chưa có bộ truyện nào.{" "}
+              <Link href="/series" style={{ color: "var(--accent)", fontWeight: 600 }}>Tạo ngay</Link>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            {seriesItems.map((s, idx) => (
+              <motion.div
+                key={s.series_id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 + idx * 0.05, type: "spring", stiffness: 300, damping: 24 }}
+              >
+                <Link
+                  href={s.chapter_count > 0 ? `/series/${s.series_id}/read` : `/series/${s.series_id}`}
+                  style={{ textDecoration: "none" }}
+                >
+                  <motion.div
+                    whileHover={{ y: -3, boxShadow: "4px 4px 0 var(--accent)" }}
+                    whileTap={{ scale: 0.96 }}
+                    style={{
+                      background: "#fff", border: "2px solid var(--border)",
+                      boxShadow: "3px 3px 0 var(--border)",
+                      overflow: "hidden", cursor: "pointer",
+                      transition: "box-shadow 0.15s",
+                    }}
+                  >
+                    <div style={{ height: 90, background: "var(--panel)", position: "relative", overflow: "hidden" }}>
+                      {s.cover_image_url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={s.cover_image_url}
+                          alt={s.title}
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: "100%", height: "100%",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "var(--border-soft)",
+                        }}>
+                          <Icon name="book" size={24} stroke={1.5}/>
+                        </div>
+                      )}
+                      {s.chapter_count > 0 && (
+                        <div style={{
+                          position: "absolute", bottom: 4, right: 4,
+                          background: "var(--accent)", color: "#fff",
+                          fontSize: 9, fontWeight: 800, padding: "2px 5px",
+                          fontFamily: "var(--font-mono)",
+                        }}>
+                          {s.chapter_count} CH
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ padding: "7px 8px" }}>
+                      <div style={{
+                        fontSize: 11, fontWeight: 700, color: "var(--fg)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        fontFamily: "var(--font-serif)",
+                      }}>
+                        {s.title}
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2, fontFamily: "var(--font-mono)" }}>
+                        {s.page_count} trang
+                      </div>
+                    </div>
+                  </motion.div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        )}
       </motion.div>
 
       {/* Recent history */}

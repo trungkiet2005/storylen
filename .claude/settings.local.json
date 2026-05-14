@@ -43,7 +43,9 @@
       "Bash(Get-ChildItem -Force)",
       "Bash(Get-ChildItem -Path \"d:\\\\AI_PROJECT\\\\Storylen_WEB\\\\storylen\\\\backend\" -Filter \"*migration*\" -Recurse)",
       "Bash(grep -n \"^function ReaderInner\\\\|^export default\\\\|^}\\\\s*$\" \"d:/AI_PROJECT/Storylen_WEB/storylen/frontend/src/app/reader/page.tsx\")",
-      "Bash(echo \"exit code: $?\")"
+      "Bash(echo \"exit code: $?\")",
+      "Bash(Get-ChildItem -Recurse -Directory -Depth 2)",
+      "PowerShell(head -30)"
     ]
   }
 }
