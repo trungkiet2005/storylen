@@ -1,0 +1,32 @@
+name: Keep Services Alive
+
+on:
+  schedule:
+    # Ping every 10 minutes to prevent Render (15min) and HuggingFace from sleeping
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    name: Ping Services
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Ping Render Backend
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            https://storylens-api.onrender.com/health)
+          echo "Render backend status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Warning: Render backend returned $STATUS"
+          fi
+
+      - name: Ping HuggingFace AI Module
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 \
+            https://huynhtrungkiet09032005-ai-storylen.hf.space/health)
+          echo "HuggingFace AI module status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Warning: HuggingFace returned $STATUS"
+          fi
