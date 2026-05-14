@@ -612,30 +612,6 @@ export default function ProfilePage() {
                         </motion.button>
                       </div>
 
-                      {/* Stats */}
-                      <div style={{ marginTop: 36 }}>
-                        <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 16 }}>THỐNG KÊ SỬ DỤNG</div>
-                        <StaggerContainer>
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                            {[
-                              { label: "Trang đã dịch", value: "0", kanji: "P" },
-                              { label: "Câu hỏi Q&A", value: "0", kanji: "Q" },
-                              { label: "Batch upload", value: "0", kanji: "B" },
-                            ].map(stat => (
-                              <StaggerItem key={stat.label} direction="up" distance={10}>
-                                <motion.div
-                                  whileHover={{ y: -4, borderColor: "var(--accent)", boxShadow: "0 4px 12px rgba(0,0,0,0.04)" }}
-                                  style={{ padding: "14px", background: "var(--bg-2)", border: "1.5px solid var(--border-soft)", textAlign: "center", transition: "border-color 0.2s, y 0.2s" }}
-                                >
-                                  <div style={{ fontSize: 28, fontFamily: "var(--font-serif)", color: "var(--accent)", marginBottom: 4 }}>{stat.kanji}</div>
-                                  <div className="display" style={{ fontSize: 22 }}>{stat.value}</div>
-                                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>{stat.label}</div>
-                                </motion.div>
-                              </StaggerItem>
-                            ))}
-                          </div>
-                        </StaggerContainer>
-                      </div>
                     </motion.div>
                   )}
 
