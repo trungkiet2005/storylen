@@ -1179,56 +1179,6 @@ function UploadPageInner() {
                 </div>
               </FadeIn>
 
-              {/* API Status indicator */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
-              >
-                <div className="stroke-ink" style={{ background: "var(--panel)", padding: 16 }}>
-                  <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 8 }}>Kênh Dữ Liệu</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                    <div style={{
-                      width: 8, height: 8, borderRadius: "50%",
-                      background:
-                        backendOnline === null ? "var(--muted)" :
-                        backendOnline ? "var(--jade)" : "var(--accent)",
-                      boxShadow:
-                        backendOnline === null ? "none" :
-                        backendOnline ? "0 0 6px var(--jade)" : "0 0 6px var(--accent)",
-                      transition: "background 0.3s, box-shadow 0.3s",
-                    }}/>
-                    <span style={{ color: "var(--fg-soft)" }}>
-                      {backendOnline === null
-                        ? "Đang kiểm tra liên kết..."
-                        : backendOnline
-                        ? "Đám mây ổn định"
-                        : "Backend đang khởi động, vui lòng chờ..."}
-                    </span>
-                  </div>
-                  {batchId && (
-                    <div className="mono" style={{ fontSize: 10, color: "var(--muted)", marginTop: 10 }}>
-                      BATCH ID: {batchId}
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-
-              {/* Feature Tip Box */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.35, ease: "easeOut" }}
-              >
-                <div className="stroke-ink" style={{ background: "var(--bg-2)", padding: 16 }}>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <div style={{ marginTop: 2 }}><Icon name="sparkle" size={14}/></div>
-                    <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--fg-soft)" }}>
-                      <strong>Gộp Batch & Upload:</strong> PDF được chuyển thành từng ảnh trong trình duyệt, sau đó xử lý như batch ảnh bình thường.
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
 
             </div>
 
