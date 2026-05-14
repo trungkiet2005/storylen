@@ -23,7 +23,7 @@ import {
   type SeriesDetail,
 } from '@/lib/api';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from '@/components/Animations';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -61,7 +61,7 @@ const DEFAULT_AI_CONFIG: AIModuleCurrentConfig = {
   target_lang: "VIN",
   detector: "default",
   ocr: "48px",
-  inpainter: "lama_large",
+  inpainter: "default",
   renderer: "default",
 };
 
@@ -776,27 +776,44 @@ function UploadPageInner() {
 
                           {/* Table list of queued files */}
                           <div className="stroke-ink" style={{ flex: 1, background: "var(--bg-2)", overflowY: "auto", maxHeight: 360, marginBottom: 20 }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "40px 60px 1fr 100px 60px", padding: "10px 16px", background: "var(--panel)", borderBottom: "2px solid var(--border)" }} className="caps-xs">
-                              <span>#</span><span></span><span>File</span><span>Kích thước</span><span></span>
+                            <div style={{ display: "grid", gridTemplateColumns: "28px 40px 60px 1fr 100px 60px", padding: "10px 16px", background: "var(--panel)", borderBottom: "2px solid var(--border)" }} className="caps-xs">
+                              <span></span><span>#</span><span></span><span>File</span><span>Kích thước</span><span></span>
                             </div>
-                            {selectedFiles.map((item, index) => (
-                              <div key={item.id} style={{ display: "grid", gridTemplateColumns: "40px 60px 1fr 100px 60px", padding: "8px 16px", borderBottom: "1px dashed var(--border-soft)", alignItems: "center", fontSize: 13, background: "var(--panel)" }}>
-                                <span className="mono" style={{ color: "var(--muted)" }}>{String(index + 1).padStart(2, "0")}</span>
-                                <img src={item.previewUrl} alt="Preview" style={{ width: 36, height: 48, objectFit: "cover", border: "1.5px solid var(--border)" }}/>
-                                <div style={{ overflow: "hidden", paddingRight: 10 }}>
-                                  <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
-                                  {item.sourceName && (
-                                    <div className="mono" style={{ color: "var(--muted)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                      PDF trang {item.sourcePage}: {item.sourceName}
+                            <Reorder.Group
+                              axis="y"
+                              values={selectedFiles}
+                              onReorder={setSelectedFiles}
+                              style={{ listStyle: "none", padding: 0, margin: 0 }}
+                            >
+                              {selectedFiles.map((item, index) => (
+                                <Reorder.Item key={item.id} value={item} style={{ listStyle: "none" }}>
+                                  <div style={{ display: "grid", gridTemplateColumns: "28px 40px 60px 1fr 100px 60px", padding: "8px 16px", borderBottom: "1px dashed var(--border-soft)", alignItems: "center", fontSize: 13, background: "var(--panel)", cursor: "grab", userSelect: "none" }}>
+                                    <span style={{ color: "var(--muted)", display: "flex", alignItems: "center" }}>
+                                      <Icon name="dots" size={12} />
+                                    </span>
+                                    <span className="mono" style={{ color: "var(--muted)" }}>{String(index + 1).padStart(2, "0")}</span>
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={item.previewUrl} alt="Preview" draggable={false} style={{ width: 36, height: 48, objectFit: "cover", border: "1.5px solid var(--border)" }}/>
+                                    <div style={{ overflow: "hidden", paddingRight: 10 }}>
+                                      <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.name}</div>
+                                      {item.sourceName && (
+                                        <div className="mono" style={{ color: "var(--muted)", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                          PDF trang {item.sourcePage}: {item.sourceName}
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                </div>
-                                <span className="mono" style={{ color: "var(--muted)" }}>{item.size}</span>
-                                <button className="btn btn-sm btn-ghost" onClick={() => removeFile(item.id)} style={{ color: "var(--accent)", padding: 4 }}>
-                                  <Icon name="trash" size={13}/>
-                                </button>
-                              </div>
-                            ))}
+                                    <span className="mono" style={{ color: "var(--muted)" }}>{item.size}</span>
+                                    <button
+                                      className="btn btn-sm btn-ghost"
+                                      onClick={e => { e.stopPropagation(); removeFile(item.id); }}
+                                      style={{ color: "var(--accent)", padding: 4 }}
+                                    >
+                                      <Icon name="trash" size={13}/>
+                                    </button>
+                                  </div>
+                                </Reorder.Item>
+                              ))}
+                            </Reorder.Group>
                           </div>
 
                           {/* BIG SUBMIT BUTTON */}
@@ -1163,7 +1180,11 @@ function UploadPageInner() {
               </FadeIn>
 
               {/* API Status indicator */}
-              <FadeIn direction="up" distance={15} delay={0.3}>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }}
+              >
                 <div className="stroke-ink" style={{ background: "var(--panel)", padding: 16 }}>
                   <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 8 }}>Kênh Dữ Liệu</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
@@ -1191,10 +1212,14 @@ function UploadPageInner() {
                     </div>
                   )}
                 </div>
-              </FadeIn>
+              </motion.div>
 
               {/* Feature Tip Box */}
-              <FadeIn direction="up" distance={15} delay={0.35}>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.35, ease: "easeOut" }}
+              >
                 <div className="stroke-ink" style={{ background: "var(--bg-2)", padding: 16 }}>
                   <div style={{ display: "flex", gap: 10 }}>
                     <div style={{ marginTop: 2 }}><Icon name="sparkle" size={14}/></div>
@@ -1203,7 +1228,7 @@ function UploadPageInner() {
                     </div>
                   </div>
                 </div>
-              </FadeIn>
+              </motion.div>
 
             </div>
 

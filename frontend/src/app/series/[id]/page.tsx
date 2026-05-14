@@ -2,7 +2,7 @@
 import React, { use, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Reorder } from "framer-motion";
 
 import { TopBar } from "@/components/TopBar";
 import { SectionHeader } from "@/components/SectionHeader";
@@ -16,6 +16,8 @@ import {
   deleteChapter,
   deleteSeries,
   getSeries,
+  reorderPages,
+  type ChapterPage,
   type ChapterResponse,
   type SeriesDetail,
 } from "@/lib/api";
@@ -48,6 +50,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedChapter, setExpandedChapter] = useState<string | null>(null);
+  const [reorderingChapter, setReorderingChapter] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // New chapter inline form
@@ -116,6 +119,36 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
     } catch (err) {
       const msg = err instanceof APIError ? err.message : "Xoá chương thất bại.";
       toast(msg, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleReorderPages = async (chapterId: string, newPages: ChapterPage[]) => {
+    if (!series) return;
+    // Optimistic update
+    setSeries(prev =>
+      prev
+        ? {
+            ...prev,
+            chapters: prev.chapters.map(c =>
+              c.chapter_id === chapterId
+                ? { ...c, pages: newPages.map((p, i) => ({ ...p, page_number: i + 1 })) }
+                : c,
+            ),
+          }
+        : prev,
+    );
+    setBusy(true);
+    try {
+      await reorderPages(
+        chapterId,
+        newPages.map((p, i) => ({ id: p.page_id, order: i + 1 })),
+      );
+    } catch (err) {
+      const msg = err instanceof APIError ? err.message : "Sắp xếp lại thất bại.";
+      toast(msg, "error");
+      await load();
     } finally {
       setBusy(false);
     }
@@ -474,6 +507,24 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                               <span style={{ fontSize: 11, color: "var(--muted)" }}>
                                 {chapter.page_count} trang
                               </span>
+                              {isExpanded && chapter.pages.length > 1 && (
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    setReorderingChapter(
+                                      reorderingChapter === chapter.chapter_id ? null : chapter.chapter_id,
+                                    );
+                                  }}
+                                  className="btn btn-sm btn-ghost"
+                                  style={{
+                                    padding: "4px 8px",
+                                    color: reorderingChapter === chapter.chapter_id ? "var(--jade)" : "var(--muted)",
+                                  }}
+                                  title="Sắp xếp trang"
+                                >
+                                  <Icon name="dots" size={11} />
+                                </button>
+                              )}
                               <button
                                 onClick={e => {
                                   e.stopPropagation();
@@ -511,6 +562,94 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                                           tại đây
                                         </Link>.
                                       </div>
+                                    ) : reorderingChapter === chapter.chapter_id ? (
+                                      <>
+                                        <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                          <Icon name="dots" size={11} />
+                                          Kéo thả để sắp xếp thứ tự trang
+                                          {busy && (
+                                            <motion.span
+                                              animate={{ rotate: 360 }}
+                                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                              style={{ display: "inline-flex" }}
+                                            >
+                                              <Icon name="refresh" size={10} />
+                                            </motion.span>
+                                          )}
+                                        </div>
+                                        <Reorder.Group
+                                          axis="x"
+                                          values={chapter.pages}
+                                          onReorder={pages => handleReorderPages(chapter.chapter_id, pages)}
+                                          style={{
+                                            listStyle: "none",
+                                            padding: "4px 0 8px",
+                                            margin: 0,
+                                            display: "flex",
+                                            gap: 8,
+                                            overflowX: "auto",
+                                          }}
+                                        >
+                                          {chapter.pages.map((p, idx) => (
+                                            <Reorder.Item
+                                              key={p.page_id}
+                                              value={p}
+                                              style={{ listStyle: "none", flexShrink: 0 }}
+                                            >
+                                              <div
+                                                style={{
+                                                  width: 90,
+                                                  cursor: "grab",
+                                                  userSelect: "none",
+                                                }}
+                                              >
+                                                {/* drag handle bar */}
+                                                <div
+                                                  style={{
+                                                    background: "var(--accent)",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    padding: "3px 0",
+                                                    gap: 3,
+                                                  }}
+                                                >
+                                                  <Icon name="dots" size={10} style={{ color: "var(--paper)" }} />
+                                                  <span style={{ fontSize: 9, color: "var(--paper)", fontFamily: "var(--font-mono)", opacity: 0.85 }}>
+                                                    #{idx + 1}
+                                                  </span>
+                                                </div>
+                                                <div
+                                                  className="stroke-ink"
+                                                  style={{
+                                                    aspectRatio: "3/4",
+                                                    background: "var(--bg-3)",
+                                                    position: "relative",
+                                                    overflow: "hidden",
+                                                    border: "2px solid var(--accent)",
+                                                    borderTop: "none",
+                                                  }}
+                                                >
+                                                  {p.thumbnail_url ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img
+                                                      src={p.thumbnail_url}
+                                                      alt={`Trang ${idx + 1}`}
+                                                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                                      loading="lazy"
+                                                      draggable={false}
+                                                    />
+                                                  ) : (
+                                                    <div style={{ display: "flex", height: "100%", alignItems: "center", justifyContent: "center", color: "var(--muted)" }}>
+                                                      <Icon name="image" size={18} />
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            </Reorder.Item>
+                                          ))}
+                                        </Reorder.Group>
+                                      </>
                                     ) : (
                                       <div
                                         style={{
