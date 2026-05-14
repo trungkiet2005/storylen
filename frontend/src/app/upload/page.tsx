@@ -20,6 +20,35 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from '@/components/Animations';
 import { useAuth } from '@/contexts/AuthContext';
 
+const LANG_NAMES: Record<string, string> = {
+  CHS: "Chinese (Simplified)",
+  CHT: "Chinese (Traditional)",
+  CSY: "Czech",
+  NLD: "Dutch",
+  ENG: "English",
+  FRA: "French",
+  DEU: "German",
+  HUN: "Hungarian",
+  ITA: "Italian",
+  JPN: "Japanese",
+  KOR: "Korean",
+  POL: "Polish",
+  PTB: "Portuguese (Brazil)",
+  ROM: "Romanian",
+  RUS: "Russian",
+  ESP: "Spanish",
+  TRK: "Turkish",
+  UKR: "Ukrainian",
+  VIN: "Vietnamese",
+  ARA: "Arabic",
+  CNR: "Montenegrin",
+  SRP: "Serbian",
+  HRV: "Croatian",
+  THA: "Thai",
+  IND: "Indonesian",
+  FIL: "Filipino (Tagalog)",
+};
+
 const DEFAULT_AI_CONFIG: AIModuleCurrentConfig = {
   translator: "gemini",
   target_lang: "VIN",
@@ -803,7 +832,7 @@ export default function UploadPage() {
                         >
                           {field.values.map(value => (
                             <option key={value} value={value}>
-                              {value}
+                              {field.key === "target_lang" ? (LANG_NAMES[value] ?? value) : value}
                             </option>
                           ))}
                         </select>
