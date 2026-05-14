@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from pydantic import BaseModel, Field, field_validator
 
 from app.database import get_supabase
-from app.routers.auth import ALLOWED_ROLES, AuthUser, ProfileUpdateRequest, get_current_admin
+from app.routers.auth import ALLOWED_ROLES, USERNAME_RE, AuthUser, ProfileUpdateRequest, get_current_admin
 
 from .deps import (
     audit,
@@ -103,6 +103,30 @@ class BanRequest(BaseModel):
         if not _BAN_DURATION_RE.fullmatch(v):
             raise ValueError("Thời lượng không hợp lệ. Ví dụ: 30m, 24h, 7d, 999999h.")
         return v
+
+
+class AdminCreateUserRequest(BaseModel):
+    email: str = Field(..., description="Địa chỉ email")
+    password: str = Field(..., min_length=8, max_length=72, description="Mật khẩu (tối thiểu 8 ký tự)")
+    username: str = Field(..., min_length=3, max_length=32)
+    role: str = Field(default="user")
+    full_name: str | None = Field(default=None, max_length=120)
+    email_confirm: bool = Field(default=True, description="Xác nhận email ngay, bỏ qua bước xác thực")
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if not USERNAME_RE.fullmatch(v):
+            raise ValueError("Username chỉ chứa chữ cái, số và dấu gạch dưới (3-32 ký tự).")
+        return v
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, v: str) -> str:
+        normalized = v.strip().lower()
+        if normalized not in ALLOWED_ROLES:
+            raise ValueError(f"Role phải là một trong: {sorted(ALLOWED_ROLES)}")
+        return normalized
 
 
 class BulkDeleteRequest(BaseModel):
@@ -306,6 +330,79 @@ def list_users(
     page_slice = sorted_users[offset : offset + limit]
     items = [_build_item(u, profiles.get(u.get("id"), {})) for u in page_slice if u.get("id")]
     return AdminUserListResponse(total=len(sorted_users), items=items)
+
+
+@router.post("", response_model=AdminUserItem, status_code=status.HTTP_201_CREATED)
+def create_user(
+    payload: AdminCreateUserRequest,
+    request: Request,
+    admin_user: AuthUser = Depends(get_current_admin),
+) -> AdminUserItem:
+    """Admin tạo tài khoản mới — không cần người dùng tự đăng ký."""
+    supabase = get_supabase()
+
+    try:
+        existing = supabase.table("profiles").select("user_id").eq("username", payload.username).limit(1).execute()
+        if existing.data:
+            raise HTTPException(status_code=409, detail="Username đã được sử dụng.")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Không thể kiểm tra username.") from exc
+
+    try:
+        result = supabase.auth.admin.create_user({
+            "email": payload.email,
+            "password": payload.password,
+            "email_confirm": payload.email_confirm,
+        })
+    except Exception as exc:
+        err_lower = str(exc).lower()
+        if any(k in err_lower for k in ("already", "exists", "duplicate", "registered")):
+            raise HTTPException(status_code=409, detail="Email đã được sử dụng.") from exc
+        logger.error("auth.admin.create_user failed: %s", exc)
+        raise HTTPException(status_code=503, detail="Không thể tạo tài khoản.") from exc
+
+    user_obj = getattr(result, "user", None) or result
+    if not user_obj or not getattr(user_obj, "id", None):
+        raise HTTPException(status_code=503, detail="Tạo tài khoản thất bại — không nhận được user ID.")
+
+    new_user_id = str(user_obj.id)
+
+    profile_data: dict[str, Any] = {
+        "user_id": new_user_id,
+        "username": payload.username,
+        "role": payload.role,
+    }
+    if payload.full_name:
+        profile_data["full_name"] = payload.full_name
+
+    try:
+        supabase.table("profiles").insert(profile_data).execute()
+    except Exception as exc:
+        logger.error("profile insert failed for %s: %s", new_user_id, exc)
+        try:
+            supabase.auth.admin.delete_user(new_user_id)
+        except Exception:
+            pass
+        raise HTTPException(status_code=409, detail="Username đã tồn tại hoặc không thể tạo hồ sơ.") from exc
+
+    audit(
+        admin_user,
+        "user.create",
+        request=request,
+        target_type="user",
+        target_id=new_user_id,
+        summary=f"Tạo tài khoản {payload.username} ({payload.email})",
+        metadata={
+            "email": payload.email,
+            "username": payload.username,
+            "role": payload.role,
+            "email_confirm": payload.email_confirm,
+        },
+    )
+
+    return _build_item(serialize_auth_user(user_obj), _profile_row(new_user_id))
 
 
 @router.get("/{user_id}", response_model=AdminUserDetailResponse)

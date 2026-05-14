@@ -7,10 +7,12 @@ import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import {
+  AdminCreateUserPayload,
   AdminUserItem,
   UserRole,
   UserStatusFilter,
   adminBulkDeleteUsers,
+  adminCreateUser,
   adminDeleteUser,
   adminListUsers,
   adminUpdateUserRole,
@@ -40,6 +42,17 @@ export default function AdminUsersPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState<AdminCreateUserPayload>({
+    email: "",
+    password: "",
+    username: "",
+    role: "user",
+    full_name: "",
+    email_confirm: true,
+  });
+  const [createBusy, setCreateBusy] = useState(false);
 
   const sortParam = useMemo(() => `${sortKey}:${sortDir}`, [sortKey, sortDir]);
 
@@ -170,6 +183,30 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.email || !createForm.password || !createForm.username) {
+      toast("Vui lòng điền đầy đủ email, mật khẩu và username.", "error");
+      return;
+    }
+    setCreateBusy(true);
+    try {
+      const payload: AdminCreateUserPayload = {
+        ...createForm,
+        full_name: createForm.full_name?.trim() || null,
+      };
+      await adminCreateUser(payload);
+      toast(`Đã tạo tài khoản "${createForm.username}" thành công.`, "success");
+      setShowCreateModal(false);
+      setCreateForm({ email: "", password: "", username: "", role: "user", full_name: "", email_confirm: true });
+      await load();
+    } catch (err) {
+      toast(errorMessage(err, "Không thể tạo tài khoản."), "error");
+    } finally {
+      setCreateBusy(false);
+    }
+  };
+
   const hasPrev = offset > 0;
   const hasNext = offset + PAGE_SIZE < total;
   const sortArrow = (key: SortKey) => (sortKey === key ? (sortDir === "asc" ? " ↑" : " ↓") : "");
@@ -257,11 +294,16 @@ export default function AdminUsersPage() {
           {loading ? "Đang tải…" : `${total.toLocaleString("vi-VN")} người dùng`}
           {selected.size > 0 && ` · đã chọn ${selected.size}`}
         </span>
-        {selected.size > 0 && (
-          <button className="btn btn-sm" style={{ background: "var(--accent)", color: "#fff" }} disabled={bulkBusy} onClick={handleBulkDelete}>
-            <Icon name="trash" size={12} /> Xoá {selected.size}
+        <div style={{ display: "flex", gap: 8 }}>
+          {selected.size > 0 && (
+            <button className="btn btn-sm" style={{ background: "var(--accent)", color: "#fff" }} disabled={bulkBusy} onClick={handleBulkDelete}>
+              <Icon name="trash" size={12} /> Xoá {selected.size}
+            </button>
+          )}
+          <button className="btn btn-sm" style={{ background: "var(--fg)", color: "var(--bg)" }} onClick={() => setShowCreateModal(true)}>
+            + Tạo tài khoản
           </button>
-        )}
+        </div>
       </div>
 
       <div className="stroke-ink" style={{ background: "var(--panel)", overflow: "hidden" }}>
@@ -430,6 +472,160 @@ export default function AdminUsersPage() {
           </button>
         </div>
       </div>
+
+      {showCreateModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowCreateModal(false); }}
+        >
+          <div
+            className="stroke-ink"
+            style={{
+              background: "var(--panel)",
+              width: "100%",
+              maxWidth: 480,
+              padding: "28px 28px 24px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 16, fontFamily: "var(--font-serif)", fontWeight: 800 }}>
+                Tạo tài khoản mới
+              </h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "var(--muted)", lineHeight: 1 }}
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label className="caps-xs" style={{ display: "block", marginBottom: 5, color: "var(--muted)" }}>
+                  Email <span style={{ color: "var(--accent)" }}>*</span>
+                </label>
+                <input
+                  type="email"
+                  required
+                  autoComplete="off"
+                  className="stroke-ink"
+                  style={{ width: "100%", padding: "9px 12px", fontSize: 13, background: "var(--bg)", fontFamily: "var(--font-sans)" }}
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="user@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="caps-xs" style={{ display: "block", marginBottom: 5, color: "var(--muted)" }}>
+                  Mật khẩu <span style={{ color: "var(--accent)" }}>*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  className="stroke-ink"
+                  style={{ width: "100%", padding: "9px 12px", fontSize: 13, background: "var(--bg)", fontFamily: "var(--font-sans)" }}
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="Tối thiểu 8 ký tự"
+                />
+              </div>
+
+              <div>
+                <label className="caps-xs" style={{ display: "block", marginBottom: 5, color: "var(--muted)" }}>
+                  Username <span style={{ color: "var(--accent)" }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  minLength={3}
+                  maxLength={32}
+                  autoComplete="off"
+                  className="stroke-ink"
+                  style={{ width: "100%", padding: "9px 12px", fontSize: 13, background: "var(--bg)", fontFamily: "var(--font-sans)" }}
+                  value={createForm.username}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value }))}
+                  placeholder="Chữ cái, số, gạch dưới (3–32 ký tự)"
+                />
+              </div>
+
+              <div>
+                <label className="caps-xs" style={{ display: "block", marginBottom: 5, color: "var(--muted)" }}>
+                  Họ tên đầy đủ
+                </label>
+                <input
+                  type="text"
+                  maxLength={120}
+                  autoComplete="off"
+                  className="stroke-ink"
+                  style={{ width: "100%", padding: "9px 12px", fontSize: 13, background: "var(--bg)", fontFamily: "var(--font-sans)" }}
+                  value={createForm.full_name ?? ""}
+                  onChange={(e) => setCreateForm((f) => ({ ...f, full_name: e.target.value }))}
+                  placeholder="Không bắt buộc"
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label className="caps-xs" style={{ display: "block", marginBottom: 5, color: "var(--muted)" }}>
+                    Quyền
+                  </label>
+                  <select
+                    className="stroke-ink"
+                    style={{ width: "100%", padding: "9px 10px", fontSize: 13, background: "var(--bg)" }}
+                    value={createForm.role}
+                    onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value as "user" | "admin" }))}
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-end", paddingBottom: 2 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={createForm.email_confirm}
+                      onChange={(e) => setCreateForm((f) => ({ ...f, email_confirm: e.target.checked }))}
+                    />
+                    <span>Xác nhận email ngay</span>
+                  </label>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={createBusy}
+                >
+                  Huỷ
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-sm"
+                  style={{ background: "var(--fg)", color: "var(--bg)", minWidth: 110 }}
+                  disabled={createBusy}
+                >
+                  {createBusy ? "Đang tạo…" : "Tạo tài khoản"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

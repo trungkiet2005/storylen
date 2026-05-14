@@ -491,6 +491,23 @@ export async function adminBulkDeleteUsers(userIds: string[]): Promise<AdminBulk
   });
 }
 
+export interface AdminCreateUserPayload {
+  email: string;
+  password: string;
+  username: string;
+  role?: "user" | "admin";
+  full_name?: string | null;
+  email_confirm?: boolean;
+}
+
+export async function adminCreateUser(payload: AdminCreateUserPayload): Promise<AdminUserItem> {
+  return request<AdminUserItem>("/admin/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 // ─── Content management ───────────────────────────────────────────────────────
 
 export interface AdminPageItem {

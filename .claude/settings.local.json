@@ -27,7 +27,11 @@
       "Bash(curl -s -w \"\\\\nHTTP Status: %{http_code}\\\\nTime: %{time_total}s\\\\n\" --max-time 15 -X POST \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: http://localhost:3000\" -F \"files=@d:/AI_PROJECT/Storylen_WEB/storylen/README.md\")",
       "Bash(curl -sv --max-time 10 -X POST \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: http://localhost:3000\" -H \"Cookie: \" -F \"files=@d:/AI_PROJECT/Storylen_WEB/storylen/README.md;type=image/jpeg\")",
       "Bash(curl -s -I -X OPTIONS \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: https://storylen.vercel.app\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: content-type\")",
-      "Bash(curl -sv --max-time 10 -X POST \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: https://storylen.vercel.app\" -F \"files=@d:/AI_PROJECT/Storylen_WEB/storylen/README.md;type=image/jpeg\")"
+      "Bash(curl -sv --max-time 10 -X POST \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: https://storylen.vercel.app\" -F \"files=@d:/AI_PROJECT/Storylen_WEB/storylen/README.md;type=image/jpeg\")",
+      "Bash(Get-ChildItem -Path \"d:\\\\AI_PROJECT\\\\Storylen_WEB\\\\storylen\" -Force)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(Get-ChildItem -Path . -Directory)",
+      "Bash(Select-Object Name)"
     ]
   }
 }
