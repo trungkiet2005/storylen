@@ -614,7 +614,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                                                     gap: 3,
                                                   }}
                                                 >
-                                                  <Icon name="dots" size={10} style={{ color: "var(--paper)" }} />
+                                                  <Icon name="dots" size={10} className="text-[var(--paper)]" />
                                                   <span style={{ fontSize: 9, color: "var(--paper)", fontFamily: "var(--font-mono)", opacity: 0.85 }}>
                                                     #{idx + 1}
                                                   </span>
