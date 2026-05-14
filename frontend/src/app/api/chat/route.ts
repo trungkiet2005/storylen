@@ -35,7 +35,6 @@ async function callGemini(key: string, prompt: string): Promise<string | null> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
       }),
     },
   );
