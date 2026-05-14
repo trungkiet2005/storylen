@@ -204,15 +204,25 @@ export default function UploadPage() {
     setLogs(prev => [...prev, { id: Math.random().toString(36).slice(2), time, text, type }]);
   }, []);
 
-  // Health check on mount (and every 15s)
+  // Health check on mount; re-schedules itself after each result to avoid
+  // overlapping requests when healthCheck() takes long (Render cold start ~35s).
   useEffect(() => {
-    const check = async () => {
+    let cancelled = false;
+    let timerId: ReturnType<typeof setTimeout>;
+
+    const runCheck = async () => {
       const online = await healthCheck();
+      if (cancelled) return;
       setBackendOnline(online);
+      // Poll faster (10s) while offline so we notice when Render wakes up quickly.
+      timerId = setTimeout(runCheck, online ? 30_000 : 10_000);
     };
-    check();
-    const id = setInterval(check, 15_000);
-    return () => clearInterval(id);
+
+    runCheck();
+    return () => {
+      cancelled = true;
+      clearTimeout(timerId);
+    };
   }, []);
 
   useEffect(() => {
@@ -833,7 +843,7 @@ export default function UploadPage() {
                         ? "Đang kiểm tra liên kết..."
                         : backendOnline
                         ? "Đám mây ổn định"
-                        : "Ngoại tuyến (Mô phỏng Pipeline)"}
+                        : "Backend đang khởi động, vui lòng chờ..."}
                     </span>
                   </div>
                   {batchId && (

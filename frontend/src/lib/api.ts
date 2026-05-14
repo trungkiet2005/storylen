@@ -141,9 +141,13 @@ export class APIError extends Error {
 
 // ─── Core fetch helper ────────────────────────────────────────────────────────
 
+// Render free-tier cold start can take 30-60s. Retry network failures automatically.
+const RETRY_DELAYS_MS = [8000, 15000]; // wait 8s then 15s before giving up
+
 async function request<T>(
   path: string,
   options?: RequestInit,
+  _attempt = 0,
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
 
@@ -157,10 +161,15 @@ async function request<T>(
       },
     });
   } catch {
-    // TypeError: Failed to fetch — backend unreachable
+    // TypeError: Failed to fetch — backend unreachable or still warming up (Render cold start).
+    // Safe to retry even for POST/PATCH/DELETE because the server never received the request.
+    if (_attempt < RETRY_DELAYS_MS.length) {
+      await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[_attempt]));
+      return request<T>(path, options, _attempt + 1);
+    }
     throw new APIError(
       0,
-      `Không thể kết nối đến backend (${BASE_URL}). Hãy kiểm tra backend đã khởi động chưa.`,
+      `Không thể kết nối đến backend (${BASE_URL}). Backend có thể đang khởi động (Render cold start ~30-60s) — thử lại sau ít phút.`,
     );
   }
 
@@ -190,7 +199,8 @@ export async function healthCheck(): Promise<boolean> {
   try {
     const res = await fetch(`${BASE_URL.replace(/\/v1$/, "")}/health`, {
       method: "GET",
-      signal: AbortSignal.timeout(4000),
+      // 35s covers Render free-tier cold start (~30-60s); short enough to not block indefinitely
+      signal: AbortSignal.timeout(35_000),
     });
     return res.ok;
   } catch {
