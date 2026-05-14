@@ -84,7 +84,13 @@ async function parseAuthResponse(res: Response, fallback: string): Promise<AuthR
   }
 
   if (!res.ok) {
-    throw new Error(body.detail || body.message || fallback);
+    const raw = body.detail || body.message || fallback;
+    const msg = Array.isArray(raw)
+      ? (raw as Array<{ msg?: string }>).map((e) => e.msg ?? String(e)).join(", ")
+      : typeof raw === "string"
+      ? raw
+      : fallback;
+    throw new Error(msg);
   }
 
   return {

@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 from app.database import get_supabase
 from app.routers.auth import AuthUser, get_current_user
-from app.services.credit_service import get_balance, upgrade_plan
+from app.services.credit_service import get_balance
 
 router = APIRouter(prefix="/credits", tags=["credits"])
 logger = logging.getLogger(__name__)
@@ -118,19 +118,16 @@ def list_plans():
 @router.post("/upgrade", response_model=UpgradeResponse)
 def upgrade_subscription(
     body: UpgradeRequest,
-    user: AuthUser = Depends(get_current_user),
+    _user: AuthUser = Depends(get_current_user),
 ):
     """
-    Upgrade user to a new plan and grant monthly + bonus credits.
-    (Placeholder: no real payment processing yet — admin grants manually.)
+    Self-service upgrade is disabled until payment gateway is integrated.
+    Plan upgrades are handled manually by admins via /admin/credits/upgrade-plan.
     """
-    supabase = get_supabase()
-    result = upgrade_plan(user.id, body.plan_id, supabase)
-    return UpgradeResponse(
-        **result,
-        message=(
-            f"Đã nâng cấp lên gói {body.plan_id.upper()}. "
-            f"Nhận được {result['monthly_credits_granted']} credits tháng"
-            + (f" + {result['bonus_credits_granted']} credits bonus!" if result["bonus_credits_granted"] else "!")
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=(
+            "Tính năng thanh toán chưa được tích hợp. "
+            "Vui lòng liên hệ admin để được nâng cấp gói thủ công."
         ),
     )

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { TopBar } from "@/components/TopBar";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
-import { getPlans, upgradePlan, type PlanInfo } from "@/lib/api";
+import { getPlans, type PlanInfo } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 
 const PLAN_COLORS: Record<string, string> = {
@@ -26,16 +26,117 @@ function formatPrice(vnd: number): string {
   return vnd.toLocaleString("vi-VN") + "đ/tháng";
 }
 
+function ContactModal({
+  plan,
+  onClose,
+}: {
+  plan: PlanInfo;
+  onClose: () => void;
+}) {
+  const color = PLAN_COLORS[plan.id] ?? "var(--muted)";
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "var(--panel)",
+          border: `2px solid ${color}`,
+          boxShadow: `6px 6px 0 0 ${color}33`,
+          padding: "28px 28px 24px",
+          maxWidth: 440,
+          width: "100%",
+        }}
+      >
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 22, marginBottom: 4 }}>
+            {PLAN_EMOJIS[plan.id]}{" "}
+            <span style={{ fontFamily: "var(--font-serif)", fontWeight: 800, color }}>
+              {plan.name}
+            </span>
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800 }}>{formatPrice(plan.price_vnd)}</div>
+        </div>
+
+        <p style={{ fontSize: 14, color: "var(--fg-soft)", lineHeight: 1.65, marginBottom: 20 }}>
+          Tính năng thanh toán đang được phát triển. Để nâng cấp ngay,
+          hãy liên hệ admin — gói sẽ được kích hoạt thủ công trong vòng{" "}
+          <strong style={{ color: "var(--fg)" }}>24 giờ</strong> sau khi xác nhận thanh toán.
+        </p>
+
+        <div
+          style={{
+            background: "var(--bg-2)",
+            border: "1px solid var(--border-soft)",
+            padding: "14px 16px",
+            marginBottom: 20,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            fontSize: 13,
+          }}
+        >
+          <div>
+            <span style={{ color: "var(--muted)", marginRight: 8 }}>Email:</span>
+            <a href="mailto:contact@storylens.app" style={{ color: color, fontWeight: 600 }}>
+              contact@storylens.app
+            </a>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted)" }}>
+            Tiêu đề email: <em>Đăng ký gói {plan.name} – [tên tài khoản của bạn]</em>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <a
+            href={`mailto:contact@storylens.app?subject=${encodeURIComponent(`Đăng ký gói ${plan.name}`)}&body=${encodeURIComponent(`Xin chào,\n\nTôi muốn đăng ký gói ${plan.name} (${formatPrice(plan.price_vnd)}).\n\nTên tài khoản: \nEmail: `)}`}
+            style={{
+              flex: 1,
+              padding: "10px",
+              background: color,
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: 13,
+              textAlign: "center",
+              textDecoration: "none",
+              display: "block",
+            }}
+          >
+            Gửi email ngay →
+          </a>
+          <button
+            onClick={onClose}
+            className="btn btn-sm btn-ghost"
+            style={{ fontSize: 13 }}
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PlanCard({
   plan,
   isCurrent,
-  onUpgrade,
-  upgrading,
+  onContact,
 }: {
   plan: PlanInfo;
   isCurrent: boolean;
-  onUpgrade: (id: string) => void;
-  upgrading: boolean;
+  onContact: (plan: PlanInfo) => void;
 }) {
   const color = PLAN_COLORS[plan.id] ?? "var(--muted)";
   const isFree = plan.id === "free";
@@ -63,7 +164,6 @@ function PlanCard({
         transition: "box-shadow 0.15s",
       }}
     >
-      {/* Current badge */}
       {isCurrent && (
         <div
           style={{
@@ -84,7 +184,6 @@ function PlanCard({
         </div>
       )}
 
-      {/* Header */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 22, marginBottom: 4 }}>
           {PLAN_EMOJIS[plan.id]} <span style={{ fontFamily: "var(--font-serif)", fontWeight: 800, fontSize: 20, color }}>{plan.name}</span>
@@ -99,7 +198,6 @@ function PlanCard({
         )}
       </div>
 
-      {/* Features */}
       <ul style={{ listStyle: "none", padding: 0, margin: "0 0 20px", flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
         {features.map((f, i) => (
           <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13 }}>
@@ -113,7 +211,6 @@ function PlanCard({
         ))}
       </ul>
 
-      {/* CTA */}
       {isFree ? (
         <div
           style={{
@@ -142,8 +239,7 @@ function PlanCard({
         </div>
       ) : (
         <button
-          onClick={() => onUpgrade(plan.id)}
-          disabled={upgrading}
+          onClick={() => onContact(plan)}
           style={{
             width: "100%",
             padding: "10px",
@@ -153,13 +249,12 @@ function PlanCard({
             fontFamily: "var(--font-sans)",
             fontWeight: 700,
             fontSize: 13,
-            cursor: upgrading ? "wait" : "pointer",
+            cursor: "pointer",
             letterSpacing: "0.03em",
-            opacity: upgrading ? 0.7 : 1,
             transition: "opacity 0.15s",
           }}
         >
-          {upgrading ? "Đang xử lý..." : `Chọn gói ${plan.name}`}
+          Đăng ký gói {plan.name}
         </button>
       )}
     </div>
@@ -167,11 +262,11 @@ function PlanCard({
 }
 
 export default function PlansPage() {
-  const { user, refreshCredits, refreshUser } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [plans, setPlans] = useState<PlanInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [upgrading, setUpgrading] = useState(false);
+  const [contactPlan, setContactPlan] = useState<PlanInfo | null>(null);
 
   const loadPlans = useCallback(async () => {
     try {
@@ -186,29 +281,15 @@ export default function PlansPage() {
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
 
-  const handleUpgrade = async (planId: string) => {
-    if (!user) {
-      toast("Vui lòng đăng nhập để nâng cấp.", "error");
-      return;
-    }
-    setUpgrading(true);
-    try {
-      const result = await upgradePlan(planId);
-      toast(result.message, "success");
-      await refreshCredits();
-      await refreshUser();
-    } catch (err: unknown) {
-      toast((err as Error).message || "Nâng cấp thất bại.", "error");
-    } finally {
-      setUpgrading(false);
-    }
-  };
-
   const currentPlan = user?.plan_tier ?? "free";
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
       <TopBar active="plans" />
+
+      {contactPlan && (
+        <ContactModal plan={contactPlan} onClose={() => setContactPlan(null)} />
+      )}
 
       <main style={{ flex: 1, maxWidth: 1100, margin: "0 auto", padding: "48px 24px 64px", width: "100%" }}>
         {/* Page header */}
@@ -254,8 +335,7 @@ export default function PlansPage() {
                 key={plan.id}
                 plan={plan}
                 isCurrent={currentPlan === plan.id}
-                onUpgrade={handleUpgrade}
-                upgrading={upgrading}
+                onContact={setContactPlan}
               />
             ))}
           </div>
@@ -319,7 +399,7 @@ export default function PlansPage() {
             },
             {
               q: "Thanh toán bằng gì?",
-              a: "Hiện tại đang trong giai đoạn beta. Tính năng thanh toán (MoMo, ZaloPay, thẻ quốc tế) sẽ được tích hợp sớm. Liên hệ để được tư vấn."
+              a: "Hiện tại đang trong giai đoạn beta. Liên hệ admin qua email để đăng ký gói — gói sẽ được kích hoạt thủ công sau khi xác nhận thanh toán. Tích hợp MoMo/ZaloPay sẽ sớm ra mắt."
             },
           ].map((item, i) => (
             <div
@@ -335,7 +415,6 @@ export default function PlansPage() {
           ))}
         </div>
 
-        {/* Back link */}
         {!user && (
           <div style={{ marginTop: 48, textAlign: "center" }}>
             <Link href="/register" style={{ textDecoration: "none" }}>

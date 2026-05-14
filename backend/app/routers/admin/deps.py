@@ -120,7 +120,8 @@ def load_profile_map(user_ids: list[str]) -> dict[str, dict[str, Any]]:
             .table("profiles")
             .select(
                 "user_id, username, role, full_name, display_name, avatar_url, "
-                "preferred_target_lang, locale, created_at, last_seen_at"
+                "preferred_target_lang, locale, created_at, last_seen_at, "
+                "plan_tier, credits_balance"
             )
             .in_("user_id", user_ids)
             .execute()

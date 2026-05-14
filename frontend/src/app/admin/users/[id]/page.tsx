@@ -18,6 +18,7 @@ import {
   adminUnbanUser,
   adminUpdateUserProfile,
   adminUpdateUserRole,
+  adminUpgradePlan,
 } from "@/lib/api";
 import { errorMessage, formatDateTime } from "../../_shared";
 
@@ -43,6 +44,8 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
   const [form, setForm] = useState<AdminProfilePatch>({});
   const [banDuration, setBanDuration] = useState("24h");
   const [banReason, setBanReason] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState("free");
+  const [planNote, setPlanNote] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,6 +93,21 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
 
   const isSelf = me?.id === id;
   const isBanned = !!user?.banned_until && new Date(user.banned_until).getTime() > Date.now();
+
+  const doUpgradePlan = async () => {
+    if (!window.confirm(`Chuyển ${user?.email} sang gói ${selectedPlan.toUpperCase()}?`)) return;
+    setBusy(true);
+    try {
+      const res = await adminUpgradePlan(id, selectedPlan, planNote || undefined);
+      toast(res.message, "success");
+      setPlanNote("");
+      await load();
+    } catch (err) {
+      toast(errorMessage(err, "Nâng cấp gói thất bại."), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const toggleRole = async () => {
     if (!user) return;
@@ -340,6 +358,59 @@ export default function AdminUserDetailPage({ params }: { params: Promise<{ id: 
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Plan & Credits */}
+      <div className="stroke-ink panel-shadow" style={{ background: "var(--panel)", padding: 20, marginBottom: 20 }}>
+        <h3 style={{ margin: "0 0 14px", fontSize: 14 }}>Gói đăng ký & Credits</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 16, flexWrap: "wrap" }}>
+          <div className="stroke-ink" style={{ background: "var(--bg-2)", padding: "10px 16px", minWidth: 120 }}>
+            <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 2 }}>GÓI HIỆN TẠI</div>
+            <div style={{ fontWeight: 800, fontSize: 16, textTransform: "uppercase" }}>{user.plan_tier ?? "free"}</div>
+          </div>
+          <div className="stroke-ink" style={{ background: "var(--bg-2)", padding: "10px 16px", minWidth: 120 }}>
+            <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 2 }}>SỐ DƯ CREDITS</div>
+            <div style={{ fontWeight: 800, fontSize: 16 }}>{user.credits_balance ?? 0}</div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, alignItems: "end" }}>
+          <label style={{ display: "block" }}>
+            <span style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Chuyển sang gói</span>
+            <select
+              value={selectedPlan}
+              onChange={(e) => setSelectedPlan(e.target.value)}
+              className="stroke-ink"
+              style={{ width: "100%", padding: 8, fontSize: 13, background: "var(--bg-2)" }}
+            >
+              {["free", "basic", "pro", "premium"].map((p) => (
+                <option key={p} value={p}>{p.toUpperCase()}</option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "block" }}>
+            <span style={{ display: "block", fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Ghi chú (tuỳ chọn)</span>
+            <input
+              value={planNote}
+              onChange={(e) => setPlanNote(e.target.value)}
+              placeholder="VD: Thanh toán chuyển khoản tháng 5"
+              className="stroke-ink"
+              style={{ width: "100%", padding: 8, fontSize: 13, background: "var(--bg-2)" }}
+            />
+          </label>
+          <button
+            className="btn btn-sm btn-primary"
+            onClick={doUpgradePlan}
+            disabled={busy || selectedPlan === (user.plan_tier ?? "free")}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            Áp dụng gói
+          </button>
+        </div>
+        {selectedPlan !== (user.plan_tier ?? "free") && (
+          <div style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
+            Credits tháng sẽ được cộng ngay vào tài khoản khi xác nhận.
+          </div>
+        )}
       </div>
 
       {/* Profile edit form */}

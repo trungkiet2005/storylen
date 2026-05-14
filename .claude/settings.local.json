@@ -31,7 +31,14 @@
       "Bash(Get-ChildItem -Path \"d:\\\\AI_PROJECT\\\\Storylen_WEB\\\\storylen\" -Force)",
       "Bash(Select-Object Name, FullName)",
       "Bash(Get-ChildItem -Path . -Directory)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"d:\\\\AI_PROJECT\\\\Storylen_WEB\\\\storylen\\\\supabase\" -Recurse -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"d:\\\\AI_PROJECT\\\\Storylen_WEB\\\\storylen\\\\frontend\\\\src\" -Recurse -Type f)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(not exist *)",
+      "PowerShell(New-Item -ItemType Directory -Force \"d:\\\\AI_PROJECT\\\\Storylen_WEB\\\\storylen\\\\supabase\\\\templates\")",
+      "Bash(find \"d:\\\\\\\\AI_PROJECT\\\\\\\\Storylen_WEB\\\\\\\\storylen\\\\\\\\frontend\\\\\\\\src\\\\\\\\app\\\\\\\\upload\" -type f)"
     ]
   }
 }

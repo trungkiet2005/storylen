@@ -177,7 +177,12 @@ async function request<T>(
     let detail = `HTTP ${res.status}`;
     try {
       const body = await res.json();
-      detail = body.detail || detail;
+      const raw = body.detail || body.message;
+      if (typeof raw === "string") {
+        detail = raw;
+      } else if (Array.isArray(raw)) {
+        detail = (raw as Array<{ msg?: string }>).map((e) => e.msg ?? String(e)).join(", ");
+      }
     } catch {
       // ignore parse errors
     }
@@ -435,6 +440,8 @@ export interface AdminUserDetail extends AdminUserItem {
   preferred_target_lang: string | null;
   email_confirmed_at: string | null;
   translations_count: number;
+  plan_tier: string;
+  credits_balance: number;
 }
 
 export interface AdminStats {
@@ -560,6 +567,27 @@ export async function adminCreateUser(payload: AdminCreateUserPayload): Promise<
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+  });
+}
+
+export interface AdminPlanUpgradeResponse {
+  user_id: string;
+  plan_tier: string;
+  credits_balance: number;
+  monthly_credits_granted: number;
+  bonus_credits_granted: number;
+  message: string;
+}
+
+export async function adminUpgradePlan(
+  userId: string,
+  planId: string,
+  note?: string,
+): Promise<AdminPlanUpgradeResponse> {
+  return request<AdminPlanUpgradeResponse>("/admin/credits/upgrade-plan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, plan_id: planId, note }),
   });
 }
 

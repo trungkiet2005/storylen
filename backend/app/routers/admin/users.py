@@ -75,6 +75,8 @@ class AdminUserDetailResponse(AdminUserItem):
     preferred_target_lang: str | None = None
     email_confirmed_at: str | None = None
     translations_count: int = 0
+    plan_tier: str = "free"
+    credits_balance: int = 0
 
 
 class UpdateRoleRequest(BaseModel):
@@ -423,6 +425,8 @@ def get_user(
         preferred_target_lang=profile.get("preferred_target_lang"),
         email_confirmed_at=to_iso(auth_user.get("email_confirmed_at")),
         translations_count=_count_user_translations(user_id),
+        plan_tier=profile.get("plan_tier", "free"),
+        credits_balance=profile.get("credits_balance", 0),
     )
     return AdminUserDetailResponse(**base)
 

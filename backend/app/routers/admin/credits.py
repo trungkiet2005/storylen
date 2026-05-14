@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from app.database import get_supabase
 from app.routers.auth import AuthUser, get_current_admin
-from app.services.credit_service import grant
+from app.services.credit_service import grant, upgrade_plan
 
 router = APIRouter(prefix="/credits", tags=["admin-credits"])
 logger = logging.getLogger(__name__)
@@ -55,6 +55,21 @@ class GrantResponse(BaseModel):
     user_id: str
     amount_granted: int
     new_balance: int
+    message: str
+
+
+class PlanUpgradeRequest(BaseModel):
+    user_id: str
+    plan_id: str  # 'free', 'basic', 'pro', 'premium'
+    note: str | None = None
+
+
+class PlanUpgradeResponse(BaseModel):
+    user_id: str
+    plan_tier: str
+    credits_balance: int
+    monthly_credits_granted: int
+    bonus_credits_granted: int
     message: str
 
 
@@ -192,4 +207,59 @@ def grant_credits(
         amount_granted=body.amount,
         new_balance=new_balance,
         message=f"Đã {action} {abs(body.amount)} credits. Số dư mới: {new_balance}.",
+    )
+
+
+@router.post("/upgrade-plan", response_model=PlanUpgradeResponse)
+def admin_upgrade_plan(
+    body: PlanUpgradeRequest,
+    admin: AuthUser = Depends(get_current_admin),
+):
+    """
+    Upgrade (or downgrade) a user's subscription plan.
+    Grants the plan's monthly credits and signup bonus if applicable.
+    Use this to manually activate paid plans after offline payment confirmation.
+    """
+    supabase = get_supabase()
+
+    # Verify user exists
+    user_result = (
+        supabase.table("profiles")
+        .select("user_id, username")
+        .eq("user_id", body.user_id)
+        .limit(1)
+        .execute()
+    )
+    if not user_result.data:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+
+    username = user_result.data[0].get("username", body.user_id)
+
+    result = upgrade_plan(body.user_id, body.plan_id, supabase)
+
+    if body.note:
+        supabase.table("credit_transactions").insert({
+            "user_id": body.user_id,
+            "amount": 0,
+            "type": "admin_grant",
+            "note": f"[Admin {admin.username}] {body.note}",
+        }).execute()
+
+    logger.info(
+        "Admin %s upgraded user %s (%s) to plan %s",
+        admin.username, username, body.user_id, body.plan_id,
+    )
+
+    bonus = result["bonus_credits_granted"]
+    return PlanUpgradeResponse(
+        user_id=body.user_id,
+        plan_tier=result["plan_tier"],
+        credits_balance=result["credits_balance"],
+        monthly_credits_granted=result["monthly_credits_granted"],
+        bonus_credits_granted=bonus,
+        message=(
+            f"Đã nâng cấp {username} lên gói {body.plan_id.upper()}. "
+            f"Đã cộng {result['monthly_credits_granted']} credits tháng"
+            + (f" + {bonus} bonus." if bonus else ".")
+        ),
     )

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xác thực tài khoản StoryLens</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f5efe3;font-family:'Helvetica Neue',Arial,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5efe3;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+          <!-- Header / Brand -->
+          <tr>
+            <td align="center" style="padding-bottom:32px;">
+              <table cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="
+                    background-color:#C8102E;
+                    padding:14px 28px;
+                    border:2px solid #111111;
+                    box-shadow:3.5px 3.5px 0 #111111;
+                  ">
+                    <span style="
+                      font-size:26px;
+                      font-weight:900;
+                      color:#f5efe3;
+                      letter-spacing:0.08em;
+                      font-family:Georgia,'Times New Roman',serif;
+                    ">StoryLens</span>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:10px 0 0;font-size:11px;color:#6b6357;letter-spacing:0.12em;text-transform:uppercase;">
+                Xóa nhòa rào cản ngôn ngữ
+              </p>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="
+              background-color:#fbf7ec;
+              border:2px solid #111111;
+              box-shadow:4px 4px 0 #111111;
+              padding:40px 40px 36px;
+            ">
+
+              <!-- Decorative top stripe -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                <tr>
+                  <td style="height:4px;background-color:#C8102E;border-radius:1px;"></td>
+                </tr>
+              </table>
+
+              <!-- Title -->
+              <h1 style="
+                margin:0 0 8px;
+                font-size:22px;
+                font-weight:800;
+                color:#111111;
+                font-family:Georgia,'Times New Roman',serif;
+                letter-spacing:0.02em;
+              ">Xác thực tài khoản</h1>
+
+              <p style="margin:0 0 24px;font-size:13px;color:#6b6357;letter-spacing:0.06em;text-transform:uppercase;">
+                Confirm your account
+              </p>
+
+              <p style="margin:0 0 16px;font-size:15px;color:#2a2623;line-height:1.7;">
+                Cảm ơn bạn đã đăng ký <strong>StoryLens</strong>!
+              </p>
+
+              <p style="margin:0 0 28px;font-size:15px;color:#2a2623;line-height:1.7;">
+                Vui lòng nhấn nút bên dưới để xác thực địa chỉ email và kích hoạt tài khoản của bạn. Liên kết này có hiệu lực trong <strong>24 giờ</strong>.
+              </p>
+
+              <!-- CTA Button -->
+              <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+                <tr>
+                  <td style="
+                    background-color:#C8102E;
+                    border:2px solid #111111;
+                    box-shadow:3px 3px 0 #111111;
+                  ">
+                    <a href="{{ .ConfirmationURL }}" style="
+                      display:block;
+                      padding:14px 32px;
+                      font-size:15px;
+                      font-weight:700;
+                      color:#f5efe3;
+                      text-decoration:none;
+                      letter-spacing:0.04em;
+                    ">Xác thực ngay →</a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 8px;font-size:13px;color:#6b6357;line-height:1.6;">
+                Nếu nút không hoạt động, sao chép và dán liên kết sau vào trình duyệt:
+              </p>
+              <p style="
+                margin:0 0 28px;
+                font-size:12px;
+                color:#C8102E;
+                word-break:break-all;
+                font-family:'Courier New',monospace;
+                background:#ede4d0;
+                padding:10px 12px;
+                border-left:3px solid #C8102E;
+              ">{{ .ConfirmationURL }}</p>
+
+              <!-- Divider -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td style="height:1px;background-color:rgba(17,17,17,0.15);"></td>
+                </tr>
+              </table>
+
+              <p style="margin:0;font-size:13px;color:#6b6357;line-height:1.6;">
+                Nếu bạn không đăng ký tài khoản StoryLens, hãy bỏ qua email này.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding:28px 0 0;">
+              <p style="margin:0 0 6px;font-size:12px;color:#6b6357;">
+                © 2025 StoryLens · Đọc truyện tranh đa ngôn ngữ bằng AI
+              </p>
+              <p style="margin:0;font-size:12px;color:#6b6357;">
+                Email này được gửi tới <strong>{{ .Email }}</strong>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
