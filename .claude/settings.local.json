@@ -38,7 +38,10 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(not exist *)",
       "PowerShell(New-Item -ItemType Directory -Force \"d:\\\\AI_PROJECT\\\\Storylen_WEB\\\\storylen\\\\supabase\\\\templates\")",
-      "Bash(find \"d:\\\\\\\\AI_PROJECT\\\\\\\\Storylen_WEB\\\\\\\\storylen\\\\\\\\frontend\\\\\\\\src\\\\\\\\app\\\\\\\\upload\" -type f)"
+      "Bash(find \"d:\\\\\\\\AI_PROJECT\\\\\\\\Storylen_WEB\\\\\\\\storylen\\\\\\\\frontend\\\\\\\\src\\\\\\\\app\\\\\\\\upload\" -type f)",
+      "Bash(Get-ChildItem -Path \"d:\\\\AI_PROJECT\\\\HF_AI_STORYLEN_DEPLOY\" -Recurse -Filter \"*.py\")",
+      "Bash(Get-ChildItem -Force)",
+      "Bash(Get-ChildItem -Path \"d:\\\\AI_PROJECT\\\\Storylen_WEB\\\\storylen\\\\backend\" -Filter \"*migration*\" -Recurse)"
     ]
   }
 }

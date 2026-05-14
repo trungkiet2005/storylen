@@ -79,6 +79,7 @@ interface FileItem {
   sourcePage?: number;
   pageId?: string;
   progress: number;
+  simulatedProgress: number;
   status: PageStatus["status"] | "queued" | "uploading";
   error?: string | null;
 }
@@ -120,6 +121,7 @@ function createFileItem(file: File, source?: { name: string; page: number }): Fi
     sourceName: source?.name,
     sourcePage: source?.page,
     progress: 0,
+    simulatedProgress: 0,
     status: "queued",
   };
 }
@@ -216,6 +218,36 @@ export default function UploadPage() {
       consoleEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [logs]);
+
+  // Smooth simulated progress — crawls toward status-based targets so bar never feels frozen
+  useEffect(() => {
+    if (state !== "processing" && state !== "uploading") return;
+
+    const STATUS_TARGETS: Record<string, number> = {
+      queued: 3,
+      uploading: 15,
+      pending: 8,
+      ocr_running: 43,
+      translating: 82,
+      completed: 100,
+      translated: 100,
+      failed: 0,
+      ocr_failed: 0,
+      error: 0,
+    };
+
+    const id = setInterval(() => {
+      setSelectedFiles(prev => prev.map(f => {
+        const target = STATUS_TARGETS[f.status] ?? f.simulatedProgress;
+        if (f.simulatedProgress >= target) return f;
+        const diff = target - f.simulatedProgress;
+        const step = Math.max(0.15, diff * 0.025);
+        return { ...f, simulatedProgress: Math.min(target, f.simulatedProgress + step) };
+      }));
+    }, 100);
+
+    return () => clearInterval(id);
+  }, [state]);
 
   // Cleanup object URLs on unmount
   useEffect(() => {
@@ -526,7 +558,8 @@ export default function UploadPage() {
   const completedCount = selectedFiles.filter(f => f.status === "completed").length;
   const failedCount = selectedFiles.filter(f => ["failed", "ocr_failed", "error"].includes(f.status)).length;
   const totalFiles = selectedFiles.length;
-  const overallProgress = totalFiles === 0 ? 0 : Math.round((selectedFiles.reduce((acc, f) => acc + f.progress, 0)) / totalFiles);
+  const getDisplayProgress = (f: FileItem) => Math.max(f.progress, Math.round(f.simulatedProgress));
+  const overallProgress = totalFiles === 0 ? 0 : Math.round(selectedFiles.reduce((acc, f) => acc + getDisplayProgress(f), 0) / totalFiles);
 
   return (
     <AnimatedPage>
@@ -719,10 +752,23 @@ export default function UploadPage() {
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${overallProgress}%` }}
-                          transition={{ duration: 0.4 }}
+                          transition={{ duration: 0.6, ease: "easeOut" }}
                           className="halftone"
-                          style={{ height: "100%", background: state === "done" && failedCount > 0 ? "var(--accent)" : "var(--jade)", borderRight: "2px solid var(--border)" }}
-                        />
+                          style={{ height: "100%", background: state === "done" && failedCount > 0 ? "var(--accent)" : "var(--jade)", borderRight: overallProgress > 0 ? "2px solid var(--border)" : "none", position: "relative", overflow: "hidden" }}
+                        >
+                          {(state === "processing" || state === "uploading") && (
+                            <motion.div
+                              animate={{ x: ["-80%", "180%"] }}
+                              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut", repeatDelay: 0.8 }}
+                              style={{
+                                position: "absolute",
+                                top: 0, bottom: 0,
+                                width: "55%",
+                                background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.22) 50%, transparent 100%)",
+                              }}
+                            />
+                          )}
+                        </motion.div>
                         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, fontFamily: "var(--font-mono)" }}>
                           {overallProgress}%
                         </div>
@@ -758,7 +804,7 @@ export default function UploadPage() {
                                   
                                   {/* Mini progress bar */}
                                   <div style={{ width: 70, height: 6, background: "var(--bg-2)", border: "1px solid var(--border)", overflow: "hidden" }}>
-                                    <div style={{ height: "100%", width: `${f.progress}%`, background: isComplete ? "var(--jade)" : "var(--accent)", transition: "width 0.3s ease" }}/>
+                                    <div style={{ height: "100%", width: `${getDisplayProgress(f)}%`, background: isComplete ? "var(--jade)" : "var(--accent)", transition: "width 0.25s ease-out" }}/>
                                   </div>
 
                                   <span style={{ color: s.color, fontWeight: 700, fontSize: 11 }}>{s.label}</span>
