@@ -21,7 +21,7 @@ from threading import BoundedSemaphore, Thread
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 
 from app.config import get_settings
 from app.database import get_supabase
@@ -146,6 +146,7 @@ def _start_pipeline_task(
 @limiter.limit(lambda: get_settings().RATE_LIMIT_UPLOAD)
 async def upload_manga_images(
     request: Request,
+    response: Response,
     files: list[UploadFile] = File(...),
     ai_config: str | None = Form(default=None),
     user: AuthUser = Depends(get_current_user),

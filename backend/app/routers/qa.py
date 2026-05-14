@@ -14,7 +14,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.config import get_settings
 from app.database import get_supabase
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 @router.post("", response_model=QAResponse)
 @limiter.limit(lambda: get_settings().RATE_LIMIT_QA)
-def ask_question(request: Request, payload: QARequest, user: AuthUser = Depends(get_current_user)):
+def ask_question(request: Request, response: Response, payload: QARequest, user: AuthUser = Depends(get_current_user)):
     """
     Ask a question about a manga page or series.
     Uses RAG (vector search + Gemini) to generate a grounded answer.
@@ -40,7 +40,7 @@ def ask_question(request: Request, payload: QARequest, user: AuthUser = Depends(
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
-    response = answer_question(
+    qa_result = answer_question(
         question=question,
         page_id=payload.page_id,
         series_id=payload.series_id,
@@ -54,10 +54,10 @@ def ask_question(request: Request, payload: QARequest, user: AuthUser = Depends(
             "page_id": payload.page_id,
             "user_id": user.id,
             "user_question": question,
-            "ai_answer": response.answer,
+            "ai_answer": qa_result.answer,
             "asked_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
     except Exception as exc:
         logger.warning("Failed to save Q&A history: %s", exc)
 
-    return response
+    return qa_result
