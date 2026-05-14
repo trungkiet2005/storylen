@@ -21,7 +21,13 @@
       "PowerShell(npx supabase login --token *)",
       "Bash(findstr /i \"crop\\\\|image\")",
       "Bash(findstr /i \"crop\")",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} %{time_total}s\" --max-time 10 https://storylens-api.onrender.com/health)",
+      "Bash(curl -s -I -X OPTIONS \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: http://localhost:3000\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: content-type\")",
+      "Bash(curl -s -w \"\\\\nHTTP Status: %{http_code}\\\\nTime: %{time_total}s\\\\n\" --max-time 15 -X POST \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: http://localhost:3000\" -F \"files=@d:/AI_PROJECT/Storylen_WEB/storylen/README.md\")",
+      "Bash(curl -sv --max-time 10 -X POST \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: http://localhost:3000\" -H \"Cookie: \" -F \"files=@d:/AI_PROJECT/Storylen_WEB/storylen/README.md;type=image/jpeg\")",
+      "Bash(curl -s -I -X OPTIONS \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: https://storylen.vercel.app\" -H \"Access-Control-Request-Method: POST\" -H \"Access-Control-Request-Headers: content-type\")",
+      "Bash(curl -sv --max-time 10 -X POST \"https://storylens-api.onrender.com/v1/upload\" -H \"Origin: https://storylen.vercel.app\" -F \"files=@d:/AI_PROJECT/Storylen_WEB/storylen/README.md;type=image/jpeg\")"
     ]
   }
 }

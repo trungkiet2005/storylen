@@ -33,4 +33,4 @@ def rate_key(request: Request) -> str:
     return "ip:" + _client_ip(request)
 
 
-limiter = Limiter(key_func=rate_key, headers_enabled=True)
+limiter = Limiter(key_func=rate_key, headers_enabled=False)
