@@ -344,6 +344,61 @@ export async function deleteHistoryItem(pageId: string): Promise<void> {
   return request<void>(`/history/${pageId}`, { method: "DELETE" });
 }
 
+// ─── Credits & Plans ─────────────────────────────────────────────────────────
+
+export interface PlanInfo {
+  id: string;
+  name: string;
+  price_vnd: number;
+  monthly_credits: number;
+  daily_credits: number;
+  max_batch_size: number;
+  priority_weight: number;
+  bonus_credits: number;
+  sort_order: number;
+}
+
+export interface CreditTransaction {
+  id: string;
+  amount: number;
+  type: string;
+  reference_id: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface CreditsResponse {
+  plan_tier: string;
+  credits_balance: number;
+  daily_credits_reset_at: string;
+  plan: PlanInfo | null;
+  recent_transactions: CreditTransaction[];
+}
+
+export interface UpgradeResponse {
+  plan_tier: string;
+  credits_balance: number;
+  monthly_credits_granted: number;
+  bonus_credits_granted: number;
+  message: string;
+}
+
+export async function getCredits(): Promise<CreditsResponse> {
+  return request<CreditsResponse>("/credits");
+}
+
+export async function getPlans(): Promise<PlanInfo[]> {
+  return request<PlanInfo[]>("/credits/plans");
+}
+
+export async function upgradePlan(planId: string): Promise<UpgradeResponse> {
+  return request<UpgradeResponse>("/credits/upgrade", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan_id: planId }),
+  });
+}
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 export type UserRole = "user" | "admin";

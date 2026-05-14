@@ -29,6 +29,7 @@ from app.models.schemas import ProcessingStatus, UploadResponse
 from app.rate_limit import limiter
 from app.routers.auth import AuthUser, get_current_user
 from app.services.ai_pipeline import process_page
+from app.services.credit_service import check_batch_size, check_has_credits, deduct
 from app.services.image_validation import verify_image_bytes
 from app.storage.supabase_storage import upload_original, upload_thumbnail
 
@@ -158,6 +159,12 @@ async def upload_manga_images(
         raise HTTPException(status_code=400, detail="No files provided.")
     ai_config_data = _parse_ai_config(ai_config)
 
+    supabase = get_supabase()
+
+    # ── Credit & batch-size checks ────────────────────────────────────────────
+    check_batch_size(user.id, len(files), supabase)
+    check_has_credits(user.id, len(files), supabase)
+
     # Validate ALL files before processing any (fail fast)
     validated: list[tuple[UploadFile, bytes, str]] = []
     for upload in files:
@@ -199,7 +206,6 @@ async def upload_manga_images(
 
     page_ids: list[str] = []
     batch_id = str(uuid.uuid4())
-    supabase = get_supabase()
 
     for upload, image_bytes, _ct in validated:
         page_id = str(uuid.uuid4())
@@ -241,6 +247,12 @@ async def upload_manga_images(
             )
 
         page_ids.append(page_id)
+
+        # ── Deduct 1 credit per image ──────────────────────────────────────
+        try:
+            deduct(user.id, 1, "upload", supabase, reference_id=page_id)
+        except Exception as exc:
+            logger.warning("Credit deduction failed for page %s: %s", page_id, exc)
 
         # ── Kick off background pipeline (calls HF Space) ─────────────────
         # Start AI processing outside the request lifecycle. The call can take

@@ -48,6 +48,9 @@ PROFILE_FIELDS = (
     "created_at",
     "updated_at",
     "last_seen_at",
+    "plan_tier",
+    "credits_balance",
+    "daily_credits_reset_at",
 )
 AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 
@@ -71,6 +74,9 @@ class AuthUser(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
     last_seen_at: str | None = None
+    plan_tier: str = "free"
+    credits_balance: int = 0
+    daily_credits_reset_at: str | None = None
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -371,6 +377,9 @@ def _to_auth_user(payload: dict[str, Any], username: str | None = None) -> AuthU
         created_at=_as_iso(profile.get("created_at")),
         updated_at=_as_iso(profile.get("updated_at")),
         last_seen_at=_as_iso(profile.get("last_seen_at")),
+        plan_tier=profile.get("plan_tier") or "free",
+        credits_balance=profile.get("credits_balance") or 0,
+        daily_credits_reset_at=str(profile.get("daily_credits_reset_at") or ""),
     )
 
 

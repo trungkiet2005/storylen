@@ -14,7 +14,7 @@ easy to test/review:
 """
 from fastapi import APIRouter
 
-from . import analytics, app_settings, audit, content, health, users
+from . import analytics, app_settings, audit, content, credits, health, users
 
 router = APIRouter(prefix="/admin")
 
@@ -24,5 +24,6 @@ router.include_router(analytics.router)        # /admin/stats, /admin/activity, 
 router.include_router(audit.router)            # /admin/audit
 router.include_router(app_settings.router)     # /admin/settings/...
 router.include_router(health.router)           # /admin/health
+router.include_router(credits.router)          # /admin/credits/...
 
 __all__ = ["router"]

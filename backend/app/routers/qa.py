@@ -21,6 +21,7 @@ from app.database import get_supabase
 from app.models.schemas import QARequest, QAResponse
 from app.rate_limit import limiter
 from app.routers.auth import AuthUser, get_current_user
+from app.services.credit_service import check_has_credits, deduct
 from app.services.rag import answer_question
 
 router = APIRouter(prefix="/qa", tags=["qa"])
@@ -40,15 +41,25 @@ def ask_question(request: Request, payload: QARequest, user: AuthUser = Depends(
     if not question:
         raise HTTPException(status_code=400, detail="Question cannot be empty.")
 
+    supabase = get_supabase()
+
+    # ── Credit check before calling RAG ───────────────────────────────────────
+    check_has_credits(user.id, 1, supabase)
+
     qa_result = answer_question(
         question=question,
         page_id=payload.page_id,
         series_id=payload.series_id,
     )
 
+    # Deduct 1 credit after successful RAG call
+    try:
+        deduct(user.id, 1, "qa", supabase)
+    except Exception as exc:
+        logger.warning("Credit deduction failed after Q&A for %s: %s", user.id, exc)
+
     # Persist Q&A to history (non-blocking — failure is logged and swallowed)
     try:
-        supabase = get_supabase()
         supabase.table("qa_history").insert({
             "qa_id": str(uuid.uuid4()),
             "page_id": payload.page_id,

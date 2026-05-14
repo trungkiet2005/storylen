@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Icon } from './Icons';
 import { useAuth, getAvatarInitial, getDisplayName } from '@/contexts/AuthContext';
 import { useToast } from './Toast';
+import { CreditBadge } from './CreditBadge';
 
 export const Logo = ({ size = 22 }: { size?: number }) => (
   <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -254,6 +255,9 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {/* Credit badge — only for logged-in users */}
+        {mounted && <CreditBadge />}
+
         {/* Theme toggle */}
         {mounted && (
           <button

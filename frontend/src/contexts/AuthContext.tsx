@@ -10,6 +10,8 @@ import React, {
   type ReactNode,
 } from "react";
 
+export type PlanTier = "free" | "basic" | "pro" | "premium";
+
 export interface User {
   id: string;
   username: string;
@@ -29,6 +31,9 @@ export interface User {
   created_at: string | null;
   updated_at: string | null;
   last_seen_at: string | null;
+  plan_tier: PlanTier;
+  credits_balance: number;
+  daily_credits_reset_at: string | null;
 }
 
 export type ProfileUpdate = Partial<{
@@ -60,6 +65,7 @@ interface AuthContextValue {
   register: (username: string, email: string, password: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<User | null>;
+  refreshCredits: () => Promise<void>;
   updateProfile: (patch: ProfileUpdate) => Promise<User>;
   uploadAvatar: (file: File) => Promise<User>;
   removeAvatar: () => Promise<User>;
@@ -158,6 +164,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data;
   }, []);
 
+  const refreshCredits = useCallback(async () => {
+    try {
+      const res = await authFetch("/credits", { method: "GET" });
+      if (!res.ok) return;
+      const data: { credits_balance: number; plan_tier: string; daily_credits_reset_at: string } = await res.json();
+      setUser(prev =>
+        prev
+          ? {
+              ...prev,
+              credits_balance: data.credits_balance,
+              plan_tier: (data.plan_tier as PlanTier) ?? prev.plan_tier,
+              daily_credits_reset_at: data.daily_credits_reset_at ?? prev.daily_credits_reset_at,
+            }
+          : prev,
+      );
+    } catch {
+      // ignore — credits are non-critical for rendering
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authFetch("/auth/logout", { method: "POST", body: "{}" });
@@ -209,11 +235,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       refreshUser,
+      refreshCredits,
       updateProfile,
       uploadAvatar,
       removeAvatar,
     }),
-    [isLoading, login, logout, refreshUser, register, user, updateProfile, uploadAvatar, removeAvatar],
+    [isLoading, login, logout, refreshUser, refreshCredits, register, user, updateProfile, uploadAvatar, removeAvatar],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
