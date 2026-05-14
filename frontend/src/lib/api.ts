@@ -104,6 +104,11 @@ export interface HistoryItem {
   chapters?: number;
   pages?: number;
   qa_ready?: boolean;
+  series_id?: string | null;
+  series_title?: string | null;
+  chapter_id?: string | null;
+  chapter_title?: string | null;
+  chapter_number?: number | null;
 }
 
 export interface HistoryResponse {
@@ -215,17 +220,46 @@ export async function healthCheck(): Promise<boolean> {
 
 // ─── Upload ───────────────────────────────────────────────────────────────────
 
+export interface UploadOptions {
+  aiConfig?: AIModuleCurrentConfig;
+  seriesId?: string;
+  chapterId?: string;
+  newChapterTitle?: string;
+}
+
 export async function uploadImages(
   files: File[],
-  aiConfig?: AIModuleCurrentConfig,
+  aiConfigOrOptions?: AIModuleCurrentConfig | UploadOptions,
 ): Promise<UploadResponse> {
   const fd = new FormData();
   for (const file of files) {
     fd.append("files", file);
   }
+
+  let aiConfig: AIModuleCurrentConfig | undefined;
+  let seriesId: string | undefined;
+  let chapterId: string | undefined;
+  let newChapterTitle: string | undefined;
+
+  if (aiConfigOrOptions) {
+    if ("aiConfig" in aiConfigOrOptions || "seriesId" in aiConfigOrOptions || "chapterId" in aiConfigOrOptions || "newChapterTitle" in aiConfigOrOptions) {
+      const opts = aiConfigOrOptions as UploadOptions;
+      aiConfig = opts.aiConfig;
+      seriesId = opts.seriesId;
+      chapterId = opts.chapterId;
+      newChapterTitle = opts.newChapterTitle;
+    } else {
+      aiConfig = aiConfigOrOptions as AIModuleCurrentConfig;
+    }
+  }
+
   if (aiConfig) {
     fd.append("ai_config", JSON.stringify(aiConfig));
   }
+  if (seriesId) fd.append("series_id", seriesId);
+  if (chapterId) fd.append("chapter_id", chapterId);
+  if (newChapterTitle) fd.append("new_chapter_title", newChapterTitle);
+
   return request<UploadResponse>("/upload", {
     method: "POST",
     body: fd,
@@ -347,6 +381,228 @@ export async function getHistory(params?: {
 
 export async function deleteHistoryItem(pageId: string): Promise<void> {
   return request<void>(`/history/${pageId}`, { method: "DELETE" });
+}
+
+// ─── Series ──────────────────────────────────────────────────────────────────
+
+export type SeriesStatus = "ongoing" | "completed" | "paused";
+
+export interface SeriesListItem {
+  series_id: string;
+  title: string;
+  description: string | null;
+  status: SeriesStatus | string;
+  tags: string[];
+  cover_image_url: string | null;
+  source_language: string | null;
+  target_language: string | null;
+  created_at: string;
+  updated_at: string;
+  chapter_count: number;
+  page_count: number;
+}
+
+export interface SeriesListResponse {
+  total: number;
+  items: SeriesListItem[];
+}
+
+export interface ChapterPage {
+  page_id: string;
+  page_number: number | null;
+  thumbnail_url: string | null;
+  translated_image_url: string | null;
+  original_image_url: string | null;
+  status: PageStatus["status"];
+}
+
+export interface ChapterResponse {
+  chapter_id: string;
+  series_id: string;
+  chapter_number: number;
+  title: string | null;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  page_count: number;
+  pages: ChapterPage[];
+}
+
+export interface SeriesDetail {
+  series_id: string;
+  user_id: string | null;
+  title: string;
+  description: string | null;
+  status: SeriesStatus | string;
+  tags: string[];
+  cover_image_url: string | null;
+  source_language: string | null;
+  target_language: string | null;
+  created_at: string;
+  updated_at: string;
+  chapters: ChapterResponse[];
+  chapter_count: number;
+  page_count: number;
+}
+
+export interface SeriesCreatePayload {
+  title: string;
+  description?: string | null;
+  status?: SeriesStatus | string;
+  tags?: string[];
+  source_language?: string | null;
+  target_language?: string | null;
+}
+
+export interface SeriesUpdatePayload {
+  title?: string;
+  description?: string | null;
+  status?: SeriesStatus | string;
+  tags?: string[];
+  source_language?: string | null;
+  target_language?: string | null;
+  cover_image_url?: string | null;
+}
+
+export interface ChapterCreatePayload {
+  title?: string | null;
+  description?: string | null;
+  chapter_number?: number;
+}
+
+export interface ChapterUpdatePayload {
+  title?: string | null;
+  description?: string | null;
+  chapter_number?: number;
+}
+
+export interface ReorderItem {
+  id: string;
+  order: number;
+}
+
+export async function listSeries(params?: {
+  limit?: number;
+  offset?: number;
+  status?: string;
+}): Promise<SeriesListResponse> {
+  const qs = new URLSearchParams();
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  if (params?.status) qs.set("status", params.status);
+  const q = qs.toString();
+  return request<SeriesListResponse>(`/series${q ? `?${q}` : ""}`);
+}
+
+export async function getSeries(seriesId: string): Promise<SeriesDetail> {
+  return request<SeriesDetail>(`/series/${seriesId}`);
+}
+
+export async function getSeriesFull(seriesId: string): Promise<SeriesDetail> {
+  return request<SeriesDetail>(`/series/${seriesId}/full`);
+}
+
+export async function createSeries(payload: SeriesCreatePayload): Promise<SeriesDetail> {
+  return request<SeriesDetail>("/series", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateSeries(
+  seriesId: string,
+  payload: SeriesUpdatePayload,
+): Promise<SeriesDetail> {
+  return request<SeriesDetail>(`/series/${seriesId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteSeries(seriesId: string): Promise<void> {
+  return request<void>(`/series/${seriesId}`, { method: "DELETE" });
+}
+
+export async function uploadSeriesCover(
+  seriesId: string,
+  file: File,
+): Promise<SeriesDetail> {
+  const fd = new FormData();
+  fd.append("file", file);
+  return request<SeriesDetail>(`/series/${seriesId}/cover`, {
+    method: "POST",
+    body: fd,
+  });
+}
+
+export async function createChapter(
+  seriesId: string,
+  payload: ChapterCreatePayload,
+): Promise<ChapterResponse> {
+  return request<ChapterResponse>(`/series/${seriesId}/chapters`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateChapter(
+  chapterId: string,
+  payload: ChapterUpdatePayload,
+): Promise<ChapterResponse> {
+  return request<ChapterResponse>(`/chapters/${chapterId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteChapter(chapterId: string): Promise<void> {
+  return request<void>(`/chapters/${chapterId}`, { method: "DELETE" });
+}
+
+export async function reorderChapters(
+  seriesId: string,
+  items: ReorderItem[],
+): Promise<void> {
+  return request<void>(`/series/${seriesId}/chapters/reorder`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+}
+
+export async function reorderPages(
+  chapterId: string,
+  items: ReorderItem[],
+): Promise<void> {
+  return request<void>(`/chapters/${chapterId}/reorder`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+}
+
+export async function addPagesToChapter(
+  chapterId: string,
+  pageIds: string[],
+): Promise<ChapterResponse> {
+  return request<ChapterResponse>(`/chapters/${chapterId}/add-pages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ page_ids: pageIds }),
+  });
+}
+
+export async function removePageFromChapter(
+  chapterId: string,
+  pageId: string,
+): Promise<void> {
+  return request<void>(`/chapters/${chapterId}/pages/${pageId}`, {
+    method: "DELETE",
+  });
 }
 
 // ─── Credits & Plans ─────────────────────────────────────────────────────────

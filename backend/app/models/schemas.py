@@ -139,8 +139,120 @@ class HistoryItem(BaseModel):
     thumbnail_url: Optional[str] = None
     last_accessed: datetime
     status: ProcessingStatus
+    series_id: Optional[str] = None
+    series_title: Optional[str] = None
+    chapter_id: Optional[str] = None
+    chapter_title: Optional[str] = None
+    chapter_number: Optional[int] = None
 
 
 class HistoryResponse(BaseModel):
     total: int
     items: list[HistoryItem]
+
+
+# ─── Manga Series / Chapters ───────────────────────────────────────────────────
+
+SeriesStatus = str  # 'ongoing' | 'completed' | 'paused' — validated at API boundary
+
+
+class SeriesCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=5000)
+    status: str = Field(default="ongoing")
+    tags: list[str] = Field(default_factory=list, max_length=20)
+    source_language: Optional[str] = Field(default=None, max_length=16)
+    target_language: Optional[str] = Field(default=None, max_length=16)
+
+
+class SeriesUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=5000)
+    status: Optional[str] = None
+    tags: Optional[list[str]] = Field(default=None, max_length=20)
+    source_language: Optional[str] = Field(default=None, max_length=16)
+    target_language: Optional[str] = Field(default=None, max_length=16)
+    cover_image_url: Optional[str] = None
+
+
+class SeriesListItem(BaseModel):
+    series_id: str
+    title: str
+    description: Optional[str] = None
+    status: str
+    tags: list[str] = []
+    cover_image_url: Optional[str] = None
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    chapter_count: int = 0
+    page_count: int = 0
+
+
+class SeriesListResponse(BaseModel):
+    total: int
+    items: list[SeriesListItem]
+
+
+class ChapterCreate(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=5000)
+    chapter_number: Optional[int] = Field(default=None, ge=1)
+
+
+class ChapterUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=5000)
+    chapter_number: Optional[int] = Field(default=None, ge=1)
+
+
+class ChapterPage(BaseModel):
+    page_id: str
+    page_number: Optional[int] = None
+    thumbnail_url: Optional[str] = None
+    translated_image_url: Optional[str] = None
+    original_image_url: Optional[str] = None
+    status: ProcessingStatus
+
+
+class ChapterResponse(BaseModel):
+    chapter_id: str
+    series_id: str
+    chapter_number: int
+    title: Optional[str] = None
+    description: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    page_count: int = 0
+    pages: list[ChapterPage] = []
+
+
+class SeriesResponse(BaseModel):
+    series_id: str
+    user_id: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    status: str
+    tags: list[str] = []
+    cover_image_url: Optional[str] = None
+    source_language: Optional[str] = None
+    target_language: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    chapters: list[ChapterResponse] = []
+    chapter_count: int = 0
+    page_count: int = 0
+
+
+class ReorderItem(BaseModel):
+    id: str
+    order: int
+
+
+class ReorderRequest(BaseModel):
+    items: list[ReorderItem]
+
+
+class AddPagesRequest(BaseModel):
+    page_ids: list[str] = Field(..., min_length=1, max_length=200)

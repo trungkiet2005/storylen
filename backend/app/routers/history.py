@@ -68,6 +68,41 @@ def get_history(
         logger.error("Failed to fetch manga_pages history: %s", exc)
         rows = []
 
+    # ── Hydrate chapter/series info for pages that have chapter_id ──────────
+    chapter_ids = {row.get("chapter_id") for row in rows if row.get("chapter_id")}
+    chapter_lookup: dict[str, dict[str, object]] = {}
+    if chapter_ids:
+        try:
+            chap_rows = (
+                supabase.table("manga_chapters")
+                .select("chapter_id, chapter_number, title, series_id")
+                .in_("chapter_id", list(chapter_ids))
+                .execute()
+                .data
+                or []
+            )
+            series_ids = {c["series_id"] for c in chap_rows if c.get("series_id")}
+            series_titles: dict[str, str] = {}
+            if series_ids:
+                ser_rows = (
+                    supabase.table("manga_series")
+                    .select("series_id, title")
+                    .in_("series_id", list(series_ids))
+                    .execute()
+                    .data
+                    or []
+                )
+                series_titles = {s["series_id"]: s.get("title") or "" for s in ser_rows}
+            for c in chap_rows:
+                chapter_lookup[c["chapter_id"]] = {
+                    "chapter_number": c.get("chapter_number"),
+                    "chapter_title": c.get("title"),
+                    "series_id": c.get("series_id"),
+                    "series_title": series_titles.get(c.get("series_id"), ""),
+                }
+        except Exception as exc:
+            logger.warning("Failed to hydrate chapter/series for history: %s", exc)
+
     items: list[HistoryItem] = []
     for row in rows:
         # Parse status safely
@@ -81,16 +116,20 @@ def get_history(
             )
             status = ProcessingStatus.FAILED
 
-        # Build a human-readable title
         page_number = row.get("page_number")
         chapter_id = row.get("chapter_id")
+        chap_info = chapter_lookup.get(chapter_id) if chapter_id else None
+
+        # Build a human-readable title
         if page_number is not None:
-            title = f"Page {page_number}"
+            title = f"Trang {page_number}"
         else:
             page_id_short = (row.get("page_id") or "?")[:8]
-            title = f"Page {page_id_short}…"
-        if chapter_id:
-            title = f"Chapter — {title}"
+            title = f"Trang {page_id_short}…"
+        if chap_info:
+            chap_num = chap_info.get("chapter_number")
+            if chap_num is not None:
+                title = f"Chương {chap_num} — {title}"
 
         uploaded_at = row.get("uploaded_at")
         if not uploaded_at:
@@ -104,6 +143,11 @@ def get_history(
                 thumbnail_url=row.get("thumbnail_url"),
                 last_accessed=uploaded_at,
                 status=status,
+                series_id=chap_info.get("series_id") if chap_info else None,
+                series_title=chap_info.get("series_title") if chap_info else None,
+                chapter_id=chapter_id,
+                chapter_title=chap_info.get("chapter_title") if chap_info else None,
+                chapter_number=chap_info.get("chapter_number") if chap_info else None,
             )
         )
 

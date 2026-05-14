@@ -18,6 +18,7 @@ import {
   TranslationHistoryItem,
   HistoryItem,
 } from '@/lib/api';
+import { AddToSeriesModal } from '@/components/AddToSeriesModal';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedPage } from '@/components/Animations';
@@ -461,6 +462,9 @@ function ReaderContent() {
   const [historyByBubble, setHistoryByBubble] = useState<Record<string, TranslationHistoryItem[]>>({});
   const [historyLoadingBubbleId, setHistoryLoadingBubbleId] = useState<string | null>(null);
 
+  // Add-to-series modal
+  const [showAddToSeries, setShowAddToSeries] = useState(false);
+
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
   // Batch processing support
@@ -729,6 +733,44 @@ function ReaderContent() {
           className="scroll"
           style={{ display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto", padding: "20px 32px", gap: 16 }}
         >
+          {/* Series breadcrumb (when page belongs to a series) */}
+          {pageData?.metadata?.series_id && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                width: "100%",
+                maxWidth: 840,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+              }}
+            >
+              <Link
+                href={`/series/${pageData.metadata.series_id}`}
+                style={{ textDecoration: "none", color: "var(--accent)", display: "inline-flex", alignItems: "center", gap: 5 }}
+              >
+                <Icon name="stack" size={11} /> Bộ truyện
+              </Link>
+              {pageData.metadata.page_number != null && (
+                <>
+                  <span style={{ color: "var(--muted)" }}>/</span>
+                  <span className="mono" style={{ color: "var(--fg-soft)" }}>Trang {pageData.metadata.page_number}</span>
+                </>
+              )}
+              <div style={{ flex: 1 }} />
+              <Link
+                href={`/series/${pageData.metadata.series_id}/read?page=${pageData.page_id}`}
+                style={{ textDecoration: "none" }}
+              >
+                <button className="btn btn-sm">
+                  <Icon name="book" size={11} /> Đọc liền mạch
+                </button>
+              </Link>
+            </motion.div>
+          )}
+
           {/* Toolbar */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -740,6 +782,21 @@ function ReaderContent() {
             <span className="caps-xs" style={{ color: "var(--accent)", marginRight: 6 }}>
               {pageData ? `Trang đã dịch · ${pageData.page_id.slice(0, 8)}…` : `Reader · Trang truyện`}
             </span>
+
+            {/* Add to series — only when page exists and is NOT already in a series */}
+            {pageData && !pageData.metadata?.series_id && (
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                className="btn btn-sm btn-ghost"
+                onClick={() => setShowAddToSeries(true)}
+                title="Thêm trang này vào một bộ truyện"
+                style={{ fontSize: 11, padding: "4px 8px" }}
+              >
+                <Icon name="stack" size={11} /> Thêm vào bộ truyện
+              </motion.button>
+            )}
+
             <div style={{ flex: 1 }}/>
 
             {/* View mode tabs */}
@@ -1257,6 +1314,19 @@ function ReaderContent() {
         </AnimatePresence>
       </div>
     </div>
+    {pageData && (
+      <AddToSeriesModal
+        open={showAddToSeries}
+        pageIds={[pageData.page_id]}
+        onClose={() => setShowAddToSeries(false)}
+        onSuccess={() => {
+          // Re-fetch page metadata so the breadcrumb appears
+          if (pageIdParam) {
+            getPage(pageIdParam).then(setPageData).catch(() => {});
+          }
+        }}
+      />
+    )}
     </AnimatedPage>
   );
 }

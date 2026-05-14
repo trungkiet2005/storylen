@@ -143,23 +143,148 @@ def _start_pipeline_task(
     worker.start()
 
 
+def _resolve_target_chapter(
+    supabase,
+    user_id: str,
+    series_id: str | None,
+    chapter_id: str | None,
+    new_chapter_title: str | None,
+) -> str | None:
+    """
+    Resolve the chapter to attach uploaded pages to.
+
+    Rules:
+    - No series_id and no chapter_id → return None (orphan pages, original behavior).
+    - chapter_id provided → verify it belongs to a series owned by user.
+    - series_id only → if new_chapter_title given OR no chapters exist, create new.
+                       Otherwise use the highest-numbered existing chapter.
+    Returns the chapter_id or None.
+    """
+    if not series_id and not chapter_id:
+        return None
+
+    # If chapter_id provided, verify ownership and return it.
+    if chapter_id:
+        chap_res = (
+            supabase.table("manga_chapters")
+            .select("chapter_id, series_id")
+            .eq("chapter_id", chapter_id)
+            .maybe_single()
+            .execute()
+        )
+        chap = chap_res.data if chap_res else None
+        if not chap:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chương.")
+        ser_res = (
+            supabase.table("manga_series")
+            .select("user_id")
+            .eq("series_id", chap["series_id"])
+            .maybe_single()
+            .execute()
+        )
+        ser = ser_res.data if ser_res else None
+        if not ser or ser.get("user_id") != user_id:
+            raise HTTPException(status_code=403, detail="Chương không thuộc về bạn.")
+        return chapter_id
+
+    # series_id only → verify ownership
+    ser_res = (
+        supabase.table("manga_series")
+        .select("series_id, user_id")
+        .eq("series_id", series_id)
+        .maybe_single()
+        .execute()
+    )
+    ser = ser_res.data if ser_res else None
+    if not ser:
+        raise HTTPException(status_code=404, detail="Không tìm thấy bộ truyện.")
+    if ser.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Bộ truyện không thuộc về bạn.")
+
+    existing = (
+        supabase.table("manga_chapters")
+        .select("chapter_id, chapter_number")
+        .eq("series_id", series_id)
+        .order("chapter_number", desc=True)
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+
+    title = (new_chapter_title or "").strip() or None
+    if title or not existing:
+        next_num = (existing[0]["chapter_number"] + 1) if existing else 1
+        new_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            supabase.table("manga_chapters").insert(
+                {
+                    "chapter_id": new_id,
+                    "series_id": series_id,
+                    "chapter_number": next_num,
+                    "title": title,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            ).execute()
+        except Exception as exc:
+            logger.error("Auto-create chapter failed: %s", exc)
+            raise HTTPException(status_code=503, detail="Không tạo được chương.") from exc
+        return new_id
+
+    return existing[0]["chapter_id"]
+
+
 @router.post("", response_model=UploadResponse, status_code=202)
 @limiter.limit(lambda: get_settings().RATE_LIMIT_UPLOAD)
 async def upload_manga_images(
     request: Request,
     files: list[UploadFile] = File(...),
     ai_config: str | None = Form(default=None),
+    series_id: str | None = Form(default=None),
+    chapter_id: str | None = Form(default=None),
+    new_chapter_title: str | None = Form(default=None),
     user: AuthUser = Depends(get_current_user),
 ):
     """
     Upload one or more manga images (JPG / PNG / WebP).
     Returns page_ids for polling /status/{page_id}.
+
+    Optional series binding:
+    - series_id + chapter_id → attach pages to that chapter
+    - series_id + new_chapter_title → create a new chapter and attach
+    - series_id only → append to the latest chapter (or auto-create chapter 1)
     """
     if not files:
         raise HTTPException(status_code=400, detail="No files provided.")
     ai_config_data = _parse_ai_config(ai_config)
 
     supabase = get_supabase()
+
+    target_chapter_id = _resolve_target_chapter(
+        supabase, user.id, series_id, chapter_id, new_chapter_title,
+    )
+
+    # Compute starting page_number when attaching to a chapter
+    starting_page_number: int | None = None
+    if target_chapter_id:
+        try:
+            existing_pages = (
+                supabase.table("manga_pages")
+                .select("page_number")
+                .eq("chapter_id", target_chapter_id)
+                .order("page_number", desc=True)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            starting_page_number = (
+                (existing_pages[0].get("page_number") or 0) + 1 if existing_pages else 1
+            )
+        except Exception:
+            starting_page_number = 1
 
     # ── Credit & batch-size checks ────────────────────────────────────────────
     check_batch_size(user.id, len(files), supabase)
@@ -207,7 +332,7 @@ async def upload_manga_images(
     page_ids: list[str] = []
     batch_id = str(uuid.uuid4())
 
-    for upload, image_bytes, _ct in validated:
+    for index, (upload, image_bytes, _ct) in enumerate(validated):
         page_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
 
@@ -228,17 +353,22 @@ async def upload_manga_images(
         # thumbnail_url may be None if generation failed — that's OK
 
         # ── Create page record in DB ───────────────────────────────────────
+        page_record: dict[str, object] = {
+            "page_id": page_id,
+            "batch_id": batch_id,
+            "user_id": user.id,
+            "original_image_url": original_url,
+            "thumbnail_url": thumbnail_url,
+            "status": ProcessingStatus.PENDING.value,
+            "progress": 0,
+            "uploaded_at": now,
+        }
+        if target_chapter_id:
+            page_record["chapter_id"] = target_chapter_id
+            page_record["page_number"] = (starting_page_number or 1) + index
+
         try:
-            supabase.table("manga_pages").insert({
-                "page_id": page_id,
-                "batch_id": batch_id,
-                "user_id": user.id,
-                "original_image_url": original_url,
-                "thumbnail_url": thumbnail_url,
-                "status": ProcessingStatus.PENDING.value,
-                "progress": 0,
-                "uploaded_at": now,
-            }).execute()
+            supabase.table("manga_pages").insert(page_record).execute()
         except Exception as exc:
             logger.error("DB insert failed for page %s: %s", page_id, exc)
             raise HTTPException(
@@ -259,6 +389,15 @@ async def upload_manga_images(
         # minutes, and hosting proxies may keep the upload request open when
         # Starlette BackgroundTasks are used for long-running work.
         _start_pipeline_task(page_id, original_url, ai_config_data)
+
+    # Bump parent series so it sorts to the top of /series listing
+    if target_chapter_id and series_id:
+        try:
+            supabase.table("manga_series").update(
+                {"updated_at": datetime.now(timezone.utc).isoformat()}
+            ).eq("series_id", series_id).execute()
+        except Exception:
+            pass
 
     return UploadResponse(
         message=(

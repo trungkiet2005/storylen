@@ -9,6 +9,7 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { AddToSeriesModal } from "@/components/AddToSeriesModal";
 import {
   AnimatedPage,
   FadeIn,
@@ -97,6 +98,25 @@ export default function HistoryPage() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Multi-select state
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  }, []);
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -277,6 +297,19 @@ export default function HistoryPage() {
                 <motion.button
                   whileHover={{ scale: 1.04 }}
                   whileTap={{ scale: 0.96 }}
+                  className={`btn btn-sm ${selectMode ? "btn-primary" : "btn-ghost"}`}
+                  onClick={() => {
+                    if (selectMode) clearSelection();
+                    else setSelectMode(true);
+                  }}
+                  aria-pressed={selectMode}
+                  title={selectMode ? "Thoát chế độ chọn" : "Chọn nhiều trang để thêm vào bộ truyện"}
+                >
+                  <Icon name="grid" size={13} /> {selectMode ? "Xong" : "Chọn nhiều"}
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
                   className="btn btn-sm btn-ghost"
                   onClick={load}
                   disabled={loading}
@@ -383,10 +416,15 @@ export default function HistoryPage() {
                   const meta = STATUS_META[item.status] ?? STATUS_META.failed;
                   const isReady = meta.tone === "ready";
                   const isDeleting = deletingId === item.id;
+                  const isSelected = selectedIds.has(item.id);
+                  const canSelect = selectMode && isReady;
                   return (
                     <StaggerItem key={item.id} direction="up" distance={15}>
                       <motion.div
                         whileHover={{ y: -3, boxShadow: "6px 6px 0 0 var(--border)" }}
+                        onClick={() => {
+                          if (canSelect) toggleSelect(item.id);
+                        }}
                         className="stroke-ink panel-shadow"
                         style={{
                           background: "var(--panel)",
@@ -395,6 +433,9 @@ export default function HistoryPage() {
                           display: "flex",
                           flexDirection: "column",
                           opacity: isDeleting ? 0.5 : 1,
+                          cursor: canSelect ? "pointer" : "default",
+                          outline: isSelected ? "3px solid var(--accent)" : undefined,
+                          outlineOffset: isSelected ? -3 : undefined,
                         }}
                       >
                         {/* Thumbnail */}
@@ -409,6 +450,54 @@ export default function HistoryPage() {
                           }}
                           className="halftone-coarse"
                         >
+                          {selectMode && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: 8,
+                                right: 8,
+                                zIndex: 2,
+                                width: 22,
+                                height: 22,
+                                background: isSelected ? "var(--accent)" : "var(--panel)",
+                                border: "2px solid var(--border)",
+                                borderRadius: 4,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: isSelected ? "var(--paper)" : "transparent",
+                              }}
+                            >
+                              <Icon name="check" size={12} />
+                            </div>
+                          )}
+                          {item.series_title && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                bottom: 6,
+                                left: 6,
+                                right: 6,
+                                background: "rgba(17,17,17,0.75)",
+                                color: "var(--paper)",
+                                padding: "3px 7px",
+                                fontSize: 9,
+                                fontFamily: "var(--font-mono)",
+                                letterSpacing: "0.04em",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
+                                zIndex: 1,
+                              }}
+                              title={item.series_title}
+                            >
+                              <Icon name="stack" size={9} />
+                              {item.series_title}
+                            </div>
+                          )}
                           {item.thumbnail_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -494,6 +583,7 @@ export default function HistoryPage() {
 
                         {/* Footer actions */}
                         <div
+                          onClick={e => e.stopPropagation()}
                           style={{
                             padding: "8px 12px",
                             borderTop: "1px dashed var(--border-soft)",
@@ -588,6 +678,55 @@ export default function HistoryPage() {
             </StaggerContainer>
           )}
         </div>
+
+        {/* Multi-select floating action bar */}
+        <AnimatePresence>
+          {selectMode && selectedIds.size > 0 && (
+            <motion.div
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 80, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              className="stroke-ink panel-shadow"
+              style={{
+                position: "fixed",
+                bottom: 24,
+                left: "50%",
+                transform: "translateX(-50%)",
+                background: "var(--panel)",
+                padding: "10px 16px",
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                zIndex: 50,
+                minWidth: 320,
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                Đã chọn {selectedIds.size} trang
+              </div>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="btn btn-sm btn-primary"
+              >
+                <Icon name="stack" size={12} /> Thêm vào bộ truyện
+              </button>
+              <button onClick={clearSelection} className="btn btn-sm btn-ghost" title="Bỏ chọn">
+                <Icon name="x" size={12} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AddToSeriesModal
+          open={showAddModal}
+          pageIds={Array.from(selectedIds)}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => {
+            clearSelection();
+            load();
+          }}
+        />
       </div>
     </AnimatedPage>
   );

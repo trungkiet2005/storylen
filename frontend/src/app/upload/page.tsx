@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { Suspense, useState, useRef, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { TopBar } from '@/components/TopBar';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Icon } from '@/components/Icons';
@@ -14,6 +15,12 @@ import {
   AIModuleCurrentConfig,
   AIModuleOptions,
   BatchStatus,
+  createSeries,
+  listSeries,
+  getSeries,
+  type SeriesListItem,
+  type ChapterResponse,
+  type SeriesDetail,
 } from '@/lib/api';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -194,21 +201,108 @@ async function convertPdfToImageFiles(
 }
 
 export default function UploadPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon name="refresh" size={28} />
+        </div>
+      }
+    >
+      <UploadPageInner />
+    </Suspense>
+  );
+}
+
+function UploadPageInner() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading: authLoading, refreshUser } = useAuth();
+  const searchParams = useSearchParams();
   const [state, setState] = useState<UploadState>("idle");
   const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([]);
   const selectedFilesRef = useRef<FileItem[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isPreparingFiles, setIsPreparingFiles] = useState(false);
-  
+
   const [aiOptions, setAiOptions] = useState<AIModuleOptions | null>(null);
   const [aiOptionsError, setAiOptionsError] = useState<string | null>(null);
   const [translationConfig, setTranslationConfig] = useState<AIModuleCurrentConfig>(DEFAULT_AI_CONFIG);
-  
+
   const [logs, setLogs] = useState<LogMessage[]>([]);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null); // null = checking
+
+  // ── Series binding ─────────────────────────────────────────────────────────
+  // "none" = orphan upload (legacy behavior). Otherwise series_id.
+  const [seriesChoice, setSeriesChoice] = useState<string>(
+    searchParams.get("series_id") || "none",
+  );
+  const [chapterChoice, setChapterChoice] = useState<string>(
+    searchParams.get("chapter_id") || "auto",
+  );
+  const [newChapterTitle, setNewChapterTitle] = useState("");
+  const [seriesList, setSeriesList] = useState<SeriesListItem[]>([]);
+  const [seriesDetail, setSeriesDetail] = useState<SeriesDetail | null>(null);
+  const [loadingSeries, setLoadingSeries] = useState(false);
+  const [showCreateSeries, setShowCreateSeries] = useState(false);
+  const [newSeriesTitle, setNewSeriesTitle] = useState("");
+  const [creatingSeries, setCreatingSeries] = useState(false);
+
+  // Load series list once
+  useEffect(() => {
+    setLoadingSeries(true);
+    listSeries({ limit: 200 })
+      .then(res => setSeriesList(res.items))
+      .catch(() => setSeriesList([]))
+      .finally(() => setLoadingSeries(false));
+  }, []);
+
+  // Load chapters when a series is picked
+  useEffect(() => {
+    if (seriesChoice === "none") {
+      setSeriesDetail(null);
+      return;
+    }
+    getSeries(seriesChoice)
+      .then(setSeriesDetail)
+      .catch(() => setSeriesDetail(null));
+  }, [seriesChoice]);
+
+  const handleCreateInlineSeries = async () => {
+    if (!newSeriesTitle.trim()) {
+      toast("Hãy nhập tên bộ truyện.", "error");
+      return;
+    }
+    setCreatingSeries(true);
+    try {
+      const series = await createSeries({ title: newSeriesTitle.trim() });
+      const item: SeriesListItem = {
+        series_id: series.series_id,
+        title: series.title,
+        description: series.description,
+        status: series.status,
+        tags: series.tags,
+        cover_image_url: series.cover_image_url,
+        source_language: series.source_language,
+        target_language: series.target_language,
+        created_at: series.created_at,
+        updated_at: series.updated_at,
+        chapter_count: series.chapter_count,
+        page_count: series.page_count,
+      };
+      setSeriesList(prev => [item, ...prev]);
+      setSeriesChoice(series.series_id);
+      setChapterChoice("auto");
+      setShowCreateSeries(false);
+      setNewSeriesTitle("");
+      toast("Đã tạo bộ truyện.", "success");
+    } catch (err) {
+      const msg = err instanceof APIError ? err.message : "Tạo bộ truyện thất bại.";
+      toast(msg, "error");
+    } finally {
+      setCreatingSeries(false);
+    }
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
@@ -420,7 +514,18 @@ export default function UploadPage() {
       addLog("Đang tải các tệp lên bộ lưu trữ...", 'info');
       const rawFiles = selectedFiles.map(f => f.file);
       
-      const response = await uploadImages(rawFiles, translationConfig);
+      const uploadOpts: { aiConfig: AIModuleCurrentConfig; seriesId?: string; chapterId?: string; newChapterTitle?: string } = {
+        aiConfig: translationConfig,
+      };
+      if (seriesChoice !== "none") {
+        uploadOpts.seriesId = seriesChoice;
+        if (chapterChoice === "new") {
+          uploadOpts.newChapterTitle = newChapterTitle.trim() || "Chương mới";
+        } else if (chapterChoice !== "auto") {
+          uploadOpts.chapterId = chapterChoice;
+        }
+      }
+      const response = await uploadImages(rawFiles, uploadOpts);
       const batchId = response.batch_id;
       const pageIds = response.page_ids;
       setBatchId(batchId);
@@ -895,6 +1000,165 @@ export default function UploadPage() {
                               Khóa tùy chọn khi đang tiến hành dịch thuật.
                             </div>
                   )}
+                </div>
+              </FadeIn>
+
+              {/* Series binding */}
+              <FadeIn direction="up" distance={15} delay={0.28}>
+                <div className="stroke-ink" style={{ background: "var(--panel)", padding: 20 }}>
+                  <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 10 }}>Thêm vào bộ truyện</div>
+
+                  <label style={{ display: "grid", gap: 6, marginBottom: 12 }}>
+                    <span className="caps-xs" style={{ color: "var(--muted)", fontSize: 10 }}>Bộ truyện</span>
+                    <select
+                      value={seriesChoice}
+                      onChange={e => {
+                        setSeriesChoice(e.target.value);
+                        setChapterChoice("auto");
+                      }}
+                      disabled={state !== "idle" || isPreparingFiles || loadingSeries}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        border: "2px solid var(--border)",
+                        background: "var(--bg)",
+                        color: "var(--fg)",
+                        fontFamily: "inherit",
+                        fontSize: 13,
+                        cursor: state !== "idle" ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      <option value="none">— Không (chỉ dịch) —</option>
+                      {seriesList.map(s => (
+                        <option key={s.series_id} value={s.series_id}>
+                          {s.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {!showCreateSeries ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateSeries(true)}
+                      className="btn btn-sm btn-ghost"
+                      style={{ width: "100%", marginBottom: 12, fontSize: 11 }}
+                      disabled={state !== "idle"}
+                    >
+                      <Icon name="plus" size={11} /> Tạo bộ truyện mới
+                    </button>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 6,
+                        marginBottom: 12,
+                        padding: 8,
+                        background: "var(--bg-2)",
+                        border: "1px dashed var(--border)",
+                      }}
+                    >
+                      <input
+                        autoFocus
+                        value={newSeriesTitle}
+                        onChange={e => setNewSeriesTitle(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleCreateInlineSeries();
+                          }
+                          if (e.key === "Escape") setShowCreateSeries(false);
+                        }}
+                        placeholder="Tên bộ truyện…"
+                        maxLength={200}
+                        style={{
+                          flex: 1,
+                          padding: "6px 8px",
+                          fontSize: 12,
+                          border: "1px solid var(--border)",
+                          background: "var(--panel)",
+                          outline: "none",
+                          color: "var(--fg)",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCreateInlineSeries}
+                        disabled={creatingSeries}
+                        className="btn btn-sm btn-primary"
+                        style={{ fontSize: 11 }}
+                      >
+                        {creatingSeries ? "…" : <Icon name="check" size={10} />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateSeries(false)}
+                        className="btn btn-sm btn-ghost"
+                        style={{ fontSize: 11 }}
+                      >
+                        <Icon name="x" size={10} />
+                      </button>
+                    </div>
+                  )}
+
+                  {seriesChoice !== "none" && (
+                    <>
+                      <label style={{ display: "grid", gap: 6, marginBottom: 10 }}>
+                        <span className="caps-xs" style={{ color: "var(--muted)", fontSize: 10 }}>Chương</span>
+                        <select
+                          value={chapterChoice}
+                          onChange={e => setChapterChoice(e.target.value)}
+                          disabled={state !== "idle" || isPreparingFiles}
+                          style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            border: "2px solid var(--border)",
+                            background: "var(--bg)",
+                            color: "var(--fg)",
+                            fontFamily: "inherit",
+                            fontSize: 13,
+                            cursor: state !== "idle" ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          <option value="auto">
+                            {seriesDetail && seriesDetail.chapters.length > 0
+                              ? `Tự động — thêm vào chương cuối (Ch.${seriesDetail.chapters[seriesDetail.chapters.length - 1].chapter_number})`
+                              : "Tự động — tạo Chương 1"}
+                          </option>
+                          {seriesDetail?.chapters.map(c => (
+                            <option key={c.chapter_id} value={c.chapter_id}>
+                              Ch.{c.chapter_number} {c.title ? `— ${c.title}` : ""}
+                            </option>
+                          ))}
+                          <option value="new">+ Tạo chương mới</option>
+                        </select>
+                      </label>
+
+                      {chapterChoice === "new" && (
+                        <input
+                          value={newChapterTitle}
+                          onChange={e => setNewChapterTitle(e.target.value)}
+                          placeholder="Tên chương mới (tùy chọn)…"
+                          maxLength={200}
+                          disabled={state !== "idle"}
+                          style={{
+                            width: "100%",
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            border: "2px solid var(--border)",
+                            background: "var(--bg-2)",
+                            outline: "none",
+                            color: "var(--fg)",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
+
+                  <div style={{ marginTop: 8, fontSize: 10, color: "var(--muted)" }}>
+                    Để trống nếu chỉ muốn dịch như bình thường (sẽ vào Lịch sử).
+                  </div>
                 </div>
               </FadeIn>
 

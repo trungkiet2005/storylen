@@ -19,7 +19,7 @@ from app.middleware import (
     RequestIDMiddleware,
 )
 from app.rate_limit import limiter
-from app.routers import admin, ai_module, auth, credits, history, pages, qa, status, upload
+from app.routers import admin, ai_module, auth, credits, history, pages, qa, series, status, upload
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 _request_id_filter = RequestIDFilter()
@@ -160,6 +160,7 @@ app.include_router(status.router,  prefix=API_PREFIX)
 app.include_router(pages.router,   prefix=API_PREFIX)
 app.include_router(qa.router,      prefix=API_PREFIX)
 app.include_router(history.router, prefix=API_PREFIX)
+app.include_router(series.router,  prefix=API_PREFIX)
 app.include_router(admin.router,   prefix=API_PREFIX)
 
 

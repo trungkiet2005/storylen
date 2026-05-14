@@ -217,7 +217,7 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
     { id: "home",    label: "Trang chủ", icon: "home",    href: "/" },
     { id: "upload",  label: "Tải lên",   icon: "upload",  href: "/upload" },
     { id: "reader",  label: "Đọc",       icon: "book",    href: "/reader" },
-    { id: "qa",      label: "Hỏi AI",    icon: "chat",    href: "/qa" },
+{ id: "series",  label: "Bộ truyện", icon: "stack",   href: "/series" },
     { id: "history", label: "Lịch sử",   icon: "history", href: "/history" },
     ...(isAdmin ? [{ id: "admin", label: "Quản trị", icon: "key", href: "/admin" }] : []),
   ];
