@@ -8,6 +8,106 @@ import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from "@/component
 import { useWibu } from "@/contexts/WibuContext";
 import { type ReadingStats } from "@/lib/localStore";
 
+// ── Daily goal card ─────────────────────────────────────────────────────────
+function DailyGoalCard({
+  todayPages,
+  target,
+  onChange,
+}: {
+  todayPages: number;
+  target: number;
+  onChange: (t: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(target));
+  const pct = target > 0 ? Math.min(100, Math.round((todayPages / target) * 100)) : 0;
+  const reached = todayPages >= target && target > 0;
+
+  const commit = () => {
+    const n = Math.max(1, Math.min(500, parseInt(draft, 10) || target));
+    onChange(n);
+    setEditing(false);
+  };
+
+  return (
+    <div
+      className="stroke-ink panel-shadow"
+      style={{ background: "var(--panel)", padding: "18px 24px", marginBottom: 24 }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Icon name="zap" size={16} />
+          <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg)" }}>
+            Mục tiêu hôm nay
+          </span>
+          {reached && (
+            <span
+              className="chip"
+              style={{ background: "var(--jade)", color: "#fff", border: "none", fontSize: 10, padding: "2px 8px", fontWeight: 800, letterSpacing: "0.05em" }}
+            >
+              ĐẠT ✓
+            </span>
+          )}
+        </div>
+        {editing ? (
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
+              autoFocus
+              style={{
+                width: 60, padding: "4px 6px", fontSize: 13,
+                border: "1.5px solid var(--border)", background: "var(--bg-2)",
+                color: "var(--fg)", outline: "none", fontFamily: "var(--font-mono)",
+              }}
+            />
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>trang/ngày</span>
+            <button onClick={commit} className="btn btn-sm btn-primary" style={{ padding: "3px 8px", fontSize: 11 }}>
+              <Icon name="check" size={11} />
+            </button>
+            <button onClick={() => { setEditing(false); setDraft(String(target)); }} className="btn btn-sm btn-ghost" style={{ padding: "3px 8px", fontSize: 11 }}>
+              <Icon name="x" size={11} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setDraft(String(target)); setEditing(true); }}
+            className="btn btn-sm btn-ghost"
+            style={{ fontSize: 11, padding: "3px 8px" }}
+          >
+            <Icon name="settings" size={11} /> Đổi mục tiêu
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+        <span className="display" style={{ fontSize: 32, color: reached ? "var(--jade)" : "var(--accent)" }}>{todayPages}</span>
+        <span style={{ fontSize: 14, color: "var(--muted)" }}>/ {target} trang</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: "var(--font-mono)", fontWeight: 700, color: reached ? "var(--jade)" : "var(--muted)" }}>{pct}%</span>
+      </div>
+
+      <div style={{ height: 8, background: "var(--bg-2)", border: "1px solid var(--border-soft)", borderRadius: 2, overflow: "hidden" }}>
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          style={{ height: "100%", background: reached ? "var(--jade)" : "var(--accent)" }}
+        />
+      </div>
+
+      <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>
+        {reached
+          ? "Đã đạt mục tiêu hôm nay. Vẫn còn đà, đọc thêm thì cứ đọc 🔥"
+          : `Còn ${Math.max(0, target - todayPages)} trang nữa là đạt mục tiêu hôm nay.`}
+      </div>
+    </div>
+  );
+}
+
 // Last 30 days for the heatmap
 function getLast30Days(): string[] {
   const days: string[] = [];
@@ -112,7 +212,7 @@ function StreakBadge({ streak }: { streak: number }) {
 }
 
 export default function StatsPage() {
-  const { stats, refreshStats, bookmarks, allProgress } = useWibu();
+  const { stats, refreshStats, bookmarks, allProgress, goals, setGoals, todayPages } = useWibu();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -148,6 +248,15 @@ export default function StatsPage() {
             </div>
           ) : (
             <>
+              {/* Daily goal */}
+              <FadeIn direction="up" distance={15} delay={0.13}>
+                <DailyGoalCard
+                  todayPages={todayPages}
+                  target={goals.dailyPages}
+                  onChange={t => setGoals({ ...goals, dailyPages: t })}
+                />
+              </FadeIn>
+
               {/* Streak badge */}
               <FadeIn direction="up" distance={15} delay={0.15}>
                 <div className="stroke-ink panel-shadow" style={{ background: "var(--panel)", padding: "16px 24px", marginBottom: 24, display: "inline-flex", alignItems: "center", gap: 20 }}>

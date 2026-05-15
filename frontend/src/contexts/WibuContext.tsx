@@ -28,6 +28,9 @@ import {
   deleteGlossaryEntry,
   getAllRatings,
   setRating as setRatingLS,
+  getGoals,
+  setGoals as setGoalsLS,
+  type ReadingGoals,
 } from "@/lib/localStore";
 
 interface WibuContextValue {
@@ -55,6 +58,11 @@ interface WibuContextValue {
   ratings: Record<string, number>;
   getRating: (seriesId: string) => number;
   setRating: (seriesId: string, rating: number) => void;
+
+  // Goals
+  goals: ReadingGoals;
+  setGoals: (g: ReadingGoals) => void;
+  todayPages: number;
 }
 
 const WibuContext = createContext<WibuContextValue | null>(null);
@@ -71,6 +79,7 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     dailyHistory: {},
   });
   const [ratingsMap, setRatingsMap] = useState<Record<string, number>>({});
+  const [goalsState, setGoalsState] = useState<ReadingGoals>({ dailyPages: 20, weeklyPages: 100 });
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -79,7 +88,14 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     setStats(getReadingStats());
     const ratings = getAllRatings();
     setRatingsMap(Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, v.rating])));
+    setGoalsState(getGoals());
   }, []);
+
+  // Today's page count derived from the stats heatmap
+  const todayPages = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return stats.dailyHistory[today] ?? 0;
+  }, [stats]);
 
   const toggleBookmark = useCallback((bm: Omit<Bookmark, "savedAt">) => {
     if (isBookmarked(bm.pageId)) {
@@ -113,6 +129,7 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     setAllProgress(getAllProgress());
     const ratings = getAllRatings();
     setRatingsMap(Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, v.rating])));
+    setGoalsState(getGoals());
   }, []);
 
   const getGlossaryFn = useCallback((seriesId: string) => getGlossary(seriesId), []);
@@ -137,6 +154,11 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const setGoalsFn = useCallback((g: ReadingGoals) => {
+    setGoalsLS(g);
+    setGoalsState(g);
+  }, []);
+
   const value = useMemo<WibuContextValue>(
     () => ({
       bookmarks,
@@ -154,8 +176,11 @@ export function WibuProvider({ children }: { children: ReactNode }) {
       ratings: ratingsMap,
       getRating: getRatingFn,
       setRating: setRatingFn,
+      goals: goalsState,
+      setGoals: setGoalsFn,
+      todayPages,
     }),
-    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn],
+    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn, goalsState, setGoalsFn, todayPages],
   );
 
   return <WibuContext.Provider value={value}>{children}</WibuContext.Provider>;

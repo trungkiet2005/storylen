@@ -260,3 +260,27 @@ export function setRating(seriesId: string, rating: number) {
 export function getAllRatings(): Record<string, SeriesRating> {
   return readRatingsMap();
 }
+
+// ─── Reading Goals ────────────────────────────────────────────────────────────
+
+export interface ReadingGoals {
+  dailyPages: number;
+  weeklyPages: number;
+}
+
+const GOALS_KEY = "sl-goals";
+const DEFAULT_GOALS: ReadingGoals = { dailyPages: 20, weeklyPages: 100 };
+
+export function getGoals(): ReadingGoals {
+  try {
+    const raw = localStorage.getItem(GOALS_KEY);
+    if (!raw) return DEFAULT_GOALS;
+    return { ...DEFAULT_GOALS, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_GOALS;
+  }
+}
+
+export function setGoals(g: ReadingGoals) {
+  localStorage.setItem(GOALS_KEY, JSON.stringify(g));
+}
