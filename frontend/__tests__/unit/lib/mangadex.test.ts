@@ -83,16 +83,16 @@ const AT_HOME_NO_DATASAVER: MdxAtHomeServer = {
 // ── mdxCoverUrl ────────────────────────────────────────────────────────────────
 
 describe("mdxCoverUrl", () => {
-  it("constructs a proxied cover URL with .512.jpg suffix", () => {
+  it("returns a direct uploads.mangadex.org URL with .512.jpg suffix", () => {
     const result = mdxCoverUrl("manga-123", "cover.jpg");
-    const raw = "https://uploads.mangadex.org/covers/manga-123/cover.jpg.512.jpg";
-    const expected = `${BASE}/mdx/cover-proxy?url=${encodeURIComponent(raw)}`;
-    expect(result).toBe(expected);
+    expect(result).toBe("https://uploads.mangadex.org/covers/manga-123/cover.jpg.512.jpg");
   });
 
-  it("encodes special characters in the raw URL", () => {
+  it("interpolates mangaId and fileName verbatim (no proxy hop)", () => {
     const result = mdxCoverUrl("manga-abc", "cover with spaces.jpg");
-    expect(result).toContain(encodeURIComponent("cover with spaces.jpg"));
+    expect(result).toContain("manga-abc");
+    expect(result).toContain("cover with spaces.jpg");
+    expect(result).not.toContain("cover-proxy");
   });
 });
 
@@ -185,12 +185,10 @@ describe("mdxMangaTitle", () => {
 // ── mdxCoverFromManga ──────────────────────────────────────────────────────────
 
 describe("mdxCoverFromManga", () => {
-  it("returns proxied cover URL when cover_art relationship exists", () => {
+  it("returns a direct CDN cover URL when cover_art relationship exists", () => {
     const result = mdxCoverFromManga(MANGA_FIXTURE);
     expect(result).not.toBeNull();
-    expect(result).toContain("/mdx/cover-proxy?url=");
-    expect(result).toContain(encodeURIComponent("manga-123"));
-    expect(result).toContain(encodeURIComponent("cover.jpg"));
+    expect(result).toBe("https://uploads.mangadex.org/covers/manga-123/cover.jpg.512.jpg");
   });
 
   it("returns null when no cover_art relationship", () => {

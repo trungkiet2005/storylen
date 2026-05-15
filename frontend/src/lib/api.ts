@@ -58,12 +58,17 @@ export interface BatchStatus {
   pages: PageStatus[];
 }
 
+export type ReviewStatus = "pending" | "approved" | "rejected";
+
 export interface BubbleData {
   bubble_id: string;
   bbox: [number, number, number, number]; // [x, y, w, h]
   original_text: string;
   translated_text: string;
   confidence: number;
+  review_status?: ReviewStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
 }
 
 export interface PageData {
@@ -347,6 +352,7 @@ export interface MdxChapter {
     title?: string;
     pages: number;
     publishAt: string;
+    translatedLanguage?: string;
   };
   relationships: Array<{ type: string; attributes?: { name?: string } }>;
 }
@@ -365,9 +371,55 @@ export interface MdxAtHomeServer {
   };
 }
 
+export function mdxImageProxy(rawUrl: string): string {
+  return `${BASE_URL}/mdx/cover-proxy?url=${encodeURIComponent(rawUrl)}`;
+}
+
+/**
+ * Direct CDN URL for manga covers. uploads.mangadex.org does NOT enforce
+ * hotlink protection on covers, so we can load them straight from the CDN
+ * (saves a backend hop and a chunked-transfer hand-off). Matches the demo.
+ * Chapter PAGE images, by contrast, must still go through `mdxImageProxy`.
+ */
 export function mdxCoverUrl(mangaId: string, fileName: string): string {
-  const raw = `https://uploads.mangadex.org/covers/${mangaId}/${fileName}.512.jpg`;
-  return `${BASE_URL}/mdx/cover-proxy?url=${encodeURIComponent(raw)}`;
+  return `https://uploads.mangadex.org/covers/${mangaId}/${fileName}.512.jpg`;
+}
+
+export function mdxPageUrls(server: MdxAtHomeServer): string[] {
+  const { baseUrl, chapter } = server;
+  const useSaver = chapter.dataSaver?.length > 0;
+  const files = useSaver ? chapter.dataSaver : chapter.data;
+  const quality = useSaver ? "data-saver" : "data";
+  return files.map((f) =>
+    mdxImageProxy(`${baseUrl}/${quality}/${chapter.hash}/${f}`),
+  );
+}
+
+/**
+ * Map a MangaDex translatedLanguage code (ISO 639-1, sometimes with a region
+ * tag like "pt-br" or "zh-hk") to a flag emoji. Falls back to a generic globe
+ * when the code is unknown.
+ */
+const LANG_FLAG: Record<string, string> = {
+  vi: "🇻🇳", en: "🇬🇧", "en-us": "🇺🇸",
+  ja: "🇯🇵", "ja-ro": "🇯🇵",
+  ko: "🇰🇷", "ko-ro": "🇰🇷",
+  zh: "🇨🇳", "zh-hk": "🇭🇰", "zh-ro": "🇨🇳", "zh-tw": "🇹🇼",
+  fr: "🇫🇷", de: "🇩🇪", it: "🇮🇹", nl: "🇳🇱",
+  es: "🇪🇸", "es-la": "🇲🇽",
+  pt: "🇵🇹", "pt-br": "🇧🇷",
+  ru: "🇷🇺", uk: "🇺🇦", pl: "🇵🇱", cs: "🇨🇿", sk: "🇸🇰",
+  bg: "🇧🇬", ro: "🇷🇴", hu: "🇭🇺", el: "🇬🇷", fi: "🇫🇮",
+  sv: "🇸🇪", no: "🇳🇴", da: "🇩🇰", lt: "🇱🇹",
+  tr: "🇹🇷", ar: "🇸🇦", fa: "🇮🇷", he: "🇮🇱",
+  hi: "🇮🇳", bn: "🇧🇩", ta: "🇮🇳",
+  th: "🇹🇭", id: "🇮🇩", ms: "🇲🇾", fil: "🇵🇭", "tl-ph": "🇵🇭",
+  my: "🇲🇲", vi_vn: "🇻🇳",
+};
+
+export function mdxLanguageFlag(code: string | undefined | null): string {
+  if (!code) return "🌐";
+  return LANG_FLAG[code.toLowerCase()] ?? "🌐";
 }
 
 export function mdxMangaTitle(manga: MdxManga): string {
@@ -379,6 +431,46 @@ export function mdxCoverFromManga(manga: MdxManga): string | null {
   const cover = manga.relationships.find((r) => r.type === "cover_art") as MdxCoverArt | undefined;
   if (!cover?.attributes?.fileName) return null;
   return mdxCoverUrl(manga.id, cover.attributes.fileName);
+}
+
+// ─── Reading-state persistence (last opened chapter) ─────────────────────────
+
+const READING_KEY = "storylens.reading";
+
+export interface MdxReadingState {
+  mangaId: string;
+  mangaTitle: string;
+  chapterId: string;
+  chapterLabel: string;
+}
+
+export function mdxSaveReading(state: MdxReadingState): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(READING_KEY, JSON.stringify(state));
+  } catch {
+    // localStorage may be unavailable in some embed/iframe contexts — silent ok.
+  }
+}
+
+export function mdxLoadReading(): MdxReadingState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(READING_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const { mangaId, mangaTitle, chapterId, chapterLabel } = parsed as Partial<MdxReadingState>;
+    if (!chapterId) return null;
+    return {
+      mangaId: mangaId ?? "",
+      mangaTitle: mangaTitle ?? "",
+      chapterId,
+      chapterLabel: chapterLabel ?? "",
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function mdxPopular(limit = 24): Promise<MdxMangaList> {
@@ -402,7 +494,7 @@ export async function mdxSearch(opts: {
 
 export async function mdxChapters(
   mangaId: string,
-  limit = 200,
+  limit = 100,
   offset = 0,
 ): Promise<MdxChapterList> {
   return request<MdxChapterList>(
@@ -414,56 +506,29 @@ export async function mdxChapterPages(chapterId: string): Promise<MdxAtHomeServe
   return request<MdxAtHomeServer>(`/mdx/chapter/${chapterId}/pages`);
 }
 
-/** Proxy any raw image URL through the backend to avoid CORS / hotlink blocks. */
-export function mdxImageProxy(rawUrl: string): string {
-  return `${BASE_URL}/mdx/cover-proxy?url=${encodeURIComponent(rawUrl)}`;
+export interface MdxChapterDetailRel {
+  type: string;
+  id: string;
+  attributes?: Record<string, unknown>;
 }
 
-/**
- * Build proxied image URLs from an at-home server response.
- * Prefers dataSaver quality (≈60% smaller) when available.
- */
-export function mdxPageUrls(data: MdxAtHomeServer): string[] {
-  const useDataSaver = (data.chapter.dataSaver?.length ?? 0) > 0;
-  const files = useDataSaver ? data.chapter.dataSaver : data.chapter.data;
-  const quality = useDataSaver ? "data-saver" : "data";
-  return files.map((f) => {
-    const raw = `${data.baseUrl}/${quality}/${data.chapter.hash}/${f}`;
-    return mdxImageProxy(raw);
-  });
+export interface MdxChapterDetail {
+  data: {
+    id: string;
+    type: "chapter";
+    attributes: {
+      chapter?: string;
+      title?: string;
+      pages?: number;
+      translatedLanguage?: string;
+    };
+    relationships: MdxChapterDetailRel[];
+  };
 }
 
-/** Save current reading state to localStorage. */
-export function mdxSaveReading(payload: {
-  mangaId: string;
-  mangaTitle: string;
-  chapterId: string;
-  chapterLabel: string;
-}): void {
-  try {
-    localStorage.setItem(
-      "storylens.reading",
-      JSON.stringify({ ...payload, updatedAt: new Date().toISOString() }),
-    );
-  } catch {
-    // ignore storage errors
-  }
-}
-
-/** Load last saved reading state from localStorage. */
-export function mdxLoadReading(): {
-  mangaId: string;
-  mangaTitle: string;
-  chapterId: string;
-  chapterLabel: string;
-} | null {
-  try {
-    const raw = localStorage.getItem("storylens.reading");
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+/** Fetch a single chapter's metadata (used to recover mangaId from chapterId). */
+export async function mdxChapter(chapterId: string): Promise<MdxChapterDetail> {
+  return request<MdxChapterDetail>(`/mdx/chapter/${chapterId}`);
 }
 
 // ─── Status polling ───────────────────────────────────────────────────────────
@@ -543,6 +608,23 @@ export async function updateBubbleTranslation(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ translated_text: translatedText }),
+  });
+}
+
+/**
+ * Studio review action — set a bubble's QC status (approved / rejected / pending).
+ * Optionally pipes through an edited translation in the same call (recorded as a
+ * new translation_history revision).
+ */
+export async function updateBubbleReview(
+  pageId: string,
+  bubbleId: string,
+  payload: { review_status: ReviewStatus; translated_text?: string },
+): Promise<BubbleData> {
+  return request<BubbleData>(`/page/${pageId}/bubbles/${bubbleId}/review`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
 }
 
