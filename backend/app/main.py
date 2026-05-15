@@ -18,8 +18,9 @@ from app.middleware import (
     RequestIDFilter,
     RequestIDMiddleware,
 )
+from app.observability import init_observability
 from app.rate_limit import limiter
-from app.routers import admin, ai_module, auth, credits, history, mangadex, pages, qa, scrape, series, status, upload, wibu
+from app.routers import admin, ai_module, auth, credits, history, mangadex, pages, qa, scrape, series, status, upload, wibu, ws
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 _request_id_filter = RequestIDFilter()
@@ -124,6 +125,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ─── Observability (Sentry + OTel) ───────────────────────────────────────────
+# Initialised early so middleware + routes are auto-instrumented. Both are
+# no-ops unless the relevant env vars (SENTRY_DSN / OTEL_EXPORTER_OTLP_ENDPOINT)
+# are set, so local dev stays quiet.
+init_observability(app)
+
 # ─── Rate limiter ─────────────────────────────────────────────────────────────
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -165,6 +172,10 @@ app.include_router(history.router, prefix=API_PREFIX)
 app.include_router(series.router,  prefix=API_PREFIX)
 app.include_router(wibu.router,    prefix=API_PREFIX)
 app.include_router(admin.router,   prefix=API_PREFIX)
+
+# WebSocket router lives under /v1/ws/* — same prefix as REST so clients
+# resolve the URL via NEXT_PUBLIC_API_URL without extra config.
+app.include_router(ws.router,      prefix=API_PREFIX)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────

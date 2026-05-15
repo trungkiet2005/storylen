@@ -132,6 +132,13 @@ class Settings(BaseSettings):
             return v.strip()
         return v
 
+    # ─── Observability ────────────────────────────────────────────────────────
+    SENTRY_DSN: str = ""                # Empty → Sentry disabled.
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+    SENTRY_ENVIRONMENT: str = "development"
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = ""  # Empty → OTel exporter disabled.
+    OTEL_SERVICE_NAME: str = "storylens-backend"
+
     # ─── Gemini (Google AI) ───────────────────────────────────────────────────
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-2.5-flash"
