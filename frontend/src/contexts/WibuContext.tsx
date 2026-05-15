@@ -37,6 +37,10 @@ import {
   getUnlockedAchievements,
   shouldNotifyWeeklyGoal,
   markWeeklyGoalNotified,
+  getAllListStatuses,
+  setListStatus as setListStatusLS,
+  READING_LIST_META,
+  type ReadingListStatus,
 } from "@/lib/localStore";
 
 interface WibuContextValue {
@@ -79,6 +83,11 @@ interface WibuContextValue {
   // Weekly goal — sentinel value, consumed by the toaster
   weeklyGoalReached: boolean;
   consumeWeeklyGoal: () => void;
+
+  // Reading lists
+  listStatuses: Record<string, ReadingListStatus>;
+  getListStatus: (seriesId: string) => ReadingListStatus | null;
+  setListStatus: (seriesId: string, status: ReadingListStatus | null) => void;
 }
 
 const WibuContext = createContext<WibuContextValue | null>(null);
@@ -98,6 +107,7 @@ export function WibuProvider({ children }: { children: ReactNode }) {
   const [goalsState, setGoalsState] = useState<ReadingGoals>({ dailyPages: 20, weeklyPages: 100 });
   const [unlockedAchievements, setUnlockedAchievements] = useState<Record<string, { unlockedAt: string }>>({});
   const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([]);
+  const [listStatusesState, setListStatusesState] = useState<Record<string, ReadingListStatus>>({});
   const hydratedRef = useRef(false);
 
   // Hydrate from localStorage on mount
@@ -109,6 +119,7 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     setRatingsMap(Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, v.rating])));
     setGoalsState(getGoals());
     setUnlockedAchievements(getUnlockedAchievements());
+    setListStatusesState(getAllListStatuses());
     // Defer achievement evaluation by one tick — gives state above a chance
     // to settle so we don't double-toast existing unlocks on first load
     queueMicrotask(() => { hydratedRef.current = true; });
@@ -232,6 +243,18 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     setGoalsState(g);
   }, []);
 
+  const getListStatusFn = useCallback((seriesId: string) => listStatusesState[seriesId] ?? null, [listStatusesState]);
+
+  const setListStatusFn = useCallback((seriesId: string, status: ReadingListStatus | null) => {
+    setListStatusLS(seriesId, status);
+    setListStatusesState(prev => {
+      const next = { ...prev };
+      if (status === null) delete next[seriesId];
+      else next[seriesId] = status;
+      return next;
+    });
+  }, []);
+
   const value = useMemo<WibuContextValue>(
     () => ({
       bookmarks,
@@ -258,8 +281,11 @@ export function WibuProvider({ children }: { children: ReactNode }) {
       consumeNewlyUnlocked,
       weeklyGoalReached,
       consumeWeeklyGoal,
+      listStatuses: listStatusesState,
+      getListStatus: getListStatusFn,
+      setListStatus: setListStatusFn,
     }),
-    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn, goalsState, setGoalsFn, todayPages, weekPages, unlockedAchievements, newlyUnlocked, consumeNewlyUnlocked, weeklyGoalReached, consumeWeeklyGoal],
+    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn, goalsState, setGoalsFn, todayPages, weekPages, unlockedAchievements, newlyUnlocked, consumeNewlyUnlocked, weeklyGoalReached, consumeWeeklyGoal, listStatusesState, getListStatusFn, setListStatusFn],
   );
 
   return <WibuContext.Provider value={value}>{children}</WibuContext.Provider>;
@@ -271,4 +297,5 @@ export function useWibu(): WibuContextValue {
   return ctx;
 }
 
-export { ACHIEVEMENTS };
+export { ACHIEVEMENTS, READING_LIST_META };
+export type { ReadingListStatus };

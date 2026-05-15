@@ -319,6 +319,42 @@ export function markWeeklyGoalNotified() {
   localStorage.setItem(WEEK_NOTIFY_KEY, startOfWeekStr());
 }
 
+// ─── Reading Lists ────────────────────────────────────────────────────────────
+
+export type ReadingListStatus = "reading" | "want" | "done" | "dropped";
+
+export const READING_LIST_META: Record<ReadingListStatus, { label: string; color: string; icon: string }> = {
+  reading: { label: "Đang đọc", color: "var(--accent)", icon: "book" },
+  want:    { label: "Muốn đọc", color: "var(--gold)",   icon: "bookmark" },
+  done:    { label: "Đã xong",  color: "var(--jade)",   icon: "check" },
+  dropped: { label: "Bỏ dở",    color: "var(--muted)",  icon: "x" },
+};
+
+const LISTS_KEY = "sl-reading-lists";
+
+function readListsMap(): Record<string, ReadingListStatus> {
+  try {
+    return JSON.parse(localStorage.getItem(LISTS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function getListStatus(seriesId: string): ReadingListStatus | null {
+  return readListsMap()[seriesId] ?? null;
+}
+
+export function setListStatus(seriesId: string, status: ReadingListStatus | null) {
+  const map = readListsMap();
+  if (status === null) delete map[seriesId];
+  else map[seriesId] = status;
+  localStorage.setItem(LISTS_KEY, JSON.stringify(map));
+}
+
+export function getAllListStatuses(): Record<string, ReadingListStatus> {
+  return readListsMap();
+}
+
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
 export interface AchievementDef {

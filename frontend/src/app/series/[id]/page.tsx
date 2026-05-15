@@ -11,6 +11,7 @@ import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWibu } from "@/contexts/WibuContext";
 import { StarRating } from "@/components/StarRating";
+import { ReadingListPicker } from "@/components/ReadingListPicker";
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from "@/components/Animations";
 import {
   APIError,
@@ -282,21 +283,28 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                       {series.title}
                     </h1>
 
-                    {/* User rating */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.04em" }}>
-                        Đánh giá của bạn:
-                      </span>
-                      <StarRating
-                        value={wibu.getRating(series.series_id)}
-                        onChange={r => wibu.setRating(series.series_id, r)}
-                        size={18}
-                      />
-                      {wibu.getRating(series.series_id) > 0 && (
-                        <span style={{ fontSize: 11, color: "var(--gold)", fontWeight: 700 }}>
-                          {wibu.getRating(series.series_id)}/5
+                    {/* User rating + reading list */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.04em" }}>
+                          Đánh giá:
                         </span>
-                      )}
+                        <StarRating
+                          value={wibu.getRating(series.series_id)}
+                          onChange={r => wibu.setRating(series.series_id, r)}
+                          size={18}
+                        />
+                        {wibu.getRating(series.series_id) > 0 && (
+                          <span style={{ fontSize: 11, color: "var(--gold)", fontWeight: 700 }}>
+                            {wibu.getRating(series.series_id)}/5
+                          </span>
+                        )}
+                      </div>
+                      <ReadingListPicker
+                        value={wibu.getListStatus(series.series_id)}
+                        onChange={s => wibu.setListStatus(series.series_id, s)}
+                        size="md"
+                      />
                     </div>
 
                     {series.description && (

@@ -9,8 +9,9 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useWibu } from "@/contexts/WibuContext";
+import { useWibu, READING_LIST_META, type ReadingListStatus } from "@/contexts/WibuContext";
 import { StarRating } from "@/components/StarRating";
+import { ReadingListPicker } from "@/components/ReadingListPicker";
 import {
   AnimatedPage,
   FadeIn,
@@ -88,6 +89,7 @@ export default function SeriesListPage() {
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [genreFilter, setGenreFilter] = useState<string | null>(null);
+  const [listFilter, setListFilter] = useState<ReadingListStatus | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
 
@@ -151,9 +153,10 @@ export default function SeriesListPage() {
         (it.tags ?? []).some(t => t.toLowerCase().includes(q));
       const matchesGenre = !genreFilter ||
         (it.tags ?? []).some(t => t.toLowerCase() === genreFilter.toLowerCase());
-      return matchesFilter && matchesSearch && matchesGenre;
+      const matchesList = !listFilter || wibu.getListStatus(it.series_id) === listFilter;
+      return matchesFilter && matchesSearch && matchesGenre && matchesList;
     });
-  }, [items, filter, search, genreFilter]);
+  }, [items, filter, search, genreFilter, listFilter, wibu]);
 
   const counts = useMemo(() => {
     let ongoing = 0;
@@ -279,6 +282,48 @@ export default function SeriesListPage() {
                   </motion.button>
                 </Link>
               </div>
+            </div>
+
+            {/* Reading list quick-filter chips */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "var(--muted)", alignSelf: "center", marginRight: 4, fontWeight: 600 }}>
+                <Icon name="bookmark" size={11} /> Danh sách:
+              </span>
+              {(Object.keys(READING_LIST_META) as ReadingListStatus[]).map(s => {
+                const m = READING_LIST_META[s];
+                const active = listFilter === s;
+                return (
+                  <motion.button
+                    key={s}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setListFilter(v => v === s ? null : s)}
+                    className="chip"
+                    style={{
+                      cursor: "pointer",
+                      border: `1.5px solid ${active ? m.color : "var(--border-soft)"}`,
+                      background: active ? m.color : "transparent",
+                      color: active ? "#fff" : m.color,
+                      fontSize: 10,
+                      padding: "3px 9px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Icon name={m.icon} size={10} /> {m.label}
+                  </motion.button>
+                );
+              })}
+              {listFilter && (
+                <button
+                  onClick={() => setListFilter(null)}
+                  className="btn btn-sm btn-ghost"
+                  style={{ padding: "2px 8px", fontSize: 10 }}
+                >
+                  <Icon name="x" size={10} /> Xoá
+                </button>
+              )}
             </div>
 
             {/* Genre quick-filter chips */}
@@ -496,10 +541,10 @@ export default function SeriesListPage() {
                                 {item.description}
                               </div>
                             )}
-                            {/* Star rating row */}
+                            {/* Star rating + list status row */}
                             {mounted && (
                               <div
-                                style={{ marginTop: 6 }}
+                                style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
                                 onClick={e => e.preventDefault()}
                               >
                                 <StarRating
@@ -507,6 +552,10 @@ export default function SeriesListPage() {
                                   onChange={r => wibu.setRating(item.series_id, r)}
                                   size={13}
                                   showClear={false}
+                                />
+                                <ReadingListPicker
+                                  value={wibu.getListStatus(item.series_id)}
+                                  onChange={s => wibu.setListStatus(item.series_id, s)}
                                 />
                               </div>
                             )}
