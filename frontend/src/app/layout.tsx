@@ -3,6 +3,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WibuProvider } from "@/contexts/WibuContext";
+import { AchievementToaster } from "@/components/AchievementToaster";
 
 export const metadata: Metadata = {
   title: "StoryLens — Đọc Truyện Tranh Đa Ngôn Ngữ Bằng AI",
@@ -30,6 +31,7 @@ export default function RootLayout({
         <AuthProvider>
           <WibuProvider>
             <ToastProvider>
+              <AchievementToaster />
               {children}
             </ToastProvider>
           </WibuProvider>

@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -31,6 +32,9 @@ import {
   getGoals,
   setGoals as setGoalsLS,
   type ReadingGoals,
+  ACHIEVEMENTS,
+  evaluateAchievements,
+  getUnlockedAchievements,
 } from "@/lib/localStore";
 
 interface WibuContextValue {
@@ -63,6 +67,11 @@ interface WibuContextValue {
   goals: ReadingGoals;
   setGoals: (g: ReadingGoals) => void;
   todayPages: number;
+
+  // Achievements
+  unlockedAchievements: Record<string, { unlockedAt: string }>;
+  newlyUnlocked: string[];
+  consumeNewlyUnlocked: () => void;
 }
 
 const WibuContext = createContext<WibuContextValue | null>(null);
@@ -80,6 +89,9 @@ export function WibuProvider({ children }: { children: ReactNode }) {
   });
   const [ratingsMap, setRatingsMap] = useState<Record<string, number>>({});
   const [goalsState, setGoalsState] = useState<ReadingGoals>({ dailyPages: 20, weeklyPages: 100 });
+  const [unlockedAchievements, setUnlockedAchievements] = useState<Record<string, { unlockedAt: string }>>({});
+  const [newlyUnlocked, setNewlyUnlocked] = useState<string[]>([]);
+  const hydratedRef = useRef(false);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -89,6 +101,10 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     const ratings = getAllRatings();
     setRatingsMap(Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, v.rating])));
     setGoalsState(getGoals());
+    setUnlockedAchievements(getUnlockedAchievements());
+    // Defer achievement evaluation by one tick — gives state above a chance
+    // to settle so we don't double-toast existing unlocks on first load
+    queueMicrotask(() => { hydratedRef.current = true; });
   }, []);
 
   // Today's page count derived from the stats heatmap
@@ -96,6 +112,30 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     const today = new Date().toISOString().slice(0, 10);
     return stats.dailyHistory[today] ?? 0;
   }, [stats]);
+
+  // Re-evaluate achievements whenever inputs change. Glossary count is read on
+  // the fly from localStorage to avoid plumbing every series through state.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const ratedCount = Object.keys(ratingsMap).length;
+    let glossaryCount = 0;
+    try {
+      const all = JSON.parse(localStorage.getItem("sl-glossary") || "{}");
+      for (const sid of Object.keys(all)) glossaryCount += Object.keys(all[sid] || {}).length;
+    } catch { /* ignore */ }
+    const newly = evaluateAchievements({
+      stats,
+      bookmarkCount: bookmarks.length,
+      ratedCount,
+      glossaryCount,
+    });
+    if (newly.length) {
+      setUnlockedAchievements(getUnlockedAchievements());
+      setNewlyUnlocked(prev => [...prev, ...newly]);
+    }
+  }, [stats, bookmarks.length, ratingsMap]);
+
+  const consumeNewlyUnlocked = useCallback(() => setNewlyUnlocked([]), []);
 
   const toggleBookmark = useCallback((bm: Omit<Bookmark, "savedAt">) => {
     if (isBookmarked(bm.pageId)) {
@@ -179,8 +219,11 @@ export function WibuProvider({ children }: { children: ReactNode }) {
       goals: goalsState,
       setGoals: setGoalsFn,
       todayPages,
+      unlockedAchievements,
+      newlyUnlocked,
+      consumeNewlyUnlocked,
     }),
-    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn, goalsState, setGoalsFn, todayPages],
+    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn, goalsState, setGoalsFn, todayPages, unlockedAchievements, newlyUnlocked, consumeNewlyUnlocked],
   );
 
   return <WibuContext.Provider value={value}>{children}</WibuContext.Provider>;
@@ -191,3 +234,5 @@ export function useWibu(): WibuContextValue {
   if (!ctx) throw new Error("useWibu must be used inside <WibuProvider>");
   return ctx;
 }
+
+export { ACHIEVEMENTS };

@@ -284,3 +284,72 @@ export function getGoals(): ReadingGoals {
 export function setGoals(g: ReadingGoals) {
   localStorage.setItem(GOALS_KEY, JSON.stringify(g));
 }
+
+// ─── Achievements ─────────────────────────────────────────────────────────────
+
+export interface AchievementDef {
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  color: string;
+  check: (ctx: AchievementCtx) => boolean;
+}
+
+export interface AchievementCtx {
+  stats: ReadingStats;
+  bookmarkCount: number;
+  ratedCount: number;
+  glossaryCount: number;
+}
+
+export const ACHIEVEMENTS: AchievementDef[] = [
+  { id: "first-page", label: "Trang Đầu Tiên",  description: "Đọc trang đầu tiên",   icon: "book",      color: "var(--muted)",  check: c => c.stats.totalPagesRead >= 1 },
+  { id: "pages-10",   label: "Người Mới",       description: "Đọc 10 trang",         icon: "book",      color: "var(--muted)",  check: c => c.stats.totalPagesRead >= 10 },
+  { id: "pages-100",  label: "Centurion",       description: "Đọc 100 trang",        icon: "star",      color: "var(--accent)", check: c => c.stats.totalPagesRead >= 100 },
+  { id: "pages-500",  label: "Đọc Cuồng",       description: "Đọc 500 trang",        icon: "trophy",    color: "var(--gold)",   check: c => c.stats.totalPagesRead >= 500 },
+  { id: "pages-1k",   label: "Đại Sư Đọc",      description: "Đọc 1,000 trang",      icon: "trophy",    color: "#b58a3b",       check: c => c.stats.totalPagesRead >= 1000 },
+  { id: "streak-3",   label: "Vào Guồng",       description: "Streak 3 ngày",        icon: "zap",       color: "var(--accent)", check: c => c.stats.longestStreak >= 3 },
+  { id: "streak-7",   label: "Tuần Lửa",        description: "Streak 7 ngày",        icon: "fire",      color: "#e04156",       check: c => c.stats.longestStreak >= 7 },
+  { id: "streak-30",  label: "Tháng Thần",      description: "Streak 30 ngày",       icon: "trophy",    color: "#b58a3b",       check: c => c.stats.longestStreak >= 30 },
+  { id: "bookmark-10",label: "Sưu Tầm Gia",     description: "Bookmark 10 trang",    icon: "bookmark",  color: "var(--indigo)", check: c => c.bookmarkCount >= 10 },
+  { id: "rate-5",     label: "Nhà Phê Bình",    description: "Đánh giá 5 bộ truyện", icon: "star-fill", color: "var(--gold)",   check: c => c.ratedCount >= 5 },
+  { id: "glossary-10",label: "Từ Điển Gia",     description: "Lưu 10 mục từ điển",   icon: "tag",       color: "var(--jade)",   check: c => c.glossaryCount >= 10 },
+  { id: "hours-10",   label: "Bền Bỉ",          description: "Đọc 10 giờ",           icon: "clock",     color: "var(--jade)",   check: c => c.stats.totalMinutesRead >= 600 },
+];
+
+const ACHIEVEMENTS_KEY = "sl-achievements";
+
+interface UnlockedRecord { unlockedAt: string }
+
+function readUnlocked(): Record<string, UnlockedRecord> {
+  try {
+    return JSON.parse(localStorage.getItem(ACHIEVEMENTS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function getUnlockedAchievements(): Record<string, UnlockedRecord> {
+  return readUnlocked();
+}
+
+/**
+ * Evaluate achievements against current ctx, persist new unlocks, and return
+ * the newly-unlocked IDs so the UI can fire toasts.
+ */
+export function evaluateAchievements(ctx: AchievementCtx): string[] {
+  const unlocked = readUnlocked();
+  const newly: string[] = [];
+  for (const a of ACHIEVEMENTS) {
+    if (unlocked[a.id]) continue;
+    if (a.check(ctx)) {
+      unlocked[a.id] = { unlockedAt: new Date().toISOString() };
+      newly.push(a.id);
+    }
+  }
+  if (newly.length) {
+    localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(unlocked));
+  }
+  return newly;
+}

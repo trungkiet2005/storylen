@@ -5,7 +5,7 @@ import { TopBar } from "@/components/TopBar";
 import { Icon } from "@/components/Icons";
 import { SectionHeader } from "@/components/SectionHeader";
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from "@/components/Animations";
-import { useWibu } from "@/contexts/WibuContext";
+import { useWibu, ACHIEVEMENTS } from "@/contexts/WibuContext";
 import { type ReadingStats } from "@/lib/localStore";
 
 // ── Daily goal card ─────────────────────────────────────────────────────────
@@ -212,7 +212,7 @@ function StreakBadge({ streak }: { streak: number }) {
 }
 
 export default function StatsPage() {
-  const { stats, refreshStats, bookmarks, allProgress, goals, setGoals, todayPages } = useWibu();
+  const { stats, refreshStats, bookmarks, allProgress, goals, setGoals, todayPages, unlockedAchievements } = useWibu();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -342,6 +342,63 @@ export default function StatsPage() {
                   </div>
                 </FadeIn>
               )}
+
+              {/* Achievements */}
+              <FadeIn direction="up" distance={15} delay={0.4}>
+                <div className="stroke-ink panel-shadow" style={{ background: "var(--panel)", padding: "24px 28px", marginTop: 24 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <Icon name="trophy" size={16} />
+                      <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                        Huy hiệu thành tựu
+                      </span>
+                    </div>
+                    <span className="mono" style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700 }}>
+                      {Object.keys(unlockedAchievements).length} / {ACHIEVEMENTS.length}
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
+                    {ACHIEVEMENTS.map(a => {
+                      const unlocked = !!unlockedAchievements[a.id];
+                      return (
+                        <motion.div
+                          key={a.id}
+                          whileHover={unlocked ? { y: -2, boxShadow: "4px 4px 0 0 var(--border)" } : undefined}
+                          title={unlocked ? `Mở khoá: ${new Date(unlockedAchievements[a.id].unlockedAt).toLocaleDateString("vi-VN")}` : "Chưa mở khoá"}
+                          style={{
+                            border: "1.5px solid var(--border-soft)",
+                            background: unlocked ? "var(--bg-2)" : "var(--bg)",
+                            padding: "10px 12px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            opacity: unlocked ? 1 : 0.45,
+                            filter: unlocked ? undefined : "grayscale(0.85)",
+                            transition: "box-shadow 0.15s",
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 36, height: 36, borderRadius: "50%",
+                              background: unlocked ? a.color : "var(--border-soft)",
+                              color: "#fff",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              boxShadow: unlocked ? `0 0 0 3px ${a.color}22` : "none",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <Icon name={a.icon} size={16} />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: unlocked ? "var(--fg)" : "var(--muted)" }}>{a.label}</div>
+                            <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.3 }}>{a.description}</div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </FadeIn>
 
               {/* Empty state */}
               {stats.totalPagesRead === 0 && (
