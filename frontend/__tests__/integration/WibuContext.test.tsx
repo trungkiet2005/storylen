@@ -5,6 +5,11 @@ import React, { type ReactNode } from "react";
 import { WibuProvider, useWibu } from "@/contexts/WibuContext";
 import { markPageRead, addReadingMinutes } from "@/lib/localStore";
 
+// WibuProvider now calls useAuth — mock it as unauthenticated so tests use localStorage path
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({ isAuthenticated: false, isLoading: false, user: null }),
+}));
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function Wrapper({ children }: { children: ReactNode }) {

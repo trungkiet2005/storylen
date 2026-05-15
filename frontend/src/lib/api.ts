@@ -1068,3 +1068,133 @@ export interface AdminHealth {
 export async function adminGetHealth(): Promise<AdminHealth> {
   return request<AdminHealth>("/admin/health");
 }
+
+// ─── Wibu (Gamification) ─────────────────────────────────────────────────────
+
+export type WibuListStatus = "reading" | "want" | "done" | "dropped";
+
+export interface WibuBookmark {
+  page_id: string;
+  page_number: number | null;
+  series_id: string | null;
+  series_title: string | null;
+  chapter_number: number | null;
+  thumbnail_url: string | null;
+  note: string;
+  saved_at: string;
+}
+
+export interface WibuGoals {
+  daily_pages: number;
+  weekly_pages: number;
+}
+
+export interface WibuStats {
+  total_pages_read: number;
+  total_minutes_read: number;
+  current_streak: number;
+  longest_streak: number;
+  last_read_date: string | null;
+  daily_history: Record<string, number>;
+}
+
+export interface WibuReadProgress {
+  series_id: string;
+  series_title: string;
+  cover_url: string | null;
+  chapter_id: string | null;
+  chapter_number: number | null;
+  page_id: string;
+  page_number: number;
+  total_pages: number;
+  read_at: string;
+}
+
+export interface WibuMeResponse {
+  bookmarks: WibuBookmark[];
+  ratings: Record<string, number>;
+  reading_lists: Record<string, WibuListStatus>;
+  goals: WibuGoals;
+  stats: WibuStats;
+  unlocked_achievement_ids: string[];
+  progress: WibuReadProgress[];
+}
+
+export async function getWibuMe(): Promise<WibuMeResponse> {
+  return request<WibuMeResponse>("/wibu/me");
+}
+
+export async function addWibuBookmark(bm: Omit<WibuBookmark, "saved_at">): Promise<WibuBookmark> {
+  return request<WibuBookmark>("/wibu/bookmarks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bm),
+  });
+}
+
+export async function removeWibuBookmark(pageId: string): Promise<void> {
+  return request<void>(`/wibu/bookmarks/${encodeURIComponent(pageId)}`, { method: "DELETE" });
+}
+
+export async function setWibuRating(seriesId: string, rating: number): Promise<void> {
+  return request<void>(`/wibu/ratings/${encodeURIComponent(seriesId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rating }),
+  });
+}
+
+export async function setWibuListStatus(seriesId: string, status: WibuListStatus): Promise<void> {
+  return request<void>(`/wibu/lists/${encodeURIComponent(seriesId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function removeWibuListStatus(seriesId: string): Promise<void> {
+  return request<void>(`/wibu/lists/${encodeURIComponent(seriesId)}`, { method: "DELETE" });
+}
+
+export async function updateWibuGoals(goals: WibuGoals): Promise<void> {
+  return request<void>("/wibu/goals", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(goals),
+  });
+}
+
+export async function addWibuMinutes(minutes: number): Promise<WibuStats> {
+  return request<WibuStats>("/wibu/stats/minutes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ minutes }),
+  });
+}
+
+export async function markWibuPageRead(pageId: string): Promise<WibuStats> {
+  return request<WibuStats>("/wibu/pages/read", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ page_id: pageId }),
+  });
+}
+
+export async function unlockWibuAchievements(achievementIds: string[]): Promise<string[]> {
+  return request<string[]>("/wibu/achievements/unlock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(achievementIds),
+  });
+}
+
+export async function saveWibuProgress(
+  seriesId: string,
+  body: Omit<WibuReadProgress, "series_id" | "read_at">,
+): Promise<WibuReadProgress> {
+  return request<WibuReadProgress>(`/wibu/progress/${encodeURIComponent(seriesId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
