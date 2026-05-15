@@ -341,6 +341,11 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                           <Icon name="upload" size={12} /> Upload trang mới
                         </motion.button>
                       </Link>
+                      <Link href={`/series/${series.series_id}/glossary`} style={{ textDecoration: "none" }}>
+                        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn btn-sm btn-ghost">
+                          <Icon name="tag" size={12} /> Từ điển
+                        </motion.button>
+                      </Link>
                       <Link href={`/series/${series.series_id}/edit`} style={{ textDecoration: "none" }}>
                         <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn btn-sm btn-ghost">
                           <Icon name="settings" size={12} /> Chỉnh sửa

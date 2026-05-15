@@ -24,6 +24,7 @@ import { AddToSeriesModal } from '@/components/AddToSeriesModal';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedPage } from '@/components/Animations';
+import { useWibu } from '@/contexts/WibuContext';
 
 type ViewMode = "overlay" | "sidebyside" | "tap";
 
@@ -587,6 +588,8 @@ function ReaderContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pageIdParam = searchParams.get("page");
+  const wibu = useWibu();
+  const [bookmarked, setBookmarked] = useState(false);
 
   const [mode, setMode] = useState<ViewMode>("overlay");
   const [selected, setSelected] = useState<number | null>(null);
@@ -595,6 +598,7 @@ function ReaderContent() {
   const [showContext, setShowContext] = useState(true);
   const [contextTab, setContextTab] = useState<"info" | "chat">("chat");
   const mainRef = useRef<HTMLDivElement>(null);
+  const sessionStartRef = useRef<number>(Date.now());
 
   // Real page data from API
   const [pageData, setPageData] = useState<PageData | null>(null);
@@ -697,6 +701,27 @@ function ReaderContent() {
   }, [nextPageId, prevPageId, router]);
 
   useEffect(() => setSelected(null), [pageIdParam]);
+
+  // Sync bookmark state when page changes
+  useEffect(() => {
+    if (pageIdParam) setBookmarked(wibu.isBookmarked(pageIdParam));
+  }, [pageIdParam, wibu]);
+
+  // Mark page read + save progress when page data loads
+  useEffect(() => {
+    if (!pageData || !pageIdParam) return;
+    wibu.markRead(pageIdParam);
+    sessionStartRef.current = Date.now();
+  }, [pageData, pageIdParam, wibu]);
+
+  // Track reading time on unmount or page change
+  useEffect(() => {
+    return () => {
+      const mins = Math.round((Date.now() - sessionStartRef.current) / 60000);
+      if (mins > 0) wibu.addMinutes(mins);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageIdParam]);
 
   const CANVAS_W = 520;
   const computedHeight = imgNaturalSize ? CANVAS_W * (imgNaturalSize.h / imgNaturalSize.w) : 740;
@@ -993,9 +1018,56 @@ function ReaderContent() {
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setZoom(z => Math.min(z + 0.1, 2.0))} aria-label="Phóng to" title="Zoom in (+)">
               <Icon name="zoom-in" size={14}/>
             </motion.button>
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" aria-label="Bookmark trang này">
-              <Icon name="bookmark" size={14}/>
-            </motion.button>
+            {/* Bookmark button */}
+            {pageData && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="btn btn-sm btn-ghost"
+                aria-label={bookmarked ? "Bỏ bookmark" : "Bookmark trang này"}
+                title={bookmarked ? "Bỏ bookmark" : "Bookmark trang này"}
+                onClick={() => {
+                  wibu.toggleBookmark({
+                    pageId: pageData.page_id,
+                    pageNumber: pageData.metadata?.page_number ?? null,
+                    seriesId: pageData.metadata?.series_id ?? null,
+                    seriesTitle: null,
+                    chapterNumber: null,
+                    thumbnailUrl: pageData.thumbnail_url ?? null,
+                    note: "",
+                  });
+                  setBookmarked(v => !v);
+                }}
+                style={{ color: bookmarked ? "var(--accent)" : undefined }}
+              >
+                <Icon name={bookmarked ? "star-fill" : "star"} size={14}/>
+              </motion.button>
+            )}
+
+            {/* Export page as PDF */}
+            {pageData?.original_image_url && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="btn btn-sm btn-ghost"
+                aria-label="Xuất PDF"
+                title="Xuất trang thành PDF"
+                onClick={() => {
+                  const url = pageData.translated_image_url || pageData.original_image_url;
+                  const html = `<!DOCTYPE html><html><head><title>StoryLens Export</title>
+                    <style>body{margin:0;background:#111;display:flex;justify-content:center;}img{max-width:100vw;}</style>
+                    </head><body><img src="${url}" onload="window.print()"/></body></html>`;
+                  const blob = new Blob([html], { type: "text/html" });
+                  const blobUrl = URL.createObjectURL(blob);
+                  const win = window.open(blobUrl, "_blank");
+                  if (win) win.addEventListener("afterprint", () => URL.revokeObjectURL(blobUrl));
+                  else URL.revokeObjectURL(blobUrl);
+                }}
+              >
+                <Icon name="pdf" size={14}/>
+              </motion.button>
+            )}
+
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setShowContext(v => !v)} aria-label="Bật/tắt panel ngữ cảnh">
               <Icon name="info" size={14}/>
             </motion.button>

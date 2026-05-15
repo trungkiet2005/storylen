@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { WibuProvider } from "@/contexts/WibuContext";
 
 export const metadata: Metadata = {
   title: "StoryLens — Đọc Truyện Tranh Đa Ngôn Ngữ Bằng AI",
@@ -27,9 +28,11 @@ export default function RootLayout({
     <html lang="vi" data-theme="light">
       <body>
         <AuthProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+          <WibuProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </WibuProvider>
         </AuthProvider>
         {/* Film grain overlay */}
         <div className="grain-overlay" aria-hidden="true" />

@@ -9,6 +9,7 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWibu } from "@/contexts/WibuContext";
 import {
   AnimatedPage,
   FadeIn,
@@ -22,6 +23,7 @@ import {
   type SeriesListItem,
   type SeriesStatus,
 } from "@/lib/api";
+import { getSeriesProgress } from "@/lib/localStore";
 
 type StatusFilter = "all" | SeriesStatus;
 
@@ -69,6 +71,9 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// Genre presets for quick filter
+const GENRE_CHIPS = ["Isekai", "Shounen", "Romance", "Action", "Fantasy", "Horror", "Slice of Life", "Mecha", "Sports"];
+
 export default function SeriesListPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -80,7 +85,11 @@ export default function SeriesListPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+  const [genreFilter, setGenreFilter] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -138,9 +147,11 @@ export default function SeriesListPage() {
         it.title.toLowerCase().includes(q) ||
         (it.description?.toLowerCase().includes(q) ?? false) ||
         (it.tags ?? []).some(t => t.toLowerCase().includes(q));
-      return matchesFilter && matchesSearch;
+      const matchesGenre = !genreFilter ||
+        (it.tags ?? []).some(t => t.toLowerCase() === genreFilter.toLowerCase());
+      return matchesFilter && matchesSearch && matchesGenre;
     });
-  }, [items, filter, search]);
+  }, [items, filter, search, genreFilter]);
 
   const counts = useMemo(() => {
     let ongoing = 0;
@@ -266,6 +277,34 @@ export default function SeriesListPage() {
                   </motion.button>
                 </Link>
               </div>
+            </div>
+
+            {/* Genre quick-filter chips */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "var(--muted)", alignSelf: "center", marginRight: 4, fontWeight: 600 }}>
+                <Icon name="tag" size={11} /> Genre:
+              </span>
+              {GENRE_CHIPS.map(g => (
+                <motion.button
+                  key={g}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setGenreFilter(v => v === g ? null : g)}
+                  className={`chip ${genreFilter === g ? "chip-accent" : ""}`}
+                  style={{ cursor: "pointer", border: "none", fontSize: 10 }}
+                >
+                  {g}
+                </motion.button>
+              ))}
+              {genreFilter && (
+                <button
+                  onClick={() => setGenreFilter(null)}
+                  className="btn btn-sm btn-ghost"
+                  style={{ padding: "2px 8px", fontSize: 10 }}
+                >
+                  <Icon name="x" size={10} /> Xoá
+                </button>
+              )}
             </div>
           </FadeIn>
 
@@ -490,6 +529,24 @@ export default function SeriesListPage() {
                           </div>
                         </Link>
 
+                        {/* Progress bar */}
+                        {mounted && (() => {
+                          const prog = getSeriesProgress(item.series_id);
+                          if (!prog) return null;
+                          const pct = prog.totalPages > 0 ? Math.round((prog.pageNumber / prog.totalPages) * 100) : 0;
+                          return (
+                            <div style={{ padding: "6px 12px 0", marginTop: -4 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginBottom: 3 }}>
+                                <span>Đã đọc {pct}%</span>
+                                <span>Tr.{prog.pageNumber}/{prog.totalPages}</span>
+                              </div>
+                              <div style={{ height: 3, background: "var(--bg-2)", borderRadius: 2, overflow: "hidden" }}>
+                                <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)", borderRadius: 2 }} />
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         <div
                           style={{
                             padding: "8px 12px",
@@ -500,6 +557,18 @@ export default function SeriesListPage() {
                             gap: 8,
                           }}
                         >
+                          {mounted && getSeriesProgress(item.series_id) ? (
+                            <Link href={`/series/${item.series_id}/read?page_id=${getSeriesProgress(item.series_id)!.pageId}`} style={{ textDecoration: "none" }}>
+                              <motion.button
+                                whileHover={{ scale: 1.04 }}
+                                whileTap={{ scale: 0.96 }}
+                                className="btn btn-sm btn-primary"
+                                style={{ padding: "4px 10px", fontSize: 11 }}
+                              >
+                                <Icon name="arrow-right" size={12} /> Tiếp tục
+                              </motion.button>
+                            </Link>
+                          ) : (
                           <Link href={`/series/${item.series_id}`} style={{ textDecoration: "none" }}>
                             <motion.button
                               whileHover={{ scale: 1.04 }}
@@ -510,6 +579,7 @@ export default function SeriesListPage() {
                               <Icon name="book" size={12} /> Mở
                             </motion.button>
                           </Link>
+                          )}
                           <div style={{ display: "flex", gap: 6 }}>
                             <Link href={`/series/${item.series_id}/edit`} style={{ textDecoration: "none" }}>
                               <motion.button

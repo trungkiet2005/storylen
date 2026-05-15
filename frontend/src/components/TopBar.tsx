@@ -207,18 +207,21 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
   }, []);
 
   const toggleTheme = useCallback(() => {
-    const next = theme === "dark" ? "light" : "dark";
+    const cycle: Record<string, string> = { light: "dark", dark: "sepia", sepia: "light" };
+    const next = cycle[theme] ?? "light";
     setTheme(next);
     document.documentElement.dataset.theme = next;
     localStorage.setItem("sl-theme", next);
   }, [theme]);
 
   const items = [
-    { id: "home",    label: "Trang chủ", icon: "home",    href: "/" },
-    { id: "upload",  label: "Tải lên",   icon: "upload",  href: "/upload" },
-    { id: "reader",  label: "Đọc",       icon: "book",    href: "/reader" },
-{ id: "series",  label: "Bộ truyện", icon: "stack",   href: "/series" },
-    { id: "history", label: "Lịch sử",   icon: "history", href: "/history" },
+    { id: "home",      label: "Trang chủ", icon: "home",     href: "/" },
+    { id: "upload",    label: "Tải lên",   icon: "upload",   href: "/upload" },
+    { id: "reader",    label: "Đọc",       icon: "book",     href: "/reader" },
+    { id: "series",    label: "Bộ truyện", icon: "stack",    href: "/series" },
+    { id: "bookmarks", label: "Bookmark",  icon: "bookmark", href: "/bookmarks" },
+    { id: "stats",     label: "Thống kê",  icon: "chart",    href: "/stats" },
+    { id: "history",   label: "Lịch sử",   icon: "history",  href: "/history" },
     ...(isAdmin ? [{ id: "admin", label: "Quản trị", icon: "key", href: "/admin" }] : []),
   ];
 
@@ -258,15 +261,16 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
         {/* Credit badge — only for logged-in users */}
         {mounted && <CreditBadge />}
 
-        {/* Theme toggle */}
+        {/* Theme toggle: light → dark → sepia → light */}
         {mounted && (
           <button
             className="btn btn-sm btn-ghost"
             onClick={toggleTheme}
-            aria-label={theme === "dark" ? "Chuyển sang chế độ sáng" : "Chuyển sang chế độ tối"}
-            title={theme === "dark" ? "Light mode" : "Dark mode"}
+            aria-label="Đổi giao diện"
+            title={theme === "light" ? "Dark mode" : theme === "dark" ? "Sepia mode" : "Light mode"}
+            style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.02em" }}
           >
-            <Icon name={theme === "dark" ? "sun" : "moon"} size={15}/>
+            {theme === "dark" ? <Icon name="sun" size={15}/> : theme === "sepia" ? <Icon name="leaf" size={15}/> : <Icon name="moon" size={15}/>}
           </button>
         )}
 
