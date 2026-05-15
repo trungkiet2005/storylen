@@ -27,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" data-theme="light">
-      <body>
+      <body suppressHydrationWarning>
         <AuthProvider>
           <WibuProvider>
             <ToastProvider>

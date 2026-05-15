@@ -270,6 +270,46 @@ export async function getAIModuleOptions(): Promise<AIModuleOptions> {
   return request<AIModuleOptions>("/ai-module/options");
 }
 
+// ─── Scrape ───────────────────────────────────────────────────────────────────
+
+export interface ScrapePreviewResponse {
+  chapter_title: string;
+  page_count: number;
+  preview_urls: string[];
+}
+
+export interface ScrapeOptions {
+  seriesId?: string;
+  chapterId?: string;
+  newChapterTitle?: string;
+  aiConfig?: AIModuleCurrentConfig;
+}
+
+export async function previewChapter(chapterUrl: string): Promise<ScrapePreviewResponse> {
+  return request<ScrapePreviewResponse>("/scrape/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chapter_url: chapterUrl }),
+  });
+}
+
+export async function scrapeChapter(
+  chapterUrl: string,
+  opts: ScrapeOptions = {},
+): Promise<UploadResponse> {
+  return request<UploadResponse>("/scrape", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chapter_url: chapterUrl,
+      series_id: opts.seriesId ?? null,
+      chapter_id: opts.chapterId ?? null,
+      new_chapter_title: opts.newChapterTitle ?? null,
+      ai_config: opts.aiConfig ? JSON.stringify(opts.aiConfig) : null,
+    }),
+  });
+}
+
 // ─── Status polling ───────────────────────────────────────────────────────────
 
 export async function getPageStatus(pageId: string): Promise<PageStatus> {
