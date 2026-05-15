@@ -12,12 +12,14 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_supabase
 from app.models.schemas import (
     BubbleResult,
+    BubbleReviewRequest,
     PageDataResponse,
     PageMetadata,
     ProcessingStatus,
@@ -157,6 +159,7 @@ def get_page(page_id: str, user: AuthUser = Depends(get_current_user)):
         supabase.table("bubble_data")
         .select(
             "bubble_id, x, y, width, height, original_text_jp, ocr_confidence,"
+            "review_status, reviewed_by, reviewed_at,"
             "translation_history(translated_text_vi, translated_at)"
         )
         .eq("page_id", page_id)
@@ -180,6 +183,9 @@ def get_page(page_id: str, user: AuthUser = Depends(get_current_user)):
         else:
             translated_text = ""
 
+        review_status_raw = (b.get("review_status") or "pending").lower()
+        if review_status_raw not in {"pending", "approved", "rejected"}:
+            review_status_raw = "pending"
         processed_data.append(
             BubbleResult(
                 bubble_id=b["bubble_id"],
@@ -192,6 +198,9 @@ def get_page(page_id: str, user: AuthUser = Depends(get_current_user)):
                 original_text=b.get("original_text_jp") or "",
                 translated_text=translated_text,
                 confidence=float(b.get("ocr_confidence") or 0.0),
+                review_status=review_status_raw,  # type: ignore[arg-type]
+                reviewed_by=b.get("reviewed_by"),
+                reviewed_at=b.get("reviewed_at"),
             )
         )
 
@@ -331,4 +340,101 @@ def update_bubble_translation(
         llm_model_used=saved.get("llm_model_used") or "user_edit",
         user_id=saved.get("user_id") or user.id,
         username=user.username,
+    )
+
+
+@router.patch(
+    "/{page_id}/bubbles/{bubble_id}/review",
+    response_model=BubbleResult,
+)
+def update_bubble_review(
+    page_id: str,
+    bubble_id: str,
+    payload: BubbleReviewRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> BubbleResult:
+    """Approve / reject / re-open a bubble. Optionally save a translation edit in the same call.
+
+    Used by the Studio QC editor — translator clicks "Approve" or "Reject" and we record both
+    the review verdict and (optionally) the latest edited text in one PATCH.
+    """
+    supabase = get_supabase()
+    bubble = _get_owned_bubble(supabase, page_id, bubble_id, user)
+
+    # If text is supplied, persist it as a new translation_history revision first
+    # (mirrors update_bubble_translation so audit history stays intact).
+    text_override: Optional[str] = None
+    if payload.translated_text is not None:
+        text_override = payload.translated_text.strip()
+        if text_override:
+            try:
+                supabase.table("translation_history").insert({
+                    "translation_id": str(uuid.uuid4()),
+                    "bubble_id": bubble_id,
+                    "translated_text_vi": text_override,
+                    "translated_at": datetime.now(timezone.utc).isoformat(),
+                    "llm_model_used": "user_edit",
+                    "user_id": user.id,
+                }).execute()
+            except Exception as exc:
+                if _is_missing_user_id_column(exc):
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Database migration required: add translation_history.user_id before saving user edits.",
+                    ) from exc
+                logger.error("Failed to save translation edit during review for bubble %s: %s", bubble_id, exc)
+                raise HTTPException(status_code=500, detail="Failed to save translation edit.") from exc
+
+    try:
+        updated = (
+            supabase.table("bubble_data")
+            .update({
+                "review_status": payload.review_status,
+                "reviewed_by": user.id,
+                "reviewed_at": datetime.now(timezone.utc).isoformat(),
+            })
+            .eq("bubble_id", bubble_id)
+            .execute()
+        )
+    except Exception as exc:
+        # The most likely cause is the studio migration not having been applied yet.
+        msg = str(exc).lower()
+        if "review_status" in msg or "reviewed_by" in msg or "reviewed_at" in msg:
+            raise HTTPException(
+                status_code=503,
+                detail="Database migration required: run supabase_migration_studio.sql before using Studio review.",
+            ) from exc
+        logger.error("Failed to update review for bubble %s: %s", bubble_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to update review.") from exc
+
+    row = (updated.data or [{}])[0]
+    # Pull the most-recent translation so the response reflects the latest text the
+    # frontend should display (either the override we just inserted, or the pre-existing one).
+    latest_text = text_override if text_override else ""
+    if not latest_text:
+        tr = (
+            supabase.table("translation_history")
+            .select("translated_text_vi, translated_at")
+            .eq("bubble_id", bubble_id)
+            .order("translated_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if tr.data:
+            latest_text = str(tr.data[0].get("translated_text_vi") or "")
+
+    return BubbleResult(
+        bubble_id=bubble_id,
+        bbox=[
+            int(bubble.get("x") or 0),
+            int(bubble.get("y") or 0),
+            int(bubble.get("width") or 0),
+            int(bubble.get("height") or 0),
+        ],
+        original_text=bubble.get("original_text_jp") or "",
+        translated_text=latest_text,
+        confidence=float(bubble.get("ocr_confidence") or 0.0),
+        review_status=row.get("review_status") or payload.review_status,  # type: ignore[arg-type]
+        reviewed_by=row.get("reviewed_by") or user.id,
+        reviewed_at=row.get("reviewed_at"),
     )
