@@ -222,7 +222,7 @@ function StreakBadge({ streak }: { streak: number }) {
 }
 
 export default function StatsPage() {
-  const { stats, refreshStats, bookmarks, allProgress, goals, setGoals, todayPages, weekPages, unlockedAchievements } = useWibu();
+  const { stats, refreshStats, bookmarks, allProgress, goals, setGoals, todayPages, weekPages, unlockedAchievements, level } = useWibu();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -258,6 +258,66 @@ export default function StatsPage() {
             </div>
           ) : (
             <>
+              {/* Level / rank card */}
+              <FadeIn direction="up" distance={15} delay={0.12}>
+                <div
+                  className="stroke-ink panel-shadow"
+                  style={{
+                    background: "linear-gradient(135deg, var(--panel) 0%, var(--bg-2) 100%)",
+                    padding: "20px 24px",
+                    marginBottom: 24,
+                    display: "grid",
+                    gridTemplateColumns: "auto 1fr",
+                    gap: 18,
+                    alignItems: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 72, height: 72,
+                      border: "3px solid var(--border)",
+                      background: "var(--accent)",
+                      color: "#fff",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "4px 4px 0 var(--border)",
+                    }}
+                  >
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.1em", opacity: 0.85 }}>LV</div>
+                    <div className="display" style={{ fontSize: 26, lineHeight: 1, color: "#fff" }}>{level.level}</div>
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                      <span className="display" style={{ fontSize: 22, color: "var(--fg)" }}>{level.rank}</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--font-mono)", fontWeight: 700 }}>
+                        {level.xp.toLocaleString("vi-VN")} XP
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <div style={{ flex: 1, height: 10, background: "var(--bg-2)", border: "1px solid var(--border-soft)", borderRadius: 2, overflow: "hidden" }}>
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.round(level.pctToNext * 100)}%` }}
+                          transition={{ duration: 0.9, ease: "easeOut" }}
+                          style={{
+                            height: "100%",
+                            background: "linear-gradient(90deg, var(--accent), var(--gold))",
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--muted)", fontWeight: 700, minWidth: 60, textAlign: "right" }}>
+                        {level.xpInLevel}/{level.xpToNext}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted)" }}>
+                      Còn <strong style={{ color: "var(--fg)" }}>{Math.max(0, level.xpToNext - level.xpInLevel).toLocaleString("vi-VN")}</strong> XP để lên cấp {level.level + 1}. XP = trang × 10 + phút × 2 + bookmark × 5.
+                    </div>
+                  </div>
+                </div>
+              </FadeIn>
+
               {/* Goals: daily + weekly */}
               <FadeIn direction="up" distance={15} delay={0.13}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 24 }}>

@@ -355,6 +355,45 @@ export function getAllListStatuses(): Record<string, ReadingListStatus> {
   return readListsMap();
 }
 
+// ─── Level / XP ───────────────────────────────────────────────────────────────
+
+export interface LevelInfo {
+  level: number;
+  rank: string;
+  xp: number;          // total XP accumulated
+  xpInLevel: number;   // XP earned within the current level
+  xpToNext: number;    // XP required to complete the current level
+  pctToNext: number;   // 0..1
+}
+
+const RANKS: { from: number; label: string }[] = [
+  { from: 0,  label: "Tân Binh" },
+  { from: 3,  label: "Học Việc" },
+  { from: 6,  label: "Wibu Sơ Cấp" },
+  { from: 10, label: "Wibu Trung Cấp" },
+  { from: 15, label: "Wibu Cao Cấp" },
+  { from: 20, label: "Lão Làng" },
+  { from: 30, label: "Truyền Kỳ" },
+  { from: 50, label: "Chúa Tể Wibu" },
+];
+
+/**
+ * XP = totalPagesRead × 10 + totalMinutesRead × 2 + bookmarks × 5.
+ * Level n requires cumulative XP = 50 × n × (n+1) (triangular curve).
+ * The first few levels come fast; later ones slow down naturally.
+ */
+export function computeLevel(stats: ReadingStats, bookmarkCount: number): LevelInfo {
+  const xp = stats.totalPagesRead * 10 + stats.totalMinutesRead * 2 + bookmarkCount * 5;
+  let level = 0;
+  while (50 * (level + 1) * (level + 2) <= xp) level += 1;
+  const xpAtCurrent = 50 * level * (level + 1);
+  const xpAtNext = 50 * (level + 1) * (level + 2);
+  const xpInLevel = xp - xpAtCurrent;
+  const xpToNext = xpAtNext - xpAtCurrent;
+  const rank = [...RANKS].reverse().find(r => level >= r.from)?.label ?? RANKS[0].label;
+  return { level, rank, xp, xpInLevel, xpToNext, pctToNext: xpToNext > 0 ? xpInLevel / xpToNext : 0 };
+}
+
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
 export interface AchievementDef {

@@ -41,6 +41,8 @@ import {
   setListStatus as setListStatusLS,
   READING_LIST_META,
   type ReadingListStatus,
+  computeLevel,
+  type LevelInfo,
 } from "@/lib/localStore";
 
 interface WibuContextValue {
@@ -88,6 +90,9 @@ interface WibuContextValue {
   listStatuses: Record<string, ReadingListStatus>;
   getListStatus: (seriesId: string) => ReadingListStatus | null;
   setListStatus: (seriesId: string, status: ReadingListStatus | null) => void;
+
+  // Level / rank
+  level: LevelInfo;
 }
 
 const WibuContext = createContext<WibuContextValue | null>(null);
@@ -156,6 +161,8 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     }
   }, [weekPages, goalsState.weeklyPages]);
   const consumeWeeklyGoal = useCallback(() => setWeeklyGoalReached(false), []);
+
+  const level = useMemo(() => computeLevel(stats, bookmarks.length), [stats, bookmarks.length]);
 
   // Re-evaluate achievements whenever inputs change. Glossary count is read on
   // the fly from localStorage to avoid plumbing every series through state.
@@ -284,8 +291,9 @@ export function WibuProvider({ children }: { children: ReactNode }) {
       listStatuses: listStatusesState,
       getListStatus: getListStatusFn,
       setListStatus: setListStatusFn,
+      level,
     }),
-    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn, goalsState, setGoalsFn, todayPages, weekPages, unlockedAchievements, newlyUnlocked, consumeNewlyUnlocked, weeklyGoalReached, consumeWeeklyGoal, listStatusesState, getListStatusFn, setListStatusFn],
+    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn, goalsState, setGoalsFn, todayPages, weekPages, unlockedAchievements, newlyUnlocked, consumeNewlyUnlocked, weeklyGoalReached, consumeWeeklyGoal, listStatusesState, getListStatusFn, setListStatusFn, level],
   );
 
   return <WibuContext.Provider value={value}>{children}</WibuContext.Provider>;
