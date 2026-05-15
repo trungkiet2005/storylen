@@ -35,6 +35,8 @@ import {
   ACHIEVEMENTS,
   evaluateAchievements,
   getUnlockedAchievements,
+  shouldNotifyWeeklyGoal,
+  markWeeklyGoalNotified,
 } from "@/lib/localStore";
 
 interface WibuContextValue {
@@ -67,11 +69,16 @@ interface WibuContextValue {
   goals: ReadingGoals;
   setGoals: (g: ReadingGoals) => void;
   todayPages: number;
+  weekPages: number;
 
   // Achievements
   unlockedAchievements: Record<string, { unlockedAt: string }>;
   newlyUnlocked: string[];
   consumeNewlyUnlocked: () => void;
+
+  // Weekly goal — sentinel value, consumed by the toaster
+  weeklyGoalReached: boolean;
+  consumeWeeklyGoal: () => void;
 }
 
 const WibuContext = createContext<WibuContextValue | null>(null);
@@ -112,6 +119,32 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     const today = new Date().toISOString().slice(0, 10);
     return stats.dailyHistory[today] ?? 0;
   }, [stats]);
+
+  // Sum the seven days of the current ISO week (Mon→Sun)
+  const weekPages = useMemo(() => {
+    const start = new Date();
+    const day = start.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    start.setDate(start.getDate() + diff);
+    let total = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      total += stats.dailyHistory[d.toISOString().slice(0, 10)] ?? 0;
+    }
+    return total;
+  }, [stats]);
+
+  // Weekly goal notification — fires once per ISO week after reaching target
+  const [weeklyGoalReached, setWeeklyGoalReached] = useState(false);
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (shouldNotifyWeeklyGoal(goalsState.weeklyPages, weekPages)) {
+      markWeeklyGoalNotified();
+      setWeeklyGoalReached(true);
+    }
+  }, [weekPages, goalsState.weeklyPages]);
+  const consumeWeeklyGoal = useCallback(() => setWeeklyGoalReached(false), []);
 
   // Re-evaluate achievements whenever inputs change. Glossary count is read on
   // the fly from localStorage to avoid plumbing every series through state.
@@ -219,11 +252,14 @@ export function WibuProvider({ children }: { children: ReactNode }) {
       goals: goalsState,
       setGoals: setGoalsFn,
       todayPages,
+      weekPages,
       unlockedAchievements,
       newlyUnlocked,
       consumeNewlyUnlocked,
+      weeklyGoalReached,
+      consumeWeeklyGoal,
     }),
-    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn, goalsState, setGoalsFn, todayPages, unlockedAchievements, newlyUnlocked, consumeNewlyUnlocked],
+    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn, goalsState, setGoalsFn, todayPages, weekPages, unlockedAchievements, newlyUnlocked, consumeNewlyUnlocked, weeklyGoalReached, consumeWeeklyGoal],
   );
 
   return <WibuContext.Provider value={value}>{children}</WibuContext.Provider>;

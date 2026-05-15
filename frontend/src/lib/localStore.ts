@@ -285,6 +285,40 @@ export function setGoals(g: ReadingGoals) {
   localStorage.setItem(GOALS_KEY, JSON.stringify(g));
 }
 
+// Week starts on Monday. The first day of the ISO week is used as a key for
+// the "already-notified-this-week" flag so the toast fires at most once per
+// week even across page reloads.
+function startOfWeekStr(): string {
+  const d = new Date();
+  const day = d.getDay(); // 0 = Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+export function getWeekPages(): number {
+  const stats = getReadingStats();
+  const start = new Date(startOfWeekStr());
+  let total = 0;
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    total += stats.dailyHistory[d.toISOString().slice(0, 10)] ?? 0;
+  }
+  return total;
+}
+
+const WEEK_NOTIFY_KEY = "sl-week-notified";
+
+export function shouldNotifyWeeklyGoal(weeklyTarget: number, currentWeekPages: number): boolean {
+  if (currentWeekPages < weeklyTarget || weeklyTarget <= 0) return false;
+  return localStorage.getItem(WEEK_NOTIFY_KEY) !== startOfWeekStr();
+}
+
+export function markWeeklyGoalNotified() {
+  localStorage.setItem(WEEK_NOTIFY_KEY, startOfWeekStr());
+}
+
 // ─── Achievements ─────────────────────────────────────────────────────────────
 
 export interface AchievementDef {

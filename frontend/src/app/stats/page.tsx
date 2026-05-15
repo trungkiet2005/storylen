@@ -8,23 +8,35 @@ import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from "@/component
 import { useWibu, ACHIEVEMENTS } from "@/contexts/WibuContext";
 import { type ReadingStats } from "@/lib/localStore";
 
-// ── Daily goal card ─────────────────────────────────────────────────────────
-function DailyGoalCard({
-  todayPages,
+// ── Goal card (today / week) ────────────────────────────────────────────────
+function GoalCard({
+  label,
+  iconName,
+  pages,
   target,
   onChange,
+  unitLabel,
+  reachedMessage,
+  pendingMessage,
+  inputMax = 500,
 }: {
-  todayPages: number;
+  label: string;
+  iconName: string;
+  pages: number;
   target: number;
   onChange: (t: number) => void;
+  unitLabel: string;
+  reachedMessage: string;
+  pendingMessage: (remaining: number) => string;
+  inputMax?: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(target));
-  const pct = target > 0 ? Math.min(100, Math.round((todayPages / target) * 100)) : 0;
-  const reached = todayPages >= target && target > 0;
+  const pct = target > 0 ? Math.min(100, Math.round((pages / target) * 100)) : 0;
+  const reached = pages >= target && target > 0;
 
   const commit = () => {
-    const n = Math.max(1, Math.min(500, parseInt(draft, 10) || target));
+    const n = Math.max(1, Math.min(inputMax, parseInt(draft, 10) || target));
     onChange(n);
     setEditing(false);
   };
@@ -32,13 +44,13 @@ function DailyGoalCard({
   return (
     <div
       className="stroke-ink panel-shadow"
-      style={{ background: "var(--panel)", padding: "18px 24px", marginBottom: 24 }}
+      style={{ background: "var(--panel)", padding: "18px 24px" }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 10, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Icon name="zap" size={16} />
+          <Icon name={iconName} size={16} />
           <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--fg)" }}>
-            Mục tiêu hôm nay
+            {label}
           </span>
           {reached && (
             <span
@@ -54,18 +66,18 @@ function DailyGoalCard({
             <input
               type="number"
               min={1}
-              max={500}
+              max={inputMax}
               value={draft}
               onChange={e => setDraft(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }}
               autoFocus
               style={{
-                width: 60, padding: "4px 6px", fontSize: 13,
+                width: 64, padding: "4px 6px", fontSize: 13,
                 border: "1.5px solid var(--border)", background: "var(--bg-2)",
                 color: "var(--fg)", outline: "none", fontFamily: "var(--font-mono)",
               }}
             />
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>trang/ngày</span>
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>{unitLabel}</span>
             <button onClick={commit} className="btn btn-sm btn-primary" style={{ padding: "3px 8px", fontSize: 11 }}>
               <Icon name="check" size={11} />
             </button>
@@ -85,7 +97,7 @@ function DailyGoalCard({
       </div>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
-        <span className="display" style={{ fontSize: 32, color: reached ? "var(--jade)" : "var(--accent)" }}>{todayPages}</span>
+        <span className="display" style={{ fontSize: 32, color: reached ? "var(--jade)" : "var(--accent)" }}>{pages}</span>
         <span style={{ fontSize: 14, color: "var(--muted)" }}>/ {target} trang</span>
         <span style={{ marginLeft: "auto", fontSize: 11, fontFamily: "var(--font-mono)", fontWeight: 700, color: reached ? "var(--jade)" : "var(--muted)" }}>{pct}%</span>
       </div>
@@ -100,9 +112,7 @@ function DailyGoalCard({
       </div>
 
       <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>
-        {reached
-          ? "Đã đạt mục tiêu hôm nay. Vẫn còn đà, đọc thêm thì cứ đọc 🔥"
-          : `Còn ${Math.max(0, target - todayPages)} trang nữa là đạt mục tiêu hôm nay.`}
+        {reached ? reachedMessage : pendingMessage(Math.max(0, target - pages))}
       </div>
     </div>
   );
@@ -212,7 +222,7 @@ function StreakBadge({ streak }: { streak: number }) {
 }
 
 export default function StatsPage() {
-  const { stats, refreshStats, bookmarks, allProgress, goals, setGoals, todayPages, unlockedAchievements } = useWibu();
+  const { stats, refreshStats, bookmarks, allProgress, goals, setGoals, todayPages, weekPages, unlockedAchievements } = useWibu();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -248,13 +258,32 @@ export default function StatsPage() {
             </div>
           ) : (
             <>
-              {/* Daily goal */}
+              {/* Goals: daily + weekly */}
               <FadeIn direction="up" distance={15} delay={0.13}>
-                <DailyGoalCard
-                  todayPages={todayPages}
-                  target={goals.dailyPages}
-                  onChange={t => setGoals({ ...goals, dailyPages: t })}
-                />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 24 }}>
+                  <GoalCard
+                    label="Mục tiêu hôm nay"
+                    iconName="zap"
+                    pages={todayPages}
+                    target={goals.dailyPages}
+                    onChange={t => setGoals({ ...goals, dailyPages: t })}
+                    unitLabel="trang/ngày"
+                    inputMax={500}
+                    reachedMessage="Đã đạt mục tiêu hôm nay. Vẫn còn đà, đọc thêm thì cứ đọc 🔥"
+                    pendingMessage={r => `Còn ${r} trang nữa là đạt mục tiêu hôm nay.`}
+                  />
+                  <GoalCard
+                    label="Mục tiêu tuần này"
+                    iconName="fire"
+                    pages={weekPages}
+                    target={goals.weeklyPages}
+                    onChange={t => setGoals({ ...goals, weeklyPages: t })}
+                    unitLabel="trang/tuần"
+                    inputMax={3000}
+                    reachedMessage="Hoàn thành mục tiêu tuần! Tuần sau reset, tiếp tục giữ phong độ nha 🎯"
+                    pendingMessage={r => `Còn ${r} trang nữa là đạt mục tiêu tuần này.`}
+                  />
+                </div>
               </FadeIn>
 
               {/* Streak badge */}
