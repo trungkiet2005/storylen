@@ -448,6 +448,12 @@ button:disabled:hover { transform: none !important; box-shadow: none !important;
     grid-template-columns: 1fr;
   }
 
+  /* Hero decorative bottom bar (barcode / issue tags) overlaps CTA on mobile */
+  .hero-poster-tags { display: none !important; }
+
+  /* Banner: hide tall vertical kanji on narrow screens */
+  .banner-kanji { display: none; }
+
   /* Stack goals side by side becomes column */
   .goals-row {
     flex-direction: column !important;
@@ -465,6 +471,23 @@ button:disabled:hover { transform: none !important; box-shadow: none !important;
   .hero-mockup-wrapper {
     display: none !important;
   }
+}
+
+/* Hero poster tags (barcode + issue text) — desktop only decoration */
+.hero-poster-tags {
+  position: absolute;
+  left: 56px; right: 56px; bottom: 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Ensure hero has enough bottom padding for poster tags on desktop */
+.hero-inner {
+  padding-bottom: clamp(32px, 5vw, 120px);
 }
 
 /* ---------- Touch-target sizes ---------- */

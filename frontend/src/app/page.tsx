@@ -407,9 +407,9 @@ export default function Home() {
       <TopBar active="home" />
 
       {/* ── Hero Section ── */}
-      <div style={{ padding: 40 }}>
+      <div style={{ padding: "clamp(16px, 4vw, 40px)" }}>
         <FadeIn duration={0.7} direction="none">
-          <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "var(--bg-2)", position: "relative", overflow: "hidden", padding: "clamp(36px, 8vw, 80px) clamp(20px, 6vw, 56px)", minHeight: 480 }}>
+          <div className="stroke-ink-thick panel-shadow-lg hero-inner" style={{ background: "var(--bg-2)", position: "relative", overflow: "hidden", padding: "clamp(32px, 7vw, 80px) clamp(20px, 6vw, 56px)" }}>
             
             {/* Giant letter bg */}
             <motion.div 
@@ -464,9 +464,9 @@ export default function Home() {
               </FadeIn>
             </div>
 
-            {/* Poster tags bottom & Barcode */}
+            {/* Poster tags bottom & Barcode — hidden on mobile */}
             <FadeIn delay={0.8} direction="none" className="w-full">
-              <div style={{ position: "absolute", left: 56, right: 56, bottom: 40, display: "flex", justifyContent: "space-between", alignItems: "flex-end", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)" }}>
+              <div className="hero-poster-tags">
                 <div>
                   <div style={{ color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>ISSUE №01</div>
                   <div>THE BEGINNING OF CONTEXTUAL READING</div>
@@ -497,41 +497,41 @@ export default function Home() {
 
       {/* ── Manga Showcase Banner ── */}
       <FadeIn duration={0.8} direction="none">
-        <div style={{ margin: '16px 40px 48px', position: 'relative', height: '220px', overflow: 'hidden' }} className="stroke-ink panel-shadow">
+        <div style={{ margin: 'clamp(12px, 3vw, 16px) clamp(16px, 4vw, 40px) 48px', position: 'relative', overflow: 'hidden', minHeight: 160 }} className="stroke-ink panel-shadow">
           <div style={{ position: 'absolute', inset: 0, background: '#000' }}>
-            <Image 
-              src="/images/manga_hero_ja.png" 
-              alt="Manga background illustration" 
+            <Image
+              src="/images/manga_hero_ja.png"
+              alt="Manga background illustration"
               fill
-              style={{ objectFit: 'cover', objectPosition: 'center 25%', opacity: 0.35, filter: 'grayscale(100%) contrast(130%)' }} 
+              style={{ objectFit: 'cover', objectPosition: 'center 25%', opacity: 0.35, filter: 'grayscale(100%) contrast(130%)' }}
             />
           </div>
           <div className="halftone" style={{ position: 'absolute', inset: 0, opacity: 0.15 }} />
-          
-          <div style={{ position: 'relative', zIndex: 2, height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 48px', color: 'var(--paper)' }}>
-            <div>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '3px 8px', border: '1px solid var(--paper)', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.15em', color: 'var(--accent)', marginBottom: 12, fontWeight: 700 }}>
-                SYSTEM_CORE::CONTEXTUAL_READING
+
+          <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'clamp(20px, 4vw, 40px) clamp(16px, 4vw, 48px)', color: 'var(--paper)', gap: 16 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '3px 8px', border: '1px solid var(--paper)', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', color: 'var(--accent)', marginBottom: 12, fontWeight: 700 }}>
+                CONTEXTUAL_READING
               </div>
-              <h3 className="display" style={{ fontSize: 42, color: 'var(--paper)', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+              <h3 className="display" style={{ fontSize: 'clamp(22px, 5vw, 42px)', color: 'var(--paper)', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                 Dịch có tư duy. Đọc không gián đoạn.
               </h3>
-              <p className="serif" style={{ fontSize: 15, color: 'rgba(245,239,227,0.8)', margin: '8px 0 0' }}>
+              <p className="serif" style={{ fontSize: 'clamp(13px, 2vw, 15px)', color: 'rgba(245,239,227,0.8)', margin: '8px 0 0' }}>
                 Bảo tồn nguyên vẹn tinh thần bản gốc với mạng nơ-ron ngữ cảnh thông minh.
               </p>
             </div>
-            
-            <div style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
-              <div className="kanji-deco" style={{ fontSize: 24, opacity: 0.75, height: 120, writingMode: 'vertical-rl', textOrientation: 'upright', color: 'var(--paper)' }}>
+
+            <div className="banner-deco" style={{ display: 'flex', gap: 20, alignItems: 'center', flexShrink: 0 }}>
+              <div className="kanji-deco banner-kanji" style={{ fontSize: 20, opacity: 0.75, height: 100, writingMode: 'vertical-rl', textOrientation: 'upright', color: 'var(--paper)' }}>
                 物語レンズ
               </div>
-              <motion.div 
+              <motion.div
                 animate={{ rotate: [-5, -8, -5] }}
                 transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-                className="seal seal-circle" 
-                style={{ background: 'var(--accent)', width: 68, height: 68, fontSize: 15, display: 'flex', flexDirection: 'column' }}
+                className="seal seal-circle"
+                style={{ background: 'var(--accent)', width: 60, height: 60, fontSize: 13, display: 'flex', flexDirection: 'column', flexShrink: 0 }}
               >
-                <span style={{ fontSize: 10, opacity: 0.9, letterSpacing: 0 }}>AI TR.</span>
+                <span style={{ fontSize: 9, opacity: 0.9, letterSpacing: 0 }}>AI TR.</span>
                 <span style={{ fontWeight: 900 }}>翻訳</span>
               </motion.div>
             </div>
