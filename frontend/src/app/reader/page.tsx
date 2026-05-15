@@ -615,6 +615,32 @@ function ReaderContent() {
   // Keyboard shortcut overlay
   const [showShortcuts, setShowShortcuts] = useState(false);
 
+  // Fullscreen reader (hides TopBar; also requests browser fullscreen for true immersion)
+  const [fullscreen, setFullscreen] = useState(false);
+  const toggleFullscreen = useCallback(() => {
+    setFullscreen(v => {
+      const next = !v;
+      // Request/exit browser fullscreen — best effort, ignore errors (eg. permissions)
+      if (typeof document !== "undefined") {
+        if (next && !document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.().catch(() => {});
+        } else if (!next && document.fullscreenElement) {
+          document.exitFullscreen?.().catch(() => {});
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  // Sync state if the user exits browser fullscreen via Esc / OS chrome
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement && fullscreen) setFullscreen(false);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, [fullscreen]);
+
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
   // Batch processing support
@@ -697,6 +723,7 @@ function ReaderContent() {
       }
       switch (e.key) {
         case "o": setShowOverlay(v => !v); break;
+        case "f": case "F": toggleFullscreen(); break;
         case "+": case "=": setZoom(z => Math.min(z + 0.1, 2.0)); break;
         case "-": setZoom(z => Math.max(z - 0.1, 0.5)); break;
         case "ArrowRight":
@@ -711,7 +738,7 @@ function ReaderContent() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [nextPageId, prevPageId, router, showShortcuts]);
+  }, [nextPageId, prevPageId, router, showShortcuts, toggleFullscreen]);
 
   useEffect(() => setSelected(null), [pageIdParam]);
 
@@ -858,7 +885,7 @@ function ReaderContent() {
   return (
     <AnimatedPage>
     <div style={{ height: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <TopBar active="reader" compact />
+      {!fullscreen && <TopBar active="reader" compact />}
 
       <div style={{ display: "grid", gridTemplateColumns: `${hasMultiplePages ? "72px" : ""} 1fr ${showContext ? "320px" : "0px"}`, flex: 1, overflow: "hidden", transition: "grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}>
 
@@ -1083,6 +1110,33 @@ function ReaderContent() {
 
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setShowContext(v => !v)} aria-label="Bật/tắt panel ngữ cảnh">
               <Icon name="info" size={14}/>
+            </motion.button>
+
+            {/* Fullscreen toggle */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="btn btn-sm btn-ghost"
+              onClick={toggleFullscreen}
+              aria-label={fullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+              title={fullscreen ? "Thoát toàn màn hình (F)" : "Toàn màn hình (F)"}
+              style={{ color: fullscreen ? "var(--accent)" : undefined }}
+            >
+              {fullscreen ? (
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3v3a2 2 0 0 1-2 2H3"/>
+                  <path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+                  <path d="M3 16h3a2 2 0 0 1 2 2v3"/>
+                  <path d="M16 21v-3a2 2 0 0 1 2-2h3"/>
+                </svg>
+              ) : (
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
+                  <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+                  <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
+                  <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+                </svg>
+              )}
             </motion.button>
 
             {/* Keyboard shortcut cheatsheet */}
@@ -1679,6 +1733,7 @@ function ReaderContent() {
                 { key: "←  →", desc: "Trang trước / sau" },
                 { key: "H / L", desc: "Trang trước / sau (vim)" },
                 { key: "O",     desc: "Bật/tắt bản dịch overlay" },
+                { key: "F",     desc: "Toàn màn hình đọc" },
                 { key: "+ / −", desc: "Phóng to / thu nhỏ" },
                 { key: "?",     desc: "Hiện/ẩn bảng phím tắt" },
                 { key: "Esc",   desc: "Đóng cửa sổ" },
