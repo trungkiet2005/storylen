@@ -1,6 +1,7 @@
 "use client";
 import { motion } from "framer-motion";
 import React, { ReactNode } from "react";
+import { ANIMATION_EASING, VIEWPORT_MARGIN } from "@/lib/constants";
 
 type AnimationProps = {
   children: ReactNode;
@@ -38,11 +39,11 @@ export const FadeIn = ({
     <motion.div
       initial={initial}
       whileInView={{ opacity: 1, x: 0, y: 0 }}
-      viewport={{ once: true, margin: "-50px" }}
+      viewport={{ once: true, margin: VIEWPORT_MARGIN }}
       transition={{
         duration,
         delay,
-        ease: [0.21, 0.47, 0.32, 0.98], // Smooth spring-like curve
+        ease: ANIMATION_EASING.STANDARD,
       }}
       className={className}
       style={style}
@@ -69,7 +70,7 @@ export const StaggerContainer = ({
     <motion.div
       initial="hidden"
       whileInView="visible"
-      viewport={{ once: true, margin: "-50px" }}
+      viewport={{ once: true, margin: VIEWPORT_MARGIN }}
       variants={{
         visible: {
           transition: {
@@ -111,7 +112,7 @@ export const StaggerItem = ({
           y: 0,
           transition: {
             duration: 0.5,
-            ease: [0.21, 0.47, 0.32, 0.98],
+            ease: ANIMATION_EASING.STANDARD,
           },
         },
       }}
@@ -138,7 +139,7 @@ export const ScaleIn = ({
       transition={{
         duration,
         delay,
-        ease: [0.34, 1.56, 0.64, 1], // Bouncy
+        ease: ANIMATION_EASING.BOUNCY,
       }}
       className={className}
       style={style}

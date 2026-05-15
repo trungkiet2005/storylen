@@ -17,10 +17,26 @@ beforeEach(() => {
 
 // framer-motion's animate-presence uses ResizeObserver in some paths
 if (typeof globalThis.ResizeObserver === "undefined") {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).ResizeObserver = class {
     observe() {}
     unobserve() {}
     disconnect() {}
+  };
+}
+
+// framer-motion's whileInView uses IntersectionObserver
+if (typeof globalThis.IntersectionObserver === "undefined") {
+  (globalThis as any).IntersectionObserver = class {
+    constructor(cb: IntersectionObserverCallback) {
+      // immediately call with an empty entry so whileInView components treat themselves as visible
+      cb([], this as unknown as IntersectionObserver);
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    readonly root = null;
+    readonly rootMargin = "";
+    readonly thresholds = [];
+    takeRecords(): IntersectionObserverEntry[] { return []; }
   };
 }

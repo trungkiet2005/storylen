@@ -1,6 +1,9 @@
 "use client";
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { Icon } from './Icons';
+import { TOAST_CONFIG } from '@/lib/constants';
+
+let _toastCounter = 0;
 
 type ToastType = "success" | "error" | "info" | "warning";
 
@@ -35,7 +38,7 @@ const COLORS: Record<ToastType, { bg: string; color: string; border: string }> =
 
 function ToastItem({ item, onRemove }: { item: Toast; onRemove: (id: number) => void }) {
   useEffect(() => {
-    const t = setTimeout(() => onRemove(item.id), item.duration ?? 4000);
+    const t = setTimeout(() => onRemove(item.id), item.duration ?? TOAST_CONFIG.DEFAULT_DURATION);
     return () => clearTimeout(t);
   }, [item, onRemove]);
 
@@ -71,14 +74,13 @@ function ToastItem({ item, onRemove }: { item: Toast; onRemove: (id: number) => 
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  let counter = 0;
 
   const removeToast = useCallback((id: number) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const toast = useCallback((message: string, type: ToastType = "info", duration = 4000) => {
-    const id = Date.now() + counter++;
+  const toast = useCallback((message: string, type: ToastType = "info", duration = TOAST_CONFIG.DEFAULT_DURATION) => {
+    const id = Date.now() + _toastCounter++;
     setToasts(prev => [...prev.slice(-4), { id, type, message, duration }]);
   }, []);
 

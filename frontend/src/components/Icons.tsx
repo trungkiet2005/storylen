@@ -1,4 +1,18 @@
-export const Icon = ({ name, size = 18, stroke = 2, className = "" }: { name: string, size?: number, stroke?: number, className?: string }) => {
+export type IconName =
+  | "home" | "upload" | "book" | "chat" | "stack" | "history" | "search"
+  | "arrow-right" | "arrow-left"
+  | "plus" | "x" | "check" | "refresh" | "send" | "folder" | "bookmark"
+  | "alert" | "dots" | "dots-h" | "download" | "trash" | "copy"
+  | "eye" | "eye-off" | "layers" | "grid" | "menu"
+  | "zoom-in" | "zoom-out"
+  | "image" | "file"
+  | "translate" | "sparkle" | "clock" | "info" | "settings" | "user" | "key" | "external"
+  | "moon" | "sun"
+  | "star" | "star-fill" | "chart" | "leaf" | "fire" | "trophy" | "pdf" | "tag" | "close"
+  | "chevron-right" | "chevron-left" | "chevron-down" | "chevron-up"
+  | "link" | "magic" | "zap";
+
+export const Icon = ({ name, size = 18, stroke = 2, className = "" }: { name: IconName | string, size?: number, stroke?: number, className?: string }) => {
   const P = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: stroke, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, className };
   switch (name) {
     // Navigation

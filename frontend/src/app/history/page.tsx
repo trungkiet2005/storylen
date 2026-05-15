@@ -23,36 +23,10 @@ import {
   type HistoryItem,
   type PageStatus,
 } from "@/lib/api";
+import { STATUS_META } from "@/lib/constants";
+import { formatRelativeTime } from "@/lib/date-utils";
 
 type StatusFilter = "all" | "ready" | "processing" | "failed";
-
-const STATUS_META: Record<
-  PageStatus["status"],
-  { label: string; tone: "ready" | "processing" | "failed"; color: string }
-> = {
-  pending:      { label: "Đang chờ",   tone: "processing", color: "var(--muted)" },
-  ocr_running:  { label: "Đang OCR",   tone: "processing", color: "var(--accent)" },
-  translating:  { label: "Đang dịch",  tone: "processing", color: "var(--accent)" },
-  translated:   { label: "Đã dịch",    tone: "ready",      color: "var(--jade)" },
-  completed:    { label: "Hoàn tất",   tone: "ready",      color: "var(--jade)" },
-  ocr_failed:   { label: "Lỗi OCR",    tone: "failed",     color: "var(--accent)" },
-  failed:       { label: "Thất bại",   tone: "failed",     color: "var(--accent)" },
-  error:        { label: "Lỗi",        tone: "failed",     color: "var(--accent)" },
-};
-
-function formatRelativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "—";
-  const diff = Date.now() - then;
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) return "vừa xong";
-  if (min < 60) return `${min} phút trước`;
-  const hours = Math.floor(min / 60);
-  if (hours < 24) return `${hours} giờ trước`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} ngày trước`;
-  return new Date(iso).toLocaleDateString("vi-VN");
-}
 
 function StatusBadge({ status }: { status: PageStatus["status"] }) {
   const meta = STATUS_META[status] ?? STATUS_META.failed;

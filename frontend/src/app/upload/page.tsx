@@ -26,35 +26,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from '@/components/Animations';
 import { useAuth } from '@/contexts/AuthContext';
-
-const LANG_NAMES: Record<string, string> = {
-  CHS: "Chinese (Simplified)",
-  CHT: "Chinese (Traditional)",
-  CSY: "Czech",
-  NLD: "Dutch",
-  ENG: "English",
-  FRA: "French",
-  DEU: "German",
-  HUN: "Hungarian",
-  ITA: "Italian",
-  JPN: "Japanese",
-  KOR: "Korean",
-  POL: "Polish",
-  PTB: "Portuguese (Brazil)",
-  ROM: "Romanian",
-  RUS: "Russian",
-  ESP: "Spanish",
-  TRK: "Turkish",
-  UKR: "Ukrainian",
-  VIN: "Vietnamese",
-  ARA: "Arabic",
-  CNR: "Montenegrin",
-  SRP: "Serbian",
-  HRV: "Croatian",
-  THA: "Thai",
-  IND: "Indonesian",
-  FIL: "Filipino (Tagalog)",
-};
+import { LANG_NAMES, FILE_LIMITS } from '@/lib/constants';
 
 const DEFAULT_AI_CONFIG: AIModuleCurrentConfig = {
   translator: "gemini",
@@ -70,11 +42,11 @@ type AIModuleConfigKey = keyof AIModuleCurrentConfig;
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
-const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
-const MAX_PDF_BYTES = 100 * 1024 * 1024;
-const PDF_RENDER_MAX_WIDTH = 2200;
-const PDF_RENDER_MAX_HEIGHT = 3200;
-const PDF_RENDER_QUALITY = 0.92;
+const MAX_IMAGE_BYTES = FILE_LIMITS.IMAGE_MAX_BYTES;
+const MAX_PDF_BYTES = FILE_LIMITS.PDF_MAX_BYTES;
+const PDF_RENDER_MAX_WIDTH = FILE_LIMITS.PDF_RENDER_MAX_WIDTH;
+const PDF_RENDER_MAX_HEIGHT = FILE_LIMITS.PDF_RENDER_MAX_HEIGHT;
+const PDF_RENDER_QUALITY = FILE_LIMITS.PDF_RENDER_QUALITY;
 
 interface FileItem {
   id: string;

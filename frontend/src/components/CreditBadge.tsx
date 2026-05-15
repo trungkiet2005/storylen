@@ -2,20 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-
-const PLAN_COLORS: Record<string, string> = {
-  free:    "var(--muted)",
-  basic:   "#2563eb",
-  pro:     "#7c3aed",
-  premium: "#d97706",
-};
-
-const PLAN_LABELS: Record<string, string> = {
-  free:    "FREE",
-  basic:   "BASIC",
-  pro:     "PRO",
-  premium: "PREMIUM",
-};
+import { PLAN_COLORS, PLAN_LABELS } from "@/lib/constants";
 
 export function CreditBadge() {
   const { user } = useAuth();

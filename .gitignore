@@ -56,6 +56,8 @@ lib/
 lib64/
 !frontend/src/lib/
 !frontend/src/lib/**
+!frontend/__tests__/unit/lib/
+!frontend/__tests__/unit/lib/**
 parts/
 sdist/
 var/
