@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  lint-and-test:
+    name: Lint + Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        working-directory: storylens_demo
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff lint
+        working-directory: storylens_demo
+        run: ruff check control_plane/ tests/
+
+      - name: Run tests
+        working-directory: storylens_demo
+        env:
+          # Tests mock Gemini — no real key needed, but env var must exist
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'test-key' }}
+          DB_URL: sqlite+aiosqlite:///./test.db
+          ARTIFACT_DIR: /tmp/artifacts
+          VECTOR_DB_DIR: /tmp/chromadb
+        run: pytest tests/ -v --tb=short
