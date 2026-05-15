@@ -39,7 +39,10 @@ _BASE_HEADERS = {
     "User-Agent": _BROWSER_UA,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
+    # Brotli requires the `brotli`/`brotlicffi` package; advertising "br" without
+    # it would let the server send brotli-compressed HTML that httpx can't decode
+    # — the body comes back as garbage and we'd find zero images.
+    "Accept-Encoding": "gzip, deflate",
     "Connection": "keep-alive",
     "Upgrade-Insecure-Requests": "1",
     "Sec-Fetch-Mode": "navigate",
@@ -193,23 +196,45 @@ def _extract_image_urls(html: str) -> list[str]:
     return _imgs_to_urls(soup.find_all("img"), strict=False)
 
 
+def _attr(img, *names: str) -> str:
+    """Return the first non-empty attribute value, handling bs4's list-valued attrs."""
+    for n in names:
+        v = img.get(n)
+        if isinstance(v, list):
+            v = v[0] if v else ""
+        if isinstance(v, str) and v.strip():
+            return v
+    return ""
+
+
 def _imgs_to_urls(imgs, strict: bool = True) -> list[str]:
-    """Extract unique image URLs from img tags, prioritising lazy-load attributes."""
+    """Extract unique image URLs from img tags, prioritising lazy-load attributes.
+
+    Robust against the two real-world quirks we've hit:
+      1. Some sites (e.g. mangaread.org) embed leading whitespace/newlines INSIDE
+         the `src=""` attribute value — `.strip()` isn't enough, we squash all
+         internal whitespace too.
+      2. `srcset` / `data-srcset` is a comma-separated list of `URL DESCRIPTOR`
+         pairs — splitting just on whitespace would chop URLs mid-string.
+    """
     seen: set[str] = set()
     result: list[str] = []
 
     for img in imgs:
-        # Lazy-load priority order
-        raw = (
-            img.get("data-src")
-            or img.get("data-lazy-src")
-            or img.get("data-original")
-            or img.get("data-srcset", "").split()[0]
-            or img.get("src")
-            or ""
-        ).strip()
+        raw = _attr(img, "data-src", "data-lazy-src", "data-original", "src")
+        if not raw:
+            srcset = _attr(img, "data-srcset", "srcset")
+            if srcset:
+                # `srcset` is "url1 1x, url2 2x" — take the first URL.
+                raw = srcset.split(",")[0].strip().split()[0] if srcset.strip() else ""
 
-        if not raw or raw.startswith("data:"):
+        if not raw:
+            continue
+
+        # URL must not contain whitespace per RFC 3986; some sites leak \t/\n.
+        raw = "".join(raw.split())
+
+        if raw.startswith("data:"):
             continue
         if not raw.startswith(("http://", "https://")):
             continue

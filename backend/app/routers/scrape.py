@@ -52,7 +52,9 @@ class ScrapeRequest(BaseModel):
 class ScrapePreviewResponse(BaseModel):
     chapter_title: str
     page_count: int
-    preview_urls: list[str]      # first ≤8 image URLs for thumbnail preview
+    # All image URLs — frontend uses the first ~8 for the thumbnail strip and
+    # the full list for the in-page reader (scroll / page preview before translation).
+    preview_urls: list[str]
 
 
 # ─── Preview (no download, no credits) ───────────────────────────────────────
@@ -84,7 +86,7 @@ async def preview_chapter(
     return ScrapePreviewResponse(
         chapter_title=chapter_title,
         page_count=len(image_urls),
-        preview_urls=image_urls[:8],
+        preview_urls=image_urls,
     )
 
 
