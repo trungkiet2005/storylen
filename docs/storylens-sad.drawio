@@ -1,0 +1,214 @@
+﻿<mxfile host="app.diagrams.net" modified="2026-04-24T00:00:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="arch1" name="E1-Architecture-NTier">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="t1" value="StoryLens - N-tier + MVC Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontStyle=1;fontSize=20;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="500" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="u1" value="Client Tier&#xa;React UI (MVC View)&#xa;TypeScript/JavaScript" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="240" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="u2" value="API Tier&#xa;FastAPI Controllers (MVC Controller)&#xa;Python" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="340" y="80" width="260" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="u3" value="Application Tier&#xa;Story / QA / Translation Services&#xa;Python" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="660" y="80" width="280" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="u4" value="Data Tier&#xa;PostgreSQL + Redis + Object Storage&#xa;SQL / JSON / Binary" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="80" width="300" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="u5" value="ML Tier&#xa;OCR + Translation + Embedding + LLM&#xa;Python (PyTorch/Transformers)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="660" y="250" width="300" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="u6" value="External Integrations&#xa;Auth (JWT/OAuth), CDN, Monitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="250" width="300" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="HTTPS/JSON" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="u1" target="u2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="Service Call" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="u2" target="u3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" value="ORM/SQL + Cache" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="u3" target="u4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" value="Inference Requests" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="u3" target="u5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" value="Model Metadata + Vector IDs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="u5" target="u4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" value="Webhooks/Logs/Metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="u2" target="u6">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" value="Assets via CDN" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="1" source="u1" target="u6">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="logic1" name="E2-Logical-View-Components">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="lt" value="Logical View (Section 4.x)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontStyle=1;fontSize=20;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="400" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="l1" value="4.1 Web UI&#xa;- Home, Upload, Reader, QA, History&#xa;- React components + state" style="swimlane;whiteSpace=wrap;html=1;rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="260" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="l2" value="4.2 API Gateway / Controller&#xa;- Auth, routing, validation&#xa;- REST endpoints" style="swimlane;whiteSpace=wrap;html=1;rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="350" y="70" width="260" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="l3" value="4.3 Story Service&#xa;- Story metadata, chapters, panels" style="swimlane;whiteSpace=wrap;html=1;rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="660" y="60" width="230" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="l4" value="4.4 OCR/Translation Service&#xa;- Text extraction, language detect, translation" style="swimlane;whiteSpace=wrap;html=1;rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="660" y="190" width="230" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="l5" value="4.5 QA/RAG Service&#xa;- Embed, retrieve, answer generation" style="swimlane;whiteSpace=wrap;html=1;rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="660" y="330" width="230" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="l6" value="4.6 Data Access Layer&#xa;- Repositories (User, Story, Translation, QA)" style="swimlane;whiteSpace=wrap;html=1;rounded=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="940" y="70" width="260" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="l7" value="4.7 PostgreSQL" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="60" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l8" value="4.8 Redis Cache" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="160" width="120" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l9" value="4.9 Vector DB (pgvector)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="260" width="150" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="l10" value="4.10 Object Storage&#xa;(images, OCR JSON)" style="shape=cloud;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="360" width="210" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="le1" value="REST" style="endArrow=block;html=1;" edge="1" parent="1" source="l1" target="l2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le2" value="use" style="endArrow=block;html=1;" edge="1" parent="1" source="l2" target="l3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le3" value="use" style="endArrow=block;html=1;" edge="1" parent="1" source="l2" target="l4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le4" value="use" style="endArrow=block;html=1;" edge="1" parent="1" source="l2" target="l5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le5" value="repository" style="endArrow=block;html=1;" edge="1" parent="1" source="l3" target="l6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le6" value="repository" style="endArrow=block;html=1;" edge="1" parent="1" source="l4" target="l6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le7" value="repository" style="endArrow=block;html=1;" edge="1" parent="1" source="l5" target="l6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le8" value="SQL" style="endArrow=block;html=1;" edge="1" parent="1" source="l6" target="l7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le9" value="cache" style="endArrow=block;html=1;" edge="1" parent="1" source="l6" target="l8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le10" value="embedding vectors" style="endArrow=block;html=1;" edge="1" parent="1" source="l5" target="l9"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="le11" value="store assets" style="endArrow=block;html=1;" edge="1" parent="1" source="l4" target="l10"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="class1" name="F1-Class-Diagram-OOP">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="ct" value="Detailed Design - Key Classes" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontStyle=1;fontSize=20;" vertex="1" parent="1">
+          <mxGeometry x="20" y="10" width="420" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="c1" value="StoryController|+uploadStory(file): StoryDTO&#xa;+getStory(id): StoryDTO&#xa;+getPanels(storyId): PanelDTO[]" style="shape=umlClass;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="80" width="270" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="c2" value="StoryService|+createStory(meta): Story&#xa;+listPanels(storyId): Panel[]&#xa;+updateStatus(storyId,status)" style="shape=umlClass;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="390" y="80" width="270" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="c3" value="OCRTranslationService|+extractText(image): OCRResult&#xa;+translate(panelText,targetLang): Translation&#xa;+saveTranslation(panelId,text)" style="shape=umlClass;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="70" width="320" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="c4" value="QAService|+ask(question,storyId): Answer&#xa;+retrieveContext(query,k): Chunk[]&#xa;+logSession(userId,message)" style="shape=umlClass;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="390" y="290" width="270" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="c5" value="EmbeddingService|+embed(text): vector&#xa;+indexChunk(chunk): void" style="shape=umlClass;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="290" width="260" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="c6" value="StoryRepository|+save(story): Story&#xa;+findById(id): Story&#xa;+findPanels(storyId): Panel[]" style="shape=umlClass;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="70" width="280" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="c7" value="QARepository|+saveMessage(msg): void&#xa;+findSession(sessionId): QASession" style="shape=umlClass;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1060" y="280" width="280" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="c8" value="Story (Entity)|-id: UUID&#xa;-title: string&#xa;-sourceLang: string&#xa;-status: StoryStatus" style="shape=umlClass;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="60" y="500" width="230" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c9" value="Panel (Entity)|-id: UUID&#xa;-storyId: UUID&#xa;-imageUrl: string&#xa;-orderNo: int" style="shape=umlClass;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="320" y="500" width="230" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="c10" value="Translation (Entity)|-id: UUID&#xa;-panelId: UUID&#xa;-targetLang: string&#xa;-translatedText: text" style="shape=umlClass;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="580" y="500" width="250" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ce1" style="endArrow=block;html=1;" edge="1" parent="1" source="c1" target="c2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ce2" style="endArrow=block;html=1;" edge="1" parent="1" source="c2" target="c6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ce3" style="endArrow=block;html=1;" edge="1" parent="1" source="c2" target="c3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ce4" style="endArrow=block;html=1;" edge="1" parent="1" source="c4" target="c5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ce5" style="endArrow=block;html=1;" edge="1" parent="1" source="c4" target="c7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ce6" value="1..*" style="endArrow=open;html=1;" edge="1" parent="1" source="c8" target="c9"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ce7" value="1..*" style="endArrow=open;html=1;" edge="1" parent="1" source="c9" target="c10"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="erd1" name="F2-ERD-Database">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="et" value="Detailed Design - ERD" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontStyle=1;fontSize=20;" vertex="1" parent="1"><mxGeometry x="20" y="10" width="300" height="30" as="geometry"/></mxCell>
+        <mxCell id="e_users" value="users|PK user_id UUID&#xa;email VARCHAR(120)&#xa;password_hash TEXT&#xa;role VARCHAR(20)&#xa;created_at TIMESTAMP" style="shape=table;whiteSpace=wrap;html=1;container=0;" vertex="1" parent="1"><mxGeometry x="50" y="80" width="270" height="170" as="geometry"/></mxCell>
+        <mxCell id="e_stories" value="stories|PK story_id UUID&#xa;FK owner_user_id UUID&#xa;title VARCHAR(200)&#xa;source_lang VARCHAR(10)&#xa;status VARCHAR(20)&#xa;created_at TIMESTAMP" style="shape=table;whiteSpace=wrap;html=1;container=0;" vertex="1" parent="1"><mxGeometry x="380" y="80" width="290" height="190" as="geometry"/></mxCell>
+        <mxCell id="e_panels" value="panels|PK panel_id UUID&#xa;FK story_id UUID&#xa;image_url TEXT&#xa;order_no INT&#xa;ocr_raw JSONB" style="shape=table;whiteSpace=wrap;html=1;container=0;" vertex="1" parent="1"><mxGeometry x="730" y="80" width="270" height="170" as="geometry"/></mxCell>
+        <mxCell id="e_trans" value="translations|PK translation_id UUID&#xa;FK panel_id UUID&#xa;target_lang VARCHAR(10)&#xa;translated_text TEXT&#xa;model_name VARCHAR(80)&#xa;confidence NUMERIC" style="shape=table;whiteSpace=wrap;html=1;container=0;" vertex="1" parent="1"><mxGeometry x="1060" y="80" width="320" height="190" as="geometry"/></mxCell>
+        <mxCell id="e_sessions" value="qa_sessions|PK session_id UUID&#xa;FK user_id UUID&#xa;FK story_id UUID&#xa;started_at TIMESTAMP" style="shape=table;whiteSpace=wrap;html=1;container=0;" vertex="1" parent="1"><mxGeometry x="380" y="360" width="290" height="150" as="geometry"/></mxCell>
+        <mxCell id="e_messages" value="qa_messages|PK message_id UUID&#xa;FK session_id UUID&#xa;sender VARCHAR(20)&#xa;message_text TEXT&#xa;context_refs JSONB&#xa;created_at TIMESTAMP" style="shape=table;whiteSpace=wrap;html=1;container=0;" vertex="1" parent="1"><mxGeometry x="730" y="340" width="300" height="190" as="geometry"/></mxCell>
+        <mxCell id="e_chunks" value="panel_chunks|PK chunk_id UUID&#xa;FK panel_id UUID&#xa;text_content TEXT&#xa;embedding VECTOR(1024)&#xa;index_updated_at TIMESTAMP" style="shape=table;whiteSpace=wrap;html=1;container=0;" vertex="1" parent="1"><mxGeometry x="1080" y="350" width="300" height="170" as="geometry"/></mxCell>
+        <mxCell id="ee1" value="1 - N" style="endArrow=block;html=1;" edge="1" parent="1" source="e_users" target="e_stories"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee2" value="1 - N" style="endArrow=block;html=1;" edge="1" parent="1" source="e_stories" target="e_panels"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee3" value="1 - N" style="endArrow=block;html=1;" edge="1" parent="1" source="e_panels" target="e_trans"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee4" value="1 - N" style="endArrow=block;html=1;" edge="1" parent="1" source="e_users" target="e_sessions"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee5" value="1 - N" style="endArrow=block;html=1;" edge="1" parent="1" source="e_stories" target="e_sessions"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee6" value="1 - N" style="endArrow=block;html=1;" edge="1" parent="1" source="e_sessions" target="e_messages"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="ee7" value="1 - N" style="endArrow=block;html=1;" edge="1" parent="1" source="e_panels" target="e_chunks"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ui1" name="F3-UI-5-Screens">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="ut" value="UI Main Screens (at least 5)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontStyle=1;fontSize=20;" vertex="1" parent="1"><mxGeometry x="20" y="10" width="420" height="30" as="geometry"/></mxCell>
+        <mxCell id="s1" value="Screen 1: Home&#xa;- Trending stories&#xa;- Search bar&#xa;- Continue reading" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="40" y="80" width="300" height="500" as="geometry"/></mxCell>
+        <mxCell id="s2" value="Screen 2: Upload&#xa;- Drop files&#xa;- OCR status&#xa;- Language selection" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="380" y="80" width="300" height="500" as="geometry"/></mxCell>
+        <mxCell id="s3" value="Screen 3: Reader&#xa;- Manga panel view&#xa;- Translation overlay&#xa;- Page navigation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="720" y="80" width="300" height="500" as="geometry"/></mxCell>
+        <mxCell id="s4" value="Screen 4: Q&amp;A&#xa;- Question input&#xa;- Context snippets&#xa;- Answer + confidence" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="1060" y="80" width="300" height="500" as="geometry"/></mxCell>
+        <mxCell id="s5" value="Screen 5: History/Batch&#xa;- Processed stories&#xa;- Export translation&#xa;- Re-run pipeline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1"><mxGeometry x="1400" y="80" width="300" height="500" as="geometry"/></mxCell>
+        <mxCell id="sf1" value="go upload" style="endArrow=block;html=1;" edge="1" parent="1" source="s1" target="s2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="sf2" value="open story" style="endArrow=block;html=1;" edge="1" parent="1" source="s2" target="s3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="sf3" value="ask" style="endArrow=block;html=1;" edge="1" parent="1" source="s3" target="s4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="sf4" value="save results" style="endArrow=block;html=1;" edge="1" parent="1" source="s4" target="s5"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ml1" name="G1-ML-Models-Analysis">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="mt" value="ML Model Design &amp; Analysis" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontStyle=1;fontSize=20;" vertex="1" parent="1"><mxGeometry x="20" y="10" width="420" height="30" as="geometry"/></mxCell>
+        <mxCell id="m1" value="Input Manga Image" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1"><mxGeometry x="50" y="120" width="180" height="70" as="geometry"/></mxCell>
+        <mxCell id="m2" value="OCR Model&#xa;PaddleOCR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1"><mxGeometry x="290" y="110" width="200" height="90" as="geometry"/></mxCell>
+        <mxCell id="m3" value="Translation Model&#xa;NLLB-200 / M2M100" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1"><mxGeometry x="550" y="110" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="m4" value="Embedding Model&#xa;BAAI bge-m3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1"><mxGeometry x="830" y="110" width="200" height="90" as="geometry"/></mxCell>
+        <mxCell id="m5" value="Answer Model (LLM)&#xa;Llama 3.1 Instruct" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1"><mxGeometry x="1090" y="110" width="220" height="90" as="geometry"/></mxCell>
+        <mxCell id="m6" value="Output: Translated Reader + Q&amp;A" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1"><mxGeometry x="1370" y="120" width="250" height="70" as="geometry"/></mxCell>
+        <mxCell id="me1" style="endArrow=block;html=1;" edge="1" parent="1" source="m1" target="m2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="me2" style="endArrow=block;html=1;" edge="1" parent="1" source="m2" target="m3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="me3" style="endArrow=block;html=1;" edge="1" parent="1" source="m3" target="m4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="me4" style="endArrow=block;html=1;" edge="1" parent="1" source="m4" target="m5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="me5" style="endArrow=block;html=1;" edge="1" parent="1" source="m5" target="m6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="mtb" value="Model notes:&#xa;1) PaddleOCR: robust for manga speech bubbles, but errors on stylized fonts.&#xa;2) NLLB/M2M100: supports multilingual translation, but may lose slang nuance.&#xa;3) bge-m3: strong retrieval for mixed short/long text, needs vector index tuning.&#xa;4) Llama 3.1: high answer quality with RAG context, but latency and hallucination risk." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#666666;align=left;verticalAlign=top;" vertex="1" parent="1"><mxGeometry x="70" y="300" width="1550" height="240" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

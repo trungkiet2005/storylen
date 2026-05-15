@@ -9,6 +9,9 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWibu } from "@/contexts/WibuContext";
+import { StarRating } from "@/components/StarRating";
+import { ReadingListPicker } from "@/components/ReadingListPicker";
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from "@/components/Animations";
 import {
   APIError,
@@ -45,6 +48,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const wibu = useWibu();
 
   const [series, setSeries] = useState<SeriesDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -176,7 +180,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
     <AnimatedPage>
       <div className="paper-grain" style={{ minHeight: "100vh" }}>
         <TopBar active="series" />
-        <div style={{ padding: "40px 56px", maxWidth: 1100, margin: "0 auto" }}>
+        <div className="page-shell" style={{ maxWidth: 1100, margin: "0 auto" }}>
           <Link href="/series" style={{ textDecoration: "none", display: "inline-block", marginBottom: 12 }}>
             <span style={{ fontSize: 12, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 6 }}>
               <Icon name="arrow-left" size={11} /> Bộ truyện
@@ -215,12 +219,9 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
               {/* Header: cover + meta */}
               <FadeIn direction="up" distance={15}>
                 <div
-                  className="stroke-ink panel-shadow"
+                  className="stroke-ink panel-shadow series-header-grid"
                   style={{
                     background: "var(--panel)",
-                    display: "grid",
-                    gridTemplateColumns: "200px 1fr",
-                    gap: 24,
                     padding: 24,
                     marginBottom: 24,
                   }}
@@ -278,6 +279,30 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                     >
                       {series.title}
                     </h1>
+
+                    {/* User rating + reading list */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.04em" }}>
+                          Đánh giá:
+                        </span>
+                        <StarRating
+                          value={wibu.getRating(series.series_id)}
+                          onChange={r => wibu.setRating(series.series_id, r)}
+                          size={18}
+                        />
+                        {wibu.getRating(series.series_id) > 0 && (
+                          <span style={{ fontSize: 11, color: "var(--gold)", fontWeight: 700 }}>
+                            {wibu.getRating(series.series_id)}/5
+                          </span>
+                        )}
+                      </div>
+                      <ReadingListPicker
+                        value={wibu.getListStatus(series.series_id)}
+                        onChange={s => wibu.setListStatus(series.series_id, s)}
+                        size="md"
+                      />
+                    </div>
 
                     {series.description && (
                       <p style={{ fontSize: 13, color: "var(--fg-soft)", marginTop: 10, lineHeight: 1.6 }}>
@@ -339,6 +364,11 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                       >
                         <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn btn-sm">
                           <Icon name="upload" size={12} /> Upload trang mới
+                        </motion.button>
+                      </Link>
+                      <Link href={`/series/${series.series_id}/glossary`} style={{ textDecoration: "none" }}>
+                        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn btn-sm btn-ghost">
+                          <Icon name="tag" size={12} /> Từ điển
                         </motion.button>
                       </Link>
                       <Link href={`/series/${series.series_id}/edit`} style={{ textDecoration: "none" }}>

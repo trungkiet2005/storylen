@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/index.html)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8000/fuji-3d.jsx)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8000/screens-home-3d.jsx)",
+      "Bash(git -C d:/storylen status)",
+      "Bash(git -C d:/storylen diff --stat)",
+      "Bash(git -C d:/storylen log --oneline -5)",
+      "Bash(git -C d:/storylen add fuji-3d.jsx screens-home-3d.jsx)",
+      "Bash(git -C d:/storylen commit -m ' *)",
+      "Bash(git -C d:/storylen push origin main)"
+    ]
+  }
+}

@@ -9,6 +9,9 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWibu, READING_LIST_META, type ReadingListStatus } from "@/contexts/WibuContext";
+import { StarRating } from "@/components/StarRating";
+import { ReadingListPicker } from "@/components/ReadingListPicker";
 import {
   AnimatedPage,
   FadeIn,
@@ -22,6 +25,7 @@ import {
   type SeriesListItem,
   type SeriesStatus,
 } from "@/lib/api";
+import { getSeriesProgress } from "@/lib/localStore";
 
 type StatusFilter = "all" | SeriesStatus;
 
@@ -69,10 +73,14 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// Genre presets for quick filter
+const GENRE_CHIPS = ["Isekai", "Shounen", "Romance", "Action", "Fantasy", "Horror", "Slice of Life", "Mecha", "Sports"];
+
 export default function SeriesListPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const wibu = useWibu();
 
   const [items, setItems] = useState<SeriesListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -80,7 +88,12 @@ export default function SeriesListPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
+  const [genreFilter, setGenreFilter] = useState<string | null>(null);
+  const [listFilter, setListFilter] = useState<ReadingListStatus | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -138,9 +151,12 @@ export default function SeriesListPage() {
         it.title.toLowerCase().includes(q) ||
         (it.description?.toLowerCase().includes(q) ?? false) ||
         (it.tags ?? []).some(t => t.toLowerCase().includes(q));
-      return matchesFilter && matchesSearch;
+      const matchesGenre = !genreFilter ||
+        (it.tags ?? []).some(t => t.toLowerCase() === genreFilter.toLowerCase());
+      const matchesList = !listFilter || wibu.getListStatus(it.series_id) === listFilter;
+      return matchesFilter && matchesSearch && matchesGenre && matchesList;
     });
-  }, [items, filter, search]);
+  }, [items, filter, search, genreFilter, listFilter, wibu]);
 
   const counts = useMemo(() => {
     let ongoing = 0;
@@ -158,7 +174,7 @@ export default function SeriesListPage() {
     <AnimatedPage>
       <div className="paper-grain" style={{ minHeight: "100vh" }}>
         <TopBar active="series" />
-        <div style={{ padding: "40px 56px" }}>
+        <div className="page-shell">
           <FadeIn direction="up" distance={20} delay={0.1}>
             <SectionHeader
               kanji="本"
@@ -188,7 +204,7 @@ export default function SeriesListPage() {
                   padding: "8px 12px",
                   border: "2px solid var(--border)",
                   background: "var(--panel)",
-                  flex: 1,
+                  flex: "1 1 220px",
                   maxWidth: 360,
                 }}
               >
@@ -266,6 +282,76 @@ export default function SeriesListPage() {
                   </motion.button>
                 </Link>
               </div>
+            </div>
+
+            {/* Reading list quick-filter chips */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "var(--muted)", alignSelf: "center", marginRight: 4, fontWeight: 600 }}>
+                <Icon name="bookmark" size={11} /> Danh sách:
+              </span>
+              {(Object.keys(READING_LIST_META) as ReadingListStatus[]).map(s => {
+                const m = READING_LIST_META[s];
+                const active = listFilter === s;
+                return (
+                  <motion.button
+                    key={s}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setListFilter(v => v === s ? null : s)}
+                    className="chip"
+                    style={{
+                      cursor: "pointer",
+                      border: `1.5px solid ${active ? m.color : "var(--border-soft)"}`,
+                      background: active ? m.color : "transparent",
+                      color: active ? "#fff" : m.color,
+                      fontSize: 10,
+                      padding: "3px 9px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Icon name={m.icon} size={10} /> {m.label}
+                  </motion.button>
+                );
+              })}
+              {listFilter && (
+                <button
+                  onClick={() => setListFilter(null)}
+                  className="btn btn-sm btn-ghost"
+                  style={{ padding: "2px 8px", fontSize: 10 }}
+                >
+                  <Icon name="x" size={10} /> Xoá
+                </button>
+              )}
+            </div>
+
+            {/* Genre quick-filter chips */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "var(--muted)", alignSelf: "center", marginRight: 4, fontWeight: 600 }}>
+                <Icon name="tag" size={11} /> Genre:
+              </span>
+              {GENRE_CHIPS.map(g => (
+                <motion.button
+                  key={g}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setGenreFilter(v => v === g ? null : g)}
+                  className={`chip ${genreFilter === g ? "chip-accent" : ""}`}
+                  style={{ cursor: "pointer", border: "none", fontSize: 10 }}
+                >
+                  {g}
+                </motion.button>
+              ))}
+              {genreFilter && (
+                <button
+                  onClick={() => setGenreFilter(null)}
+                  className="btn btn-sm btn-ghost"
+                  style={{ padding: "2px 8px", fontSize: 10 }}
+                >
+                  <Icon name="x" size={10} /> Xoá
+                </button>
+              )}
             </div>
           </FadeIn>
 
@@ -455,6 +541,24 @@ export default function SeriesListPage() {
                                 {item.description}
                               </div>
                             )}
+                            {/* Star rating + list status row */}
+                            {mounted && (
+                              <div
+                                style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
+                                onClick={e => e.preventDefault()}
+                              >
+                                <StarRating
+                                  value={wibu.getRating(item.series_id)}
+                                  onChange={r => wibu.setRating(item.series_id, r)}
+                                  size={13}
+                                  showClear={false}
+                                />
+                                <ReadingListPicker
+                                  value={wibu.getListStatus(item.series_id)}
+                                  onChange={s => wibu.setListStatus(item.series_id, s)}
+                                />
+                              </div>
+                            )}
                             {item.tags && item.tags.length > 0 && (
                               <div style={{ display: "flex", gap: 4, marginTop: 6, flexWrap: "wrap" }}>
                                 {item.tags.slice(0, 4).map(tag => (
@@ -490,6 +594,24 @@ export default function SeriesListPage() {
                           </div>
                         </Link>
 
+                        {/* Progress bar */}
+                        {mounted && (() => {
+                          const prog = getSeriesProgress(item.series_id);
+                          if (!prog) return null;
+                          const pct = prog.totalPages > 0 ? Math.round((prog.pageNumber / prog.totalPages) * 100) : 0;
+                          return (
+                            <div style={{ padding: "6px 12px 0", marginTop: -4 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", marginBottom: 3 }}>
+                                <span>Đã đọc {pct}%</span>
+                                <span>Tr.{prog.pageNumber}/{prog.totalPages}</span>
+                              </div>
+                              <div style={{ height: 3, background: "var(--bg-2)", borderRadius: 2, overflow: "hidden" }}>
+                                <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)", borderRadius: 2 }} />
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         <div
                           style={{
                             padding: "8px 12px",
@@ -500,6 +622,18 @@ export default function SeriesListPage() {
                             gap: 8,
                           }}
                         >
+                          {mounted && getSeriesProgress(item.series_id) ? (
+                            <Link href={`/series/${item.series_id}/read?page_id=${getSeriesProgress(item.series_id)!.pageId}`} style={{ textDecoration: "none" }}>
+                              <motion.button
+                                whileHover={{ scale: 1.04 }}
+                                whileTap={{ scale: 0.96 }}
+                                className="btn btn-sm btn-primary"
+                                style={{ padding: "4px 10px", fontSize: 11 }}
+                              >
+                                <Icon name="arrow-right" size={12} /> Tiếp tục
+                              </motion.button>
+                            </Link>
+                          ) : (
                           <Link href={`/series/${item.series_id}`} style={{ textDecoration: "none" }}>
                             <motion.button
                               whileHover={{ scale: 1.04 }}
@@ -510,6 +644,7 @@ export default function SeriesListPage() {
                               <Icon name="book" size={12} /> Mở
                             </motion.button>
                           </Link>
+                          )}
                           <div style={{ display: "flex", gap: 6 }}>
                             <Link href={`/series/${item.series_id}/edit`} style={{ textDecoration: "none" }}>
                               <motion.button

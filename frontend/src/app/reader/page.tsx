@@ -24,6 +24,7 @@ import { AddToSeriesModal } from '@/components/AddToSeriesModal';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedPage } from '@/components/Animations';
+import { useWibu } from '@/contexts/WibuContext';
 
 type ViewMode = "overlay" | "sidebyside" | "tap";
 
@@ -587,6 +588,8 @@ function ReaderContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pageIdParam = searchParams.get("page");
+  const wibu = useWibu();
+  const [bookmarked, setBookmarked] = useState(false);
 
   const [mode, setMode] = useState<ViewMode>("overlay");
   const [selected, setSelected] = useState<number | null>(null);
@@ -595,6 +598,7 @@ function ReaderContent() {
   const [showContext, setShowContext] = useState(true);
   const [contextTab, setContextTab] = useState<"info" | "chat">("chat");
   const mainRef = useRef<HTMLDivElement>(null);
+  const sessionStartRef = useRef<number>(Date.now());
 
   // Real page data from API
   const [pageData, setPageData] = useState<PageData | null>(null);
@@ -607,6 +611,35 @@ function ReaderContent() {
 
   // Add-to-series modal
   const [showAddToSeries, setShowAddToSeries] = useState(false);
+
+  // Keyboard shortcut overlay
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Fullscreen reader (hides TopBar; also requests browser fullscreen for true immersion)
+  const [fullscreen, setFullscreen] = useState(false);
+  const toggleFullscreen = useCallback(() => {
+    setFullscreen(v => {
+      const next = !v;
+      // Request/exit browser fullscreen — best effort, ignore errors (eg. permissions)
+      if (typeof document !== "undefined") {
+        if (next && !document.fullscreenElement) {
+          document.documentElement.requestFullscreen?.().catch(() => {});
+        } else if (!next && document.fullscreenElement) {
+          document.exitFullscreen?.().catch(() => {});
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  // Sync state if the user exits browser fullscreen via Esc / OS chrome
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement && fullscreen) setFullscreen(false);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, [fullscreen]);
 
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
@@ -678,8 +711,19 @@ function ReaderContent() {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // ? opens the shortcut overlay (Shift+/ on most layouts)
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowShortcuts(v => !v);
+        return;
+      }
+      if (e.key === "Escape" && showShortcuts) {
+        setShowShortcuts(false);
+        return;
+      }
       switch (e.key) {
         case "o": setShowOverlay(v => !v); break;
+        case "f": case "F": toggleFullscreen(); break;
         case "+": case "=": setZoom(z => Math.min(z + 0.1, 2.0)); break;
         case "-": setZoom(z => Math.max(z - 0.1, 0.5)); break;
         case "ArrowRight":
@@ -694,14 +738,45 @@ function ReaderContent() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [nextPageId, prevPageId, router]);
+  }, [nextPageId, prevPageId, router, showShortcuts, toggleFullscreen]);
 
   useEffect(() => setSelected(null), [pageIdParam]);
 
-  const CANVAS_W = 520;
+  // Sync bookmark state when page changes
+  useEffect(() => {
+    if (pageIdParam) setBookmarked(wibu.isBookmarked(pageIdParam));
+  }, [pageIdParam, wibu]);
+
+  // Mark page read + save progress when page data loads
+  useEffect(() => {
+    if (!pageData || !pageIdParam) return;
+    wibu.markRead(pageIdParam);
+    sessionStartRef.current = Date.now();
+  }, [pageData, pageIdParam, wibu]);
+
+  // Track reading time on unmount or page change
+  useEffect(() => {
+    return () => {
+      const mins = Math.round((Date.now() - sessionStartRef.current) / 60000);
+      if (mins > 0) wibu.addMinutes(mins);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageIdParam]);
+
+  const [canvasW, setCanvasW] = useState(520);
+  useEffect(() => {
+    const update = () => {
+      const vw = window.innerWidth;
+      setCanvasW(vw < 480 ? vw - 16 : vw < 768 ? vw - 32 : 520);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  const CANVAS_W = canvasW;
   const computedHeight = imgNaturalSize ? CANVAS_W * (imgNaturalSize.h / imgNaturalSize.w) : 740;
 
-  const SIDE_W = 360;
+  const SIDE_W = Math.min(360, Math.floor((canvasW - 20) / 2));
   const computedSideH = imgNaturalSize ? SIDE_W * (imgNaturalSize.h / imgNaturalSize.w) : 520;
   const translatedImageUrl = pageData?.translated_image_url || null;
   const mainImageUrl = pageData?.original_image_url
@@ -820,9 +895,9 @@ function ReaderContent() {
   return (
     <AnimatedPage>
     <div style={{ height: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <TopBar active="reader" compact />
+      {!fullscreen && <TopBar active="reader" compact />}
 
-      <div style={{ display: "grid", gridTemplateColumns: `${hasMultiplePages ? "72px" : ""} 1fr ${showContext ? "320px" : "0px"}`, flex: 1, overflow: "hidden", transition: "grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: `${hasMultiplePages ? "72px" : ""} 1fr ${showContext ? "clamp(280px, 30vw, 360px)" : "0px"}`, flex: 1, overflow: "hidden", transition: "grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}>
 
         {/* ── Left Rail: Dynamic Thumbnails ── */}
         {hasMultiplePages && (
@@ -874,7 +949,7 @@ function ReaderContent() {
         <div
           ref={mainRef}
           className="scroll"
-          style={{ display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto", padding: "20px 32px", gap: 16 }}
+          style={{ display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto", padding: "20px clamp(8px, 3vw, 32px)", gap: 16 }}
         >
           {/* Series breadcrumb (when page belongs to a series) */}
           {pageData?.metadata?.series_id && (
@@ -993,11 +1068,98 @@ function ReaderContent() {
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setZoom(z => Math.min(z + 0.1, 2.0))} aria-label="Phóng to" title="Zoom in (+)">
               <Icon name="zoom-in" size={14}/>
             </motion.button>
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" aria-label="Bookmark trang này">
-              <Icon name="bookmark" size={14}/>
-            </motion.button>
+            {/* Bookmark button */}
+            {pageData && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="btn btn-sm btn-ghost"
+                aria-label={bookmarked ? "Bỏ bookmark" : "Bookmark trang này"}
+                title={bookmarked ? "Bỏ bookmark" : "Bookmark trang này"}
+                onClick={() => {
+                  wibu.toggleBookmark({
+                    pageId: pageData.page_id,
+                    pageNumber: pageData.metadata?.page_number ?? null,
+                    seriesId: pageData.metadata?.series_id ?? null,
+                    seriesTitle: null,
+                    chapterNumber: null,
+                    thumbnailUrl: pageData.thumbnail_url ?? null,
+                    note: "",
+                  });
+                  setBookmarked(v => !v);
+                }}
+                style={{ color: bookmarked ? "var(--accent)" : undefined }}
+              >
+                <Icon name={bookmarked ? "star-fill" : "star"} size={14}/>
+              </motion.button>
+            )}
+
+            {/* Export page as PDF */}
+            {pageData?.original_image_url && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="btn btn-sm btn-ghost"
+                aria-label="Xuất PDF"
+                title="Xuất trang thành PDF"
+                onClick={() => {
+                  const url = pageData.translated_image_url || pageData.original_image_url;
+                  const html = `<!DOCTYPE html><html><head><title>StoryLens Export</title>
+                    <style>body{margin:0;background:#111;display:flex;justify-content:center;}img{max-width:100vw;}</style>
+                    </head><body><img src="${url}" onload="window.print()"/></body></html>`;
+                  const blob = new Blob([html], { type: "text/html" });
+                  const blobUrl = URL.createObjectURL(blob);
+                  const win = window.open(blobUrl, "_blank");
+                  if (win) win.addEventListener("afterprint", () => URL.revokeObjectURL(blobUrl));
+                  else URL.revokeObjectURL(blobUrl);
+                }}
+              >
+                <Icon name="pdf" size={14}/>
+              </motion.button>
+            )}
+
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setShowContext(v => !v)} aria-label="Bật/tắt panel ngữ cảnh">
               <Icon name="info" size={14}/>
+            </motion.button>
+
+            {/* Fullscreen toggle */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="btn btn-sm btn-ghost"
+              onClick={toggleFullscreen}
+              aria-label={fullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+              title={fullscreen ? "Thoát toàn màn hình (F)" : "Toàn màn hình (F)"}
+              style={{ color: fullscreen ? "var(--accent)" : undefined }}
+            >
+              {fullscreen ? (
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 3v3a2 2 0 0 1-2 2H3"/>
+                  <path d="M21 8h-3a2 2 0 0 1-2-2V3"/>
+                  <path d="M3 16h3a2 2 0 0 1 2 2v3"/>
+                  <path d="M16 21v-3a2 2 0 0 1 2-2h3"/>
+                </svg>
+              ) : (
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
+                  <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+                  <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
+                  <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+                </svg>
+              )}
+            </motion.button>
+
+            {/* Keyboard shortcut cheatsheet */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="btn btn-sm btn-ghost"
+              onClick={() => setShowShortcuts(true)}
+              aria-label="Phím tắt"
+              title="Phím tắt (?)"
+              style={{ fontFamily: "var(--font-mono)", fontWeight: 800, fontSize: 12, width: 26, justifyContent: "center" }}
+            >
+              ?
             </motion.button>
           </motion.div>
 
@@ -1168,10 +1330,11 @@ function ReaderContent() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 30 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="reader-context-overlay"
               style={{
                 background: "var(--bg-2)",
                 borderLeft: "2px solid var(--border)",
-                minWidth: 320,
+                minWidth: 280,
                 display: "flex",
                 flexDirection: "column",
                 overflow: "hidden",
@@ -1245,7 +1408,29 @@ function ReaderContent() {
 
                   {/* Translation edits */}
                   <div>
-                    <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 8 }}>Sửa bản dịch</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div className="caps-xs" style={{ color: "var(--accent)" }}>Sửa bản dịch</div>
+                      {pageData && pageData.processed_data.length > 0 && (
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          style={{ padding: "3px 6px", fontSize: 10 }}
+                          onClick={async () => {
+                            const text = pageData.processed_data
+                              .map((b, i) => `[${i + 1}] ${editTexts[b.bubble_id] ?? b.translated_text}`)
+                              .join("\n\n");
+                            try {
+                              await navigator.clipboard.writeText(text);
+                              toast(`Đã copy ${pageData.processed_data.length} bubble.`, "success");
+                            } catch {
+                              toast("Không thể copy.", "error");
+                            }
+                          }}
+                          title="Copy tất cả bản dịch của trang"
+                        >
+                          <Icon name="copy" size={10}/> Copy tất cả
+                        </button>
+                      )}
+                    </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {(pageData?.processed_data || []).map((bubble, index) => {
                         const history = historyByBubble[bubble.bubble_id] || [];
@@ -1253,18 +1438,58 @@ function ReaderContent() {
                         const isSaving = savingBubbleId === bubble.bubble_id;
                         const isHistoryLoading = historyLoadingBubbleId === bubble.bubble_id;
 
+                        const currentTranslated = editTexts[bubble.bubble_id] ?? bubble.translated_text;
                         return (
                           <div key={bubble.bubble_id} className="stroke-ink" style={{ background: "var(--panel)", padding: 10 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
                               <span className="mono" style={{ fontSize: 11, fontWeight: 800 }}>#{index + 1}</span>
-                              <button
-                                className="btn btn-sm btn-ghost"
-                                style={{ padding: "3px 6px", fontSize: 11 }}
-                                onClick={() => toggleTranslationHistory(bubble)}
-                                aria-label="Xem lịch sử sửa dịch"
-                              >
-                                <Icon name="history" size={12}/> {isHistoryOpen ? "Ẩn" : "Lịch sử"}
-                              </button>
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <button
+                                  className="btn btn-sm btn-ghost"
+                                  style={{ padding: "3px 6px", fontSize: 11 }}
+                                  onClick={async () => {
+                                    if (!bubble.original_text) return;
+                                    try {
+                                      await navigator.clipboard.writeText(bubble.original_text);
+                                      toast("Đã copy bản gốc.", "success");
+                                    } catch {
+                                      toast("Không thể copy.", "error");
+                                    }
+                                  }}
+                                  disabled={!bubble.original_text}
+                                  title="Copy bản gốc"
+                                  aria-label="Copy bản gốc"
+                                >
+                                  <Icon name="copy" size={11}/> Gốc
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-ghost"
+                                  style={{ padding: "3px 6px", fontSize: 11 }}
+                                  onClick={async () => {
+                                    const text = currentTranslated;
+                                    if (!text) return;
+                                    try {
+                                      await navigator.clipboard.writeText(text);
+                                      toast("Đã copy bản dịch.", "success");
+                                    } catch {
+                                      toast("Không thể copy.", "error");
+                                    }
+                                  }}
+                                  disabled={!currentTranslated}
+                                  title="Copy bản dịch"
+                                  aria-label="Copy bản dịch"
+                                >
+                                  <Icon name="copy" size={11}/> Dịch
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-ghost"
+                                  style={{ padding: "3px 6px", fontSize: 11 }}
+                                  onClick={() => toggleTranslationHistory(bubble)}
+                                  aria-label="Xem lịch sử sửa dịch"
+                                >
+                                  <Icon name="history" size={12}/> {isHistoryOpen ? "Ẩn" : "Lịch sử"}
+                                </button>
+                              </div>
                             </div>
 
                             <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, marginBottom: 8 }}>
@@ -1470,6 +1695,84 @@ function ReaderContent() {
         }}
       />
     )}
+
+    {/* Keyboard shortcut cheatsheet overlay */}
+    <AnimatePresence>
+      {showShortcuts && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowShortcuts(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 500,
+            background: "rgba(17,17,17,0.55)",
+            backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.92, y: 16, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.95, y: 8, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+            onClick={e => e.stopPropagation()}
+            className="stroke-ink-thick panel-shadow-lg"
+            style={{
+              background: "var(--panel)",
+              padding: "24px 28px",
+              maxWidth: 520, width: "100%",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <div>
+                <div className="caps-xs" style={{ color: "var(--accent)" }}>Reader · Phím tắt</div>
+                <div className="display" style={{ fontSize: 22, marginTop: 2 }}>Bàn phím tốc độ</div>
+              </div>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                className="btn btn-sm btn-ghost"
+                aria-label="Đóng"
+              >
+                <Icon name="x" size={14}/>
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 18px" }}>
+              {[
+                { key: "←  →", desc: "Trang trước / sau" },
+                { key: "H / L", desc: "Trang trước / sau (vim)" },
+                { key: "O",     desc: "Bật/tắt bản dịch overlay" },
+                { key: "F",     desc: "Toàn màn hình đọc" },
+                { key: "+ / −", desc: "Phóng to / thu nhỏ" },
+                { key: "?",     desc: "Hiện/ẩn bảng phím tắt" },
+                { key: "Esc",   desc: "Đóng cửa sổ" },
+                { key: "Ctrl+Enter", desc: "Gửi câu hỏi cho AI" },
+              ].map(s => (
+                <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+                  <kbd
+                    style={{
+                      background: "var(--bg-2)", border: "1.5px solid var(--border)",
+                      padding: "3px 8px", fontFamily: "var(--font-mono)",
+                      fontSize: 11, fontWeight: 700, minWidth: 70, textAlign: "center",
+                      borderRadius: 3, boxShadow: "1.5px 1.5px 0 var(--border)",
+                    }}
+                  >
+                    {s.key}
+                  </kbd>
+                  <span style={{ fontSize: 12, color: "var(--fg-soft)" }}>{s.desc}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 18, paddingTop: 12, borderTop: "1px dashed var(--border-soft)", fontSize: 11, color: "var(--muted)" }}>
+              Bấm <kbd style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "1px 5px", fontFamily: "var(--font-mono)" }}>?</kbd> bất cứ lúc nào để mở lại bảng này.
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
     </AnimatedPage>
   );
 }
