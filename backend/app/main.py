@@ -19,7 +19,7 @@ from app.middleware import (
     RequestIDMiddleware,
 )
 from app.rate_limit import limiter
-from app.routers import admin, ai_module, auth, credits, history, pages, qa, scrape, series, status, upload, wibu
+from app.routers import admin, ai_module, auth, credits, history, mangadex, pages, qa, scrape, series, status, upload, wibu
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 _request_id_filter = RequestIDFilter()
@@ -153,8 +153,9 @@ app.add_middleware(
 API_PREFIX = "/v1"
 
 app.include_router(upload.router,  prefix=API_PREFIX)
-app.include_router(scrape.router,  prefix=API_PREFIX)
-app.include_router(auth.router,    prefix=API_PREFIX)
+app.include_router(scrape.router,    prefix=API_PREFIX)
+app.include_router(mangadex.router,  prefix=API_PREFIX)
+app.include_router(auth.router,      prefix=API_PREFIX)
 app.include_router(credits.router, prefix=API_PREFIX)
 app.include_router(ai_module.router, prefix=API_PREFIX)
 app.include_router(status.router,  prefix=API_PREFIX)

@@ -310,6 +310,110 @@ export async function scrapeChapter(
   });
 }
 
+// ─── MangaDex proxy ───────────────────────────────────────────────────────────
+
+export interface MdxCoverArt {
+  type: "cover_art";
+  attributes: { fileName: string; volume?: string };
+}
+
+export interface MdxTag {
+  attributes: { name: { en: string }; group: string };
+}
+
+export interface MdxManga {
+  id: string;
+  attributes: {
+    title: Record<string, string>;
+    description: Record<string, string>;
+    status: "ongoing" | "completed" | "hiatus" | "cancelled";
+    lastChapter?: string;
+    tags: MdxTag[];
+  };
+  relationships: Array<MdxCoverArt | { type: string; attributes?: Record<string, unknown> }>;
+}
+
+export interface MdxMangaList {
+  data: MdxManga[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface MdxChapter {
+  id: string;
+  attributes: {
+    chapter?: string;
+    title?: string;
+    pages: number;
+    publishAt: string;
+  };
+  relationships: Array<{ type: string; attributes?: { name?: string } }>;
+}
+
+export interface MdxChapterList {
+  data: MdxChapter[];
+  total: number;
+}
+
+export interface MdxAtHomeServer {
+  baseUrl: string;
+  chapter: {
+    hash: string;
+    data: string[];
+    dataSaver: string[];
+  };
+}
+
+export function mdxCoverUrl(mangaId: string, fileName: string): string {
+  const raw = `https://uploads.mangadex.org/covers/${mangaId}/${fileName}.512.jpg`;
+  return `${BASE_URL}/mdx/cover-proxy?url=${encodeURIComponent(raw)}`;
+}
+
+export function mdxMangaTitle(manga: MdxManga): string {
+  const t = manga.attributes.title;
+  return t["vi"] || t["en"] || t["ja-ro"] || Object.values(t)[0] || "Unknown";
+}
+
+export function mdxCoverFromManga(manga: MdxManga): string | null {
+  const cover = manga.relationships.find((r) => r.type === "cover_art") as MdxCoverArt | undefined;
+  if (!cover?.attributes?.fileName) return null;
+  return mdxCoverUrl(manga.id, cover.attributes.fileName);
+}
+
+export async function mdxPopular(limit = 24): Promise<MdxMangaList> {
+  return request<MdxMangaList>(`/mdx/manga/popular?limit=${limit}`);
+}
+
+export async function mdxSearch(opts: {
+  title?: string;
+  tags?: string[];
+  limit?: number;
+  offset?: number;
+}): Promise<MdxMangaList> {
+  const params = new URLSearchParams({
+    limit: String(opts.limit ?? 24),
+    offset: String(opts.offset ?? 0),
+  });
+  if (opts.title) params.set("title", opts.title);
+  (opts.tags ?? []).forEach((t) => params.append("includedTags", t));
+  return request<MdxMangaList>(`/mdx/manga?${params}`);
+}
+
+export async function mdxChapters(
+  mangaId: string,
+  limit = 100,
+  offset = 0,
+): Promise<MdxChapterList> {
+  return request<MdxChapterList>(
+    `/mdx/manga/${mangaId}/chapters?limit=${limit}&offset=${offset}`,
+  );
+}
+
+export async function mdxChapterPages(chapterId: string): Promise<MdxAtHomeServer> {
+  return request<MdxAtHomeServer>(`/mdx/chapter/${chapterId}/pages`);
+}
+
 // ─── Status polling ───────────────────────────────────────────────────────────
 
 export async function getPageStatus(pageId: string): Promise<PageStatus> {

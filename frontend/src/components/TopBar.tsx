@@ -230,6 +230,8 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
 
   const items = [
     { id: "home",      label: "Trang chủ", icon: "home",     href: "/" },
+    { id: "browse",    label: "Kho truyện", icon: "grid",    href: "/browse" },
+    { id: "search",    label: "Tìm truyện", icon: "search",  href: "/search" },
     { id: "upload",    label: "Tải lên",   icon: "upload",   href: "/upload" },
     { id: "reader",    label: "Đọc",       icon: "book",     href: "/reader" },
     { id: "series",    label: "Bộ truyện", icon: "stack",    href: "/series" },
