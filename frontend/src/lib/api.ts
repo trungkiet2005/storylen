@@ -267,8 +267,22 @@ export async function uploadImages(
 
   return request<UploadResponse>("/upload", {
     method: "POST",
+    headers: { "Idempotency-Key": newIdempotencyKey() },
     body: fd,
   });
+}
+
+/**
+ * Build a fresh Idempotency-Key header value. Backend dedupes retries with the
+ * same key for ~10 minutes, so a network flake doesn't double-charge credits.
+ * Uses `crypto.randomUUID` where available; falls back to Math.random for very
+ * old runtimes that aren't realistic for us anymore.
+ */
+function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export async function getAIModuleOptions(): Promise<AIModuleOptions> {
@@ -304,7 +318,10 @@ export async function scrapeChapter(
 ): Promise<UploadResponse> {
   return request<UploadResponse>("/scrape", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": newIdempotencyKey(),
+    },
     body: JSON.stringify({
       chapter_url: chapterUrl,
       series_id: opts.seriesId ?? null,
@@ -532,6 +549,117 @@ export async function mdxChapter(chapterId: string): Promise<MdxChapterDetail> {
 }
 
 // ─── Status polling ───────────────────────────────────────────────────────────
+
+// ─── Batch progress: WebSocket with polling fallback ─────────────────────────
+
+export interface BatchProgressHandle {
+  /** Close the underlying WebSocket / polling timer. Safe to call repeatedly. */
+  close: () => void;
+}
+
+/**
+ * Subscribe to live updates for one batch. Returns a handle whose `.close()`
+ * tears down whatever transport ended up active.
+ *
+ * Tries WebSocket first (single push channel — see backend ws.py). If the
+ * handshake fails (older deploy, auth expired, proxy strips Upgrade), falls
+ * back to 2.5s polling so the caller doesn't have to care which transport
+ * is actually carrying the traffic.
+ */
+export function subscribeBatchProgress(
+  batchId: string,
+  onUpdate: (status: BatchStatus) => void,
+  onTerminal?: () => void,
+): BatchProgressHandle {
+  let closed = false;
+  let ws: WebSocket | null = null;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  const cleanup = () => {
+    closed = true;
+    if (ws) { try { ws.close(); } catch { /* ignore */ } ws = null; }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  };
+
+  const startPolling = () => {
+    if (closed) return;
+    const tick = async () => {
+      if (closed) return;
+      try {
+        const status = await getBatchStatus(batchId);
+        onUpdate(status);
+        const allDone = status.pages.every((p) =>
+          ["completed", "failed", "ocr_failed", "error"].includes(p.status),
+        );
+        if (allDone) {
+          onTerminal?.();
+          cleanup();
+        }
+      } catch {
+        // Transient network — keep polling, the next tick will retry.
+      }
+    };
+    void tick();
+    pollTimer = setInterval(tick, 2500);
+  };
+
+  // Build a ws:// or wss:// URL from BASE_URL so we follow whatever scheme +
+  // host the REST API uses (so dev + prod just work without a separate env var).
+  let wsUrl: string;
+  try {
+    const httpUrl = new URL(`${BASE_URL}/ws/batch/${batchId}`);
+    httpUrl.protocol = httpUrl.protocol === "https:" ? "wss:" : "ws:";
+    wsUrl = httpUrl.toString();
+  } catch {
+    startPolling();
+    return { close: cleanup };
+  }
+
+  try {
+    ws = new WebSocket(wsUrl);
+  } catch {
+    startPolling();
+    return { close: cleanup };
+  }
+
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "batch" && msg.data) {
+        onUpdate(msg.data as BatchStatus);
+      } else if (msg.type === "done") {
+        onTerminal?.();
+      }
+      // type === "ping" / "error" → no action needed at this layer.
+    } catch {
+      // Drop malformed frames quietly — they shouldn't happen.
+    }
+  };
+
+  ws.onerror = () => {
+    // Browsers don't expose the close code in onerror — onclose handles fallback.
+  };
+
+  ws.onclose = (ev) => {
+    if (closed) return;
+    // Auth failure or "not found" from the server → fall back to polling, which
+    // will exercise the REST endpoint (and its own 401 path) and give us better
+    // error semantics than silently retrying the WS handshake.
+    if (ev.code === 4401 || ev.code === 4404) {
+      startPolling();
+      return;
+    }
+    // 1000 = normal close (terminal already signalled via "done" frame).
+    if (ev.code === 1000) {
+      cleanup();
+      return;
+    }
+    // Anything else → fall back so the user still sees progress.
+    startPolling();
+  };
+
+  return { close: cleanup };
+}
 
 export async function getPageStatus(pageId: string): Promise<PageStatus> {
   return request<PageStatus>(`/status/${pageId}`);

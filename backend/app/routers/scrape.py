@@ -9,7 +9,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 
 from app.config import get_settings
@@ -22,6 +22,7 @@ from app.routers.upload import (
     _resolve_target_chapter,
     _start_pipeline_task,
 )
+from app.services import idempotency
 from app.services.credit_service import check_has_credits, deduct
 from app.services.image_validation import verify_image_bytes
 from app.services.scraper import (
@@ -98,11 +99,23 @@ async def scrape_chapter(
     request: Request,
     payload: ScrapeRequest,
     user: AuthUser = Depends(get_current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> UploadResponse:
     """
     Download all images from a manga chapter URL and start the translation pipeline.
     Behaves identically to /upload: deducts 1 credit per image, returns batch_id.
+
+    Pass an `Idempotency-Key` header to make this safely retryable: a duplicate
+    request with the same key within 10 minutes returns the original response
+    instead of re-charging credits + re-running the pipeline.
     """
+    # Idempotency replay — must happen BEFORE any side effects.
+    idem_key = idempotency.normalise_key(user.id, idempotency_key, endpoint="scrape")
+    cached = idempotency.get(idem_key)
+    if cached is not None:
+        logger.info("Idempotency hit for scrape: user=%s key=%s", user.id, idempotency_key)
+        return cached
+
     try:
         validate_scrape_url(payload.chapter_url)
     except ValueError as exc:
@@ -261,8 +274,12 @@ async def scrape_chapter(
     if skipped:
         msg += f" ({skipped} ảnh bị bỏ qua do lỗi tải hoặc quá kích thước)"
 
-    return UploadResponse(
+    response = UploadResponse(
         message=msg,
         page_ids=page_ids,
         batch_id=batch_id,
     )
+    # Cache the success response so a client retry with the same Idempotency-Key
+    # within the TTL gets back the same batch_id instead of paying twice.
+    idempotency.put(idem_key, response)
+    return response
