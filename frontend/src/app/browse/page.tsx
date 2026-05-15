@@ -156,9 +156,12 @@ function ChapterPanel({
   const goRead = () => {
     if (!selected) return;
     const ch = chapters.find((c) => c.id === selected);
-    const label = ch ? `Chương ${ch.attributes.chapter ?? "?"}` : "";
+    const num = ch?.attributes.chapter ?? "?";
+    const label = ch?.attributes.title
+      ? `Chương ${num} — ${ch.attributes.title}`
+      : `Chương ${num}`;
     router.push(
-      `/browse/read?chapterId=${selected}&mangaTitle=${encodeURIComponent(mdxMangaTitle(manga))}&chapterLabel=${encodeURIComponent(label)}`,
+      `/browse/read?chapterId=${selected}&mangaId=${manga.id}&mangaTitle=${encodeURIComponent(mdxMangaTitle(manga))}&chapterLabel=${encodeURIComponent(label)}`,
     );
   };
 

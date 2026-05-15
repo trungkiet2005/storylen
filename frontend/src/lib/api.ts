@@ -402,7 +402,7 @@ export async function mdxSearch(opts: {
 
 export async function mdxChapters(
   mangaId: string,
-  limit = 100,
+  limit = 200,
   offset = 0,
 ): Promise<MdxChapterList> {
   return request<MdxChapterList>(
@@ -412,6 +412,58 @@ export async function mdxChapters(
 
 export async function mdxChapterPages(chapterId: string): Promise<MdxAtHomeServer> {
   return request<MdxAtHomeServer>(`/mdx/chapter/${chapterId}/pages`);
+}
+
+/** Proxy any raw image URL through the backend to avoid CORS / hotlink blocks. */
+export function mdxImageProxy(rawUrl: string): string {
+  return `${BASE_URL}/mdx/cover-proxy?url=${encodeURIComponent(rawUrl)}`;
+}
+
+/**
+ * Build proxied image URLs from an at-home server response.
+ * Prefers dataSaver quality (≈60% smaller) when available.
+ */
+export function mdxPageUrls(data: MdxAtHomeServer): string[] {
+  const useDataSaver = (data.chapter.dataSaver?.length ?? 0) > 0;
+  const files = useDataSaver ? data.chapter.dataSaver : data.chapter.data;
+  const quality = useDataSaver ? "data-saver" : "data";
+  return files.map((f) => {
+    const raw = `${data.baseUrl}/${quality}/${data.chapter.hash}/${f}`;
+    return mdxImageProxy(raw);
+  });
+}
+
+/** Save current reading state to localStorage. */
+export function mdxSaveReading(payload: {
+  mangaId: string;
+  mangaTitle: string;
+  chapterId: string;
+  chapterLabel: string;
+}): void {
+  try {
+    localStorage.setItem(
+      "storylens.reading",
+      JSON.stringify({ ...payload, updatedAt: new Date().toISOString() }),
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
+/** Load last saved reading state from localStorage. */
+export function mdxLoadReading(): {
+  mangaId: string;
+  mangaTitle: string;
+  chapterId: string;
+  chapterLabel: string;
+} | null {
+  try {
+    const raw = localStorage.getItem("storylens.reading");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 // ─── Status polling ───────────────────────────────────────────────────────────
