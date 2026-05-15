@@ -612,6 +612,9 @@ function ReaderContent() {
   // Add-to-series modal
   const [showAddToSeries, setShowAddToSeries] = useState(false);
 
+  // Keyboard shortcut overlay
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
   const [imgNaturalSize, setImgNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
   // Batch processing support
@@ -682,6 +685,16 @@ function ReaderContent() {
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // ? opens the shortcut overlay (Shift+/ on most layouts)
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowShortcuts(v => !v);
+        return;
+      }
+      if (e.key === "Escape" && showShortcuts) {
+        setShowShortcuts(false);
+        return;
+      }
       switch (e.key) {
         case "o": setShowOverlay(v => !v); break;
         case "+": case "=": setZoom(z => Math.min(z + 0.1, 2.0)); break;
@@ -698,7 +711,7 @@ function ReaderContent() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [nextPageId, prevPageId, router]);
+  }, [nextPageId, prevPageId, router, showShortcuts]);
 
   useEffect(() => setSelected(null), [pageIdParam]);
 
@@ -1070,6 +1083,19 @@ function ReaderContent() {
 
             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setShowContext(v => !v)} aria-label="Bật/tắt panel ngữ cảnh">
               <Icon name="info" size={14}/>
+            </motion.button>
+
+            {/* Keyboard shortcut cheatsheet */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="btn btn-sm btn-ghost"
+              onClick={() => setShowShortcuts(true)}
+              aria-label="Phím tắt"
+              title="Phím tắt (?)"
+              style={{ fontFamily: "var(--font-mono)", fontWeight: 800, fontSize: 12, width: 26, justifyContent: "center" }}
+            >
+              ?
             </motion.button>
           </motion.div>
 
@@ -1604,6 +1630,83 @@ function ReaderContent() {
         }}
       />
     )}
+
+    {/* Keyboard shortcut cheatsheet overlay */}
+    <AnimatePresence>
+      {showShortcuts && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setShowShortcuts(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 500,
+            background: "rgba(17,17,17,0.55)",
+            backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.92, y: 16, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.95, y: 8, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+            onClick={e => e.stopPropagation()}
+            className="stroke-ink-thick panel-shadow-lg"
+            style={{
+              background: "var(--panel)",
+              padding: "24px 28px",
+              maxWidth: 520, width: "100%",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+              <div>
+                <div className="caps-xs" style={{ color: "var(--accent)" }}>Reader · Phím tắt</div>
+                <div className="display" style={{ fontSize: 22, marginTop: 2 }}>Bàn phím tốc độ</div>
+              </div>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                className="btn btn-sm btn-ghost"
+                aria-label="Đóng"
+              >
+                <Icon name="x" size={14}/>
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 18px" }}>
+              {[
+                { key: "←  →", desc: "Trang trước / sau" },
+                { key: "H / L", desc: "Trang trước / sau (vim)" },
+                { key: "O",     desc: "Bật/tắt bản dịch overlay" },
+                { key: "+ / −", desc: "Phóng to / thu nhỏ" },
+                { key: "?",     desc: "Hiện/ẩn bảng phím tắt" },
+                { key: "Esc",   desc: "Đóng cửa sổ" },
+                { key: "Ctrl+Enter", desc: "Gửi câu hỏi cho AI" },
+              ].map(s => (
+                <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
+                  <kbd
+                    style={{
+                      background: "var(--bg-2)", border: "1.5px solid var(--border)",
+                      padding: "3px 8px", fontFamily: "var(--font-mono)",
+                      fontSize: 11, fontWeight: 700, minWidth: 70, textAlign: "center",
+                      borderRadius: 3, boxShadow: "1.5px 1.5px 0 var(--border)",
+                    }}
+                  >
+                    {s.key}
+                  </kbd>
+                  <span style={{ fontSize: 12, color: "var(--fg-soft)" }}>{s.desc}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 18, paddingTop: 12, borderTop: "1px dashed var(--border-soft)", fontSize: 11, color: "var(--muted)" }}>
+              Bấm <kbd style={{ background: "var(--bg-2)", border: "1px solid var(--border)", padding: "1px 5px", fontFamily: "var(--font-mono)" }}>?</kbd> bất cứ lúc nào để mở lại bảng này.
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
     </AnimatedPage>
   );
 }
