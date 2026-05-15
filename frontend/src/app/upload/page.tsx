@@ -18,6 +18,9 @@ import {
   createSeries,
   listSeries,
   getSeries,
+  previewChapter,
+  scrapeChapter,
+  ScrapePreviewResponse,
   type SeriesListItem,
   type ChapterResponse,
   type SeriesDetail,
@@ -39,6 +42,7 @@ const DEFAULT_AI_CONFIG: AIModuleCurrentConfig = {
 
 type UploadState = "idle" | "dragging" | "uploading" | "processing" | "done" | "error";
 type AIModuleConfigKey = keyof AIModuleCurrentConfig;
+type LeftTab = "upload" | "scrape";
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
@@ -275,6 +279,16 @@ function UploadPageInner() {
       setCreatingSeries(false);
     }
   };
+  // ── Left tab (upload vs scrape) ────────────────────────────────────────────
+  const [leftTab, setLeftTab] = useState<LeftTab>("upload");
+
+  // ── Scrape URL state ────────────────────────────────────────────────────────
+  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [scrapePreview, setScrapePreview] = useState<ScrapePreviewResponse | null>(null);
+  const [scrapePreviewLoading, setScrapePreviewLoading] = useState(false);
+  const [scrapePreviewError, setScrapePreviewError] = useState<string | null>(null);
+  const [scrapeLoading, setScrapeLoading] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
@@ -446,6 +460,118 @@ function UploadPageInner() {
     setState("idle");
     void handleFiles(e.dataTransfer.files);
   }, [handleFiles]);
+
+  const handleScrapePreview = async () => {
+    const url = scrapeUrl.trim();
+    if (!url) return;
+    setScrapePreview(null);
+    setScrapePreviewError(null);
+    setScrapePreviewLoading(true);
+    try {
+      const preview = await previewChapter(url);
+      setScrapePreview(preview);
+    } catch (err) {
+      const msg = err instanceof APIError ? err.message : "Không thể tải thông tin chapter.";
+      setScrapePreviewError(msg);
+    } finally {
+      setScrapePreviewLoading(false);
+    }
+  };
+
+  const handleScrapeStart = async () => {
+    const url = scrapeUrl.trim();
+    if (!url || !scrapePreview) return;
+
+    if (!backendOnline) {
+      toast("Backend đang offline. Vui lòng thử lại sau.", "error");
+      return;
+    }
+
+    const activeUser = isAuthenticated ? await refreshUser() : null;
+    if (!activeUser) {
+      toast("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.", "error");
+      return;
+    }
+
+    setScrapeLoading(true);
+    setState("uploading");
+    setLogs([]);
+    addLog(`Bắt đầu scrape ${scrapePreview.page_count} trang từ: ${url}`, "system");
+
+    try {
+      const opts: { seriesId?: string; chapterId?: string; newChapterTitle?: string; aiConfig: AIModuleCurrentConfig } = {
+        aiConfig: translationConfig,
+      };
+      if (seriesChoice !== "none") {
+        opts.seriesId = seriesChoice;
+        if (chapterChoice === "new") {
+          opts.newChapterTitle = newChapterTitle.trim() || scrapePreview.chapter_title;
+        } else if (chapterChoice !== "auto") {
+          opts.chapterId = chapterChoice;
+        }
+      }
+
+      addLog("Đang tải ảnh từ web và upload lên cloud...", "info");
+      const response = await scrapeChapter(url, opts);
+      const batchId = response.batch_id;
+      const pageIds = response.page_ids;
+      setBatchId(batchId);
+
+      addLog(`Scrape thành công ${pageIds.length} trang. Batch: ${batchId.slice(0, 8)}...`, "success");
+      addLog("Bắt đầu pipeline dịch thuật AI...", "info");
+
+      const fakePlaceholders = pageIds.map((pid, idx) => ({
+        id: pid,
+        file: new File([], `page-${String(idx + 1).padStart(3, "0")}.jpg`),
+        name: `Trang ${idx + 1}`,
+        size: "—",
+        previewUrl: scrapePreview.preview_urls[idx] || "",
+        pageId: pid,
+        progress: 0,
+        simulatedProgress: 0,
+        status: "pending" as const,
+      }));
+      setSelectedFiles(fakePlaceholders);
+      setState("processing");
+
+      let attempts = 0;
+      const maxAttempts = 150;
+      const poll = setInterval(async () => {
+        try {
+          const batchStatus = await getBatchStatus(batchId);
+          let terminalCount = 0;
+
+          setSelectedFiles(prev => prev.map(f => {
+            const remote = batchStatus.pages.find(p => p.page_id === f.pageId);
+            if (!remote) return f;
+            if (["completed", "failed", "ocr_failed"].includes(remote.status)) terminalCount++;
+            if (f.status !== remote.status) {
+              if (remote.status === "completed") addLog(`✓ Xong: ${f.name}`, "success");
+              else if (["failed", "ocr_failed"].includes(remote.status)) addLog(`✕ Lỗi: ${f.name}`, "error");
+              else if (remote.status === "translating") addLog(`→ Đang dịch: ${f.name}`, "info");
+            }
+            return { ...f, status: remote.status, progress: remote.progress, error: remote.error };
+          }));
+
+          attempts++;
+          if (terminalCount === pageIds.length || attempts >= maxAttempts) {
+            clearInterval(poll);
+            setState("done");
+            addLog("=== HOÀN THÀNH SCRAPE & DỊCH THUẬT ===", "system");
+            toast("Đã scrape và dịch xong toàn bộ chapter!", "success");
+          }
+        } catch { /* ignore polling errors */ }
+      }, 2500);
+    } catch (err) {
+      const msg = err instanceof APIError ? err.message : "Lỗi khi scrape chapter.";
+      setErrorMsg(msg);
+      setState("error");
+      addLog(`LỖI: ${msg}`, "error");
+      toast(msg, "error");
+    } finally {
+      setScrapeLoading(false);
+    }
+  };
 
   const startProcessing = async () => {
     if (selectedFiles.length === 0 || isPreparingFiles) return;
@@ -672,6 +798,38 @@ function UploadPageInner() {
                 onDragLeave={e => { e.preventDefault(); if (state === "dragging") setState("idle"); }}
                 onDrop={onDrop}
               >
+                {/* ── Tab switcher ── */}
+                {(state === "idle" || state === "dragging") && (
+                  <div style={{ display: "flex", borderBottom: "2px solid var(--border)", flexShrink: 0 }}>
+                    {([
+                      { id: "upload" as LeftTab, label: "Upload ảnh / PDF", icon: "upload" },
+                      { id: "scrape" as LeftTab, label: "Scrape từ URL", icon: "link" },
+                    ]).map((tab, i) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setLeftTab(tab.id)}
+                        style={{
+                          flex: 1,
+                          padding: "12px 16px",
+                          background: leftTab === tab.id ? "var(--panel)" : "var(--bg-2)",
+                          color: leftTab === tab.id ? "var(--fg)" : "var(--muted)",
+                          border: "none",
+                          borderRight: i === 0 ? "2px solid var(--border)" : "none",
+                          borderBottom: leftTab === tab.id ? "2px solid var(--panel)" : "none",
+                          marginBottom: leftTab === tab.id ? -2 : 0,
+                          fontSize: 13, fontWeight: leftTab === tab.id ? 800 : 500,
+                          cursor: "pointer", display: "flex", alignItems: "center",
+                          justifyContent: "center", gap: 7,
+                          fontFamily: "var(--font-serif)",
+                          transition: "background 0.15s, color 0.15s",
+                        }}
+                      >
+                        <Icon name={tab.icon} size={13}/> {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {/* Hidden File Input */}
                 <input
                   ref={fileInputRef}
@@ -683,8 +841,134 @@ function UploadPageInner() {
                 />
 
                 <AnimatePresence mode="wait">
-                  {/* ── IDLE / QUEUE STATE ── */}
-                  {(state === "idle" || state === "dragging") && (
+                  {/* ── SCRAPE URL PANEL ── */}
+                  {(state === "idle" || state === "dragging") && leftTab === "scrape" && (
+                    <motion.div
+                      key="scrape"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      style={{ flex: 1, display: "flex", flexDirection: "column", padding: 24, gap: 16 }}
+                    >
+                      <div>
+                        <div className="display" style={{ fontSize: 20, marginBottom: 6 }}>Scrape chapter từ web</div>
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                          Dán link chapter từ mangaread.org — tự động tải về toàn bộ trang và dịch.
+                        </div>
+                      </div>
+
+                      {/* URL input */}
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                          type="url"
+                          value={scrapeUrl}
+                          onChange={e => { setScrapeUrl(e.target.value); setScrapePreview(null); setScrapePreviewError(null); }}
+                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); void handleScrapePreview(); } }}
+                          placeholder="https://www.mangaread.org/manga/.../chapter-XX/"
+                          style={{
+                            flex: 1,
+                            padding: "10px 12px",
+                            border: "2px solid var(--border)",
+                            background: "var(--bg)",
+                            color: "var(--fg)",
+                            fontFamily: "var(--font-mono)",
+                            fontSize: 12,
+                            outline: "none",
+                          }}
+                        />
+                        <motion.button
+                          whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                          className="btn btn-sm"
+                          onClick={() => void handleScrapePreview()}
+                          disabled={!scrapeUrl.trim() || scrapePreviewLoading}
+                          style={{ whiteSpace: "nowrap", padding: "10px 16px" }}
+                        >
+                          {scrapePreviewLoading ? "Đang tải..." : "Xem trước"}
+                        </motion.button>
+                      </div>
+
+                      {/* Preview error */}
+                      {scrapePreviewError && (
+                        <div style={{ background: "var(--bg-2)", border: "1.5px solid var(--accent)", color: "var(--accent)", padding: "10px 12px", fontSize: 12 }}>
+                          {scrapePreviewError}
+                        </div>
+                      )}
+
+                      {/* Preview result */}
+                      {scrapePreview && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                        >
+                          {/* Chapter info */}
+                          <div className="stroke-ink" style={{ background: "var(--bg-2)", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 3 }}>Chapter tìm thấy</div>
+                              <div style={{ fontWeight: 700, fontSize: 14, fontFamily: "var(--font-serif)" }}>{scrapePreview.chapter_title}</div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div className="caps-xs" style={{ color: "var(--muted)" }}>Số trang</div>
+                              <div className="display" style={{ fontSize: 28, lineHeight: 1 }}>{scrapePreview.page_count}</div>
+                            </div>
+                          </div>
+
+                          {/* Image thumbnail strip */}
+                          {scrapePreview.preview_urls.length > 0 && (
+                            <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: "2px 0" }}>
+                              {scrapePreview.preview_urls.map((url, i) => (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img
+                                  key={i}
+                                  src={url}
+                                  alt={`Trang ${i + 1}`}
+                                  style={{
+                                    height: 90, width: "auto", flexShrink: 0,
+                                    border: "2px solid var(--border)",
+                                    objectFit: "cover",
+                                  }}
+                                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                />
+                              ))}
+                              {scrapePreview.page_count > scrapePreview.preview_urls.length && (
+                                <div style={{ height: 90, minWidth: 56, flexShrink: 0, border: "2px dashed var(--border-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--muted)" }}>
+                                  +{scrapePreview.page_count - scrapePreview.preview_urls.length}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Start button */}
+                          <motion.button
+                            whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+                            className="btn btn-primary btn-lg"
+                            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "16px 0", fontSize: 15 }}
+                            disabled={scrapeLoading || authLoading}
+                            onClick={() => void handleScrapeStart()}
+                          >
+                            <Icon name="sparkle" size={17}/>
+                            {scrapeLoading ? "ĐANG SCRAPE..." : `SCRAPE & DỊCH ${scrapePreview.page_count} TRANG`}
+                          </motion.button>
+
+                          <div style={{ fontSize: 11, color: "var(--muted)", textAlign: "center" }}>
+                            Tiêu thụ <strong>{scrapePreview.page_count} credit</strong> · Trang sẽ được lưu vào bộ truyện đã chọn bên phải
+                          </div>
+                        </motion.div>
+                      )}
+
+                      {/* Empty hint */}
+                      {!scrapePreview && !scrapePreviewError && !scrapePreviewLoading && (
+                        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", color: "var(--muted)", gap: 10, opacity: 0.7 }}>
+                          <Icon name="link" size={36} stroke={1.2}/>
+                          <div style={{ fontSize: 12 }}>Dán URL chapter vào ô trên rồi bấm Xem trước</div>
+                          <div style={{ fontSize: 11 }}>Hỗ trợ: mangaread.org, mangakakalot.com, chapmanganato.to</div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* ── IDLE / QUEUE STATE (upload tab only) ── */}
+                  {(state === "idle" || state === "dragging") && leftTab === "upload" && (
                     <motion.div
                       key="idle"
                       initial={{ opacity: 0 }}

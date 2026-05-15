@@ -28,6 +28,27 @@ import { useWibu } from '@/contexts/WibuContext';
 
 type ViewMode = "overlay" | "sidebyside" | "tap";
 
+// ── Bubble style (stored in localStorage) ───────────────────────────────────
+interface BubbleStyle {
+  textColor: string;
+  bgColor: string;
+  fontSize: number; // 0 = auto
+}
+
+const BUBBLE_STYLE_DEFAULTS: BubbleStyle = { textColor: "#111111", bgColor: "#ffffff", fontSize: 0 };
+const STYLE_STORAGE_KEY = "storylens_bubble_styles";
+
+function loadBubbleStyles(): Record<string, BubbleStyle> {
+  try {
+    const raw = localStorage.getItem(STYLE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveBubbleStyles(styles: Record<string, BubbleStyle>) {
+  try { localStorage.setItem(STYLE_STORAGE_KEY, JSON.stringify(styles)); } catch { /* quota */ }
+}
+
 interface ChatMessage {
   id: number;
   role: "user" | "assistant";
@@ -449,6 +470,7 @@ function BubbleOverlays({
   selected,
   onSelect,
   mode,
+  getStyle,
 }: {
   bubbles: BubbleData[];
   containerW: number;
@@ -458,6 +480,7 @@ function BubbleOverlays({
   selected: number | null;
   onSelect: (i: number | null) => void;
   mode: ViewMode;
+  getStyle?: (bubbleId: string) => BubbleStyle;
 }) {
   const scaleX = containerW / imageW;
   const scaleY = containerH / imageH;
@@ -478,6 +501,10 @@ function BubbleOverlays({
           const isGiant = (w * h) >= (imageW * imageH * 0.8);
 
           if (mode === "overlay") {
+            const style = getStyle?.(b.bubble_id) ?? BUBBLE_STYLE_DEFAULTS;
+            const autoFontSize = isGiant ? 18 : Math.min(32, Math.max(10, rhScaled * 0.35));
+            const fontSize = style.fontSize > 0 ? style.fontSize : autoFontSize;
+
             return (
               <motion.g
                 key={`${i}-overlay`}
@@ -485,15 +512,10 @@ function BubbleOverlays({
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 260,
-                  damping: 20,
-                  delay: i * 0.05
-                }}
+                transition={{ type: "spring", stiffness: 260, damping: 20, delay: i * 0.05 }}
               >
                 {!isGiant ? (
-                  <rect x={rx} y={ry} width={rwScaled} height={rhScaled} fill="white" stroke="#111" strokeWidth="1.5" rx="4" />
+                  <rect x={rx} y={ry} width={rwScaled} height={rhScaled} fill={style.bgColor} stroke="#111" strokeWidth="1.5" rx="4" />
                 ) : (
                   <rect x={rx} y={ry} width={rwScaled} height={rhScaled} fill="rgba(255,255,255,0.2)" stroke="rgba(255,0,0,0.5)" strokeWidth="2" strokeDasharray="5 5" rx="4" />
                 )}
@@ -507,14 +529,14 @@ function BubbleOverlays({
                   <div
                     style={{
                       width: "100%", height: "100%",
-                      fontSize: isGiant ? 18 : Math.min(32, Math.max(10, rhScaled * 0.35)),
+                      fontSize,
                       fontFamily: "var(--font-serif)",
                       fontWeight: 600,
                       display: "flex",
                       alignItems: isGiant ? "flex-start" : "center",
-                      justifyContent: isGiant ? "center" : "center",
+                      justifyContent: "center",
                       textAlign: "center",
-                      color: isGiant ? "#d00" : "#111",
+                      color: isGiant ? "#d00" : style.textColor,
                       overflow: "hidden",
                       lineHeight: 1.3,
                       padding: isGiant ? "10px" : "2px",
@@ -652,6 +674,30 @@ function ReaderContent() {
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // ── Bubble styles (per-bubble, persisted to localStorage) ────────────────
+  const [bubbleStyles, setBubbleStyles] = useState<Record<string, BubbleStyle>>(() => loadBubbleStyles());
+
+  const updateBubbleStyle = (bubbleId: string, patch: Partial<BubbleStyle>) => {
+    setBubbleStyles(prev => {
+      const current = prev[bubbleId] ?? { ...BUBBLE_STYLE_DEFAULTS };
+      const next = { ...prev, [bubbleId]: { ...current, ...patch } };
+      saveBubbleStyles(next);
+      return next;
+    });
+  };
+
+  const resetBubbleStyle = (bubbleId: string) => {
+    setBubbleStyles(prev => {
+      const next = { ...prev };
+      delete next[bubbleId];
+      saveBubbleStyles(next);
+      return next;
+    });
+  };
+
+  const getBubbleStyle = (bubbleId: string): BubbleStyle =>
+    bubbleStyles[bubbleId] ?? BUBBLE_STYLE_DEFAULTS;
 
   useEffect(() => {
     if (!batchId) {
@@ -1231,6 +1277,7 @@ function ReaderContent() {
                               containerW={SIDE_W} containerH={computedSideH}
                               imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
                               selected={selected} onSelect={setSelected} mode="overlay"
+                              getStyle={getBubbleStyle}
                             />
                           )}
                         </div>
@@ -1261,6 +1308,7 @@ function ReaderContent() {
                             containerW={CANVAS_W} containerH={computedHeight}
                             imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
                             selected={selected} onSelect={setSelected} mode={mode}
+                            getStyle={getBubbleStyle}
                           />
                         )}
                       </div>
@@ -1525,6 +1573,72 @@ function ReaderContent() {
                             >
                               <Icon name="check" size={13}/> {isSaving ? "Đang lưu..." : "Lưu bản sửa"}
                             </button>
+
+                            {/* ── Bubble style controls ── */}
+                            {(() => {
+                              const bStyle = getBubbleStyle(bubble.bubble_id);
+                              const hasCustomStyle =
+                                bStyle.textColor !== BUBBLE_STYLE_DEFAULTS.textColor ||
+                                bStyle.bgColor !== BUBBLE_STYLE_DEFAULTS.bgColor ||
+                                bStyle.fontSize !== BUBBLE_STYLE_DEFAULTS.fontSize;
+                              return (
+                                <div style={{ marginTop: 8, borderTop: "1px dashed var(--border-soft)", paddingTop: 8 }}>
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <span className="caps-xs" style={{ color: "var(--muted)", fontSize: 9 }}>Màu sắc & cỡ chữ overlay</span>
+                                    {hasCustomStyle && (
+                                      <button
+                                        className="btn btn-sm btn-ghost"
+                                        style={{ fontSize: 9, padding: "2px 5px", color: "var(--accent)" }}
+                                        onClick={() => resetBubbleStyle(bubble.bubble_id)}
+                                        title="Đặt lại mặc định"
+                                      >
+                                        Reset
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+                                    {/* Text color */}
+                                    <label style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+                                      <span style={{ fontSize: 9, color: "var(--muted)" }}>Chữ</span>
+                                      <input
+                                        type="color"
+                                        value={bStyle.textColor}
+                                        onChange={e => updateBubbleStyle(bubble.bubble_id, { textColor: e.target.value })}
+                                        style={{ width: "100%", height: 28, border: "1.5px solid var(--border)", cursor: "pointer", padding: 2, background: "var(--bg)" }}
+                                        title="Màu chữ"
+                                      />
+                                    </label>
+                                    {/* Background color */}
+                                    <label style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+                                      <span style={{ fontSize: 9, color: "var(--muted)" }}>Nền</span>
+                                      <input
+                                        type="color"
+                                        value={bStyle.bgColor}
+                                        onChange={e => updateBubbleStyle(bubble.bubble_id, { bgColor: e.target.value })}
+                                        style={{ width: "100%", height: 28, border: "1.5px solid var(--border)", cursor: "pointer", padding: 2, background: "var(--bg)" }}
+                                        title="Màu nền bubble"
+                                      />
+                                    </label>
+                                    {/* Font size */}
+                                    <label style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "center" }}>
+                                      <span style={{ fontSize: 9, color: "var(--muted)" }}>
+                                        Cỡ {bStyle.fontSize > 0 ? `${bStyle.fontSize}px` : "Auto"}
+                                      </span>
+                                      <input
+                                        type="range"
+                                        min={0}
+                                        max={32}
+                                        step={1}
+                                        value={bStyle.fontSize}
+                                        onChange={e => updateBubbleStyle(bubble.bubble_id, { fontSize: Number(e.target.value) })}
+                                        style={{ width: "100%", accentColor: "var(--accent)" }}
+                                        title="Cỡ chữ (0 = tự động)"
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                              );
+                            })()}
 
                             {isHistoryOpen && (
                               <div style={{ borderTop: "1px solid var(--border-soft)", marginTop: 10, paddingTop: 8 }}>
