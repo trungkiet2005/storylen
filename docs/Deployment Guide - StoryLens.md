@@ -1,146 +1,311 @@
 # Deployment Guide - StoryLens
 
-## 1. Introduction
-### 1.1 Purpose
-Tài liệu này cung cấp hướng dẫn chi tiết về cách triển khai hệ thống StoryLens lên môi trường sản xuất. Nó bao gồm các bước cấu hình, cài đặt phụ thuộc, triển khai các thành phần frontend, backend và AI, cũng như các khuyến nghị về giám sát và bảo trì.
+## 1. Overview
 
-### 1.2 Scope
-Hướng dẫn này bao gồm việc triển khai các thành phần chính của StoryLens: Frontend (React/Vite), Backend (FastAPI), các dịch vụ AI (YOLOv8, Manga-OCR, RAG) và cơ sở dữ liệu (Vector DB). Nó tập trung vào môi trường cloud (ví dụ: Railway/Render) nhưng cũng có thể áp dụng cho các môi trường khác với một số điều chỉnh.
+StoryLens consists of three independently deployed services:
+
+| Service | Platform | Deploy Method |
+|---------|----------|--------------|
+| Frontend (Next.js) | Vercel | Auto-deploy on push to `main` |
+| Backend API (FastAPI) | Render.com | Docker via `render.yaml` |
+| AI Worker | HuggingFace Spaces | Manual Docker push or Spaces sync |
+
+Shared infrastructure:
+- **Database + Storage:** Supabase (PostgreSQL, pgvector, Storage, Auth)
+- **Translation AI:** Google Gemini API
 
 ---
 
 ## 2. Prerequisites
-Trước khi bắt đầu triển khai, hãy đảm bảo rằng bạn đã có các tài nguyên và công cụ sau:
 
-- **Tài khoản Cloud:** Tài khoản trên một nền tảng cloud như Railway, Render, AWS, GCP, Azure, v.v.
-- **Docker & Docker Compose:** Để đóng gói và chạy các dịch vụ.
-- **Git:** Để clone mã nguồn.
-- **Python 3.9+ & pip:** Để cài đặt các phụ thuộc Python.
-- **Node.js & npm/yarn:** Để cài đặt các phụ thuộc Frontend.
-- **API Keys:**
-    - Google Gemini API Key.
-    - Các API key khác nếu có (ví dụ: cho dịch vụ lưu trữ ảnh S3).
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Node.js | 18+ | Frontend build |
+| Python | 3.10+ | Backend/AI |
+| Docker | 24+ | Container builds |
+| Git | latest | Version control |
+| Supabase CLI | latest | DB migrations |
+| Vercel CLI | latest | Frontend deployment (optional) |
 
----
-
-## 3. Deployment Architecture
-
-StoryLens được thiết kế để triển khai dưới dạng các microservice hoặc dịch vụ độc lập, cho phép mở rộng và quản lý dễ dàng. Các thành phần chính sẽ được đóng gói trong Docker containers.
-
-```mermaid
-graph LR
-    User -->|Browser| Frontend_Container(Frontend Container)
-    Frontend_Container -->|HTTPS| Backend_Container(Backend Container)
-    Backend_Container -->|Internal API| AI_Service_Container(AI Service Container)
-    Backend_Container -->|DB Connection| Vector_DB_Instance(Vector DB - ChromaDB/FAISS)
-    AI_Service_Container -->|External API| Gemini_Cloud(Gemini API)
-    AI_Service_Container -->|Local Models| YOLOv8_MangaOCR_Models(YOLOv8 & Manga-OCR Models)
-
-    subgraph "Cloud Environment"
-        Frontend_Container
-        Backend_Container
-        AI_Service_Container
-        Vector_DB_Instance
-    end
-
-    subgraph "Docker Containers"
-        Frontend_Container
-        Backend_Container
-        AI_Service_Container
-    end
-```
+Accounts required:
+- [Supabase](https://supabase.com) — database, storage, auth
+- [Google AI Studio](https://aistudio.google.com) — Gemini API key(s)
+- [Render.com](https://render.com) — backend hosting
+- [Vercel](https://vercel.com) — frontend hosting
+- [HuggingFace](https://huggingface.co) — AI worker hosting
 
 ---
 
-## 4. Deployment Steps
+## 3. Supabase Setup
 
-### 4.1 Clone Repository
+### 3.1 Create Supabase Project
+1. Create a new project at [app.supabase.com](https://app.supabase.com)
+2. Note your **Project URL**, **anon key**, and **service role key**
+
+### 3.2 Run Migrations
+Apply migrations in order using the Supabase SQL editor or CLI:
+
 ```bash
-git clone https://github.com/your-repo/storylens.git
-cd storylens
+# Using Supabase CLI
+supabase db push
+
+# Or manually via SQL editor in order:
+# 1. backend/supabase_migration.sql       (core schema + RLS + pgvector)
+# 2. backend/supabase_migration_series.sql (series/chapter extensions)
+# 3. backend/supabase_migration_credits.sql (credit & subscription system)
+# 4. backend/supabase_migration_admin.sql  (admin tables + analytics RPCs)
+# 5. backend/supabase_patch.sql            (any hotfixes, apply if needed)
 ```
 
-### 4.2 Environment Variables Configuration
-Tạo file `.env` trong thư mục gốc của dự án và điền các biến môi trường cần thiết:
+### 3.3 Storage Buckets
+The migrations create these buckets automatically:
+- `manga-originals` (private)
+- `manga-thumbnails` (private)
+- `avatars` (public)
+- `series-covers` (public)
 
-```dotenv
-# Backend Configuration
-GEMINI_API_KEY=YOUR_GEMINI_API_KEY_1,YOUR_GEMINI_API_KEY_2 # Hỗ trợ nhiều key cách nhau bằng dấu phẩy để tự động xoay vòng khi hết Quota
-DATABASE_URL=sqlite:///./sql_app.db # For local development, or your production DB URL
-# ... other backend specific variables
-
-# Frontend Configuration
-VITE_API_BASE_URL=https://api.storylens.com/v1 # Your deployed backend URL
-# ... other frontend specific variables
-```
-
-### 4.3 Docker-based Deployment (Recommended)
-
-#### 4.3.1 Build Docker Images
-```bash
-docker-compose build
-```
-
-#### 4.3.2 Run Containers
-```bash
-docker-compose up -d
-```
-
-#### 4.3.3 Verify Deployment
-- Truy cập Frontend tại `http://localhost:3000` (hoặc cổng đã cấu hình).
-- Kiểm tra log của các container để đảm bảo không có lỗi.
-
-### 4.4 Manual Deployment (Alternative)
-
-#### 4.4.1 Frontend Deployment
-1.  **Cài đặt phụ thuộc:**
-    ```bash
-    cd frontend
-    npm install # hoặc yarn install
-    ```
-2.  **Build ứng dụng:**
-    ```bash
-    npm run build # hoặc yarn build
-    ```
-3.  **Triển khai:** Copy thư mục `dist` lên web server (Nginx, Apache) hoặc dịch vụ hosting tĩnh (Railway Static App, Render Static Site).
-
-#### 4.4.2 Backend Deployment
-1.  **Cài đặt phụ thuộc:**
-    ```bash
-    cd backend
-    pip install -r requirements.txt
-    ```
-2.  **Chạy ứng dụng:**
-    ```bash
-    uvicorn main:app --host 0.0.0.0 --port 8000
-    ```
-    - Đối với môi trường production, sử dụng Gunicorn kết hợp với Uvicorn worker.
-    - Triển khai lên các dịch vụ như Railway Service, Render Web Service, hoặc Kubernetes.
-
-#### 4.4.3 AI Services Deployment
-- Các mô hình AI (YOLOv8, Manga-OCR) có thể được tải và chạy cục bộ trong container của Backend hoặc trong một dịch vụ AI riêng biệt.
-- Đảm bảo các model weights được tải xuống hoặc bao gồm trong Docker image.
+Verify they exist in **Supabase Dashboard → Storage**.
 
 ---
 
-## 5. Post-Deployment Configuration
+## 4. Backend Deployment (Render.com)
 
-### 5.1 Domain Configuration
-- Cấu hình DNS để trỏ domain của bạn đến địa chỉ IP hoặc URL của dịch vụ đã triển khai.
-- Thiết lập SSL/TLS (Let's Encrypt) để đảm bảo kết nối HTTPS.
+### 4.1 Environment Variables
+Create a `.env` file in `backend/` from the template:
 
-### 5.2 Monitoring and Logging
-- Tích hợp các công cụ giám sát (Prometheus, Grafana) để theo dõi hiệu suất hệ thống.
-- Cấu hình hệ thống ghi log tập trung (ELK Stack, Loki) để dễ dàng gỡ lỗi và theo dõi lỗi.
+```bash
+cp backend/.env.example backend/.env
+```
 
-### 5.3 Backup and Recovery
-- Thiết lập các quy trình sao lưu định kỳ cho cơ sở dữ liệu.
-- Đảm bảo có kế hoạch phục hồi sau thảm họa.
+Fill in all values:
+
+```bash
+# Application
+APP_NAME=StoryLens
+APP_VERSION=1.0.0
+DEBUG=false
+ALLOWED_ORIGINS=https://your-frontend.vercel.app,https://yourdomain.com
+MAX_FILE_SIZE_MB=10
+MAX_AVATAR_SIZE_MB=2
+MAX_REQUEST_SIZE_MB=50
+MAX_PIPELINE_CONCURRENCY=3
+
+# Supabase
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_BUCKET_ORIGINALS=manga-originals
+SUPABASE_BUCKET_THUMBNAILS=manga-thumbnails
+
+# Auth Cookies (production settings)
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_SAMESITE=none
+AUTH_COOKIE_DOMAIN=.yourdomain.com    # optional
+AUTH_ACCESS_COOKIE_NAME=sl_access
+AUTH_REFRESH_COOKIE_NAME=sl_refresh
+AUTH_REFRESH_COOKIE_MAX_AGE_SECONDS=2592000   # 30 days
+
+# Gemini (supports multiple keys for rotation)
+GEMINI_API_KEY=AIza...,AIza...,AIza...
+GEMINI_MODEL=gemini-2.5-flash
+
+# HuggingFace Space (AI Worker)
+HF_SPACE_URL=https://your-username-storylens-ai.hf.space
+HF_SPACE_TOKEN=hf_...   # optional, required if space is private
+
+# AI Module defaults
+AI_MODULE_TRANSLATOR=gemini
+AI_MODULE_TARGET_LANG=VIN
+AI_MODULE_DETECTOR=default
+AI_MODULE_OCR=manga-ocr
+AI_MODULE_INPAINTER=lama
+AI_MODULE_RENDERER=default
+
+# Rate Limiting (slowapi format)
+RATE_LIMIT_REGISTER=5/minute
+RATE_LIMIT_LOGIN=10/minute
+RATE_LIMIT_UPLOAD=30/minute
+```
+
+### 4.2 Deploy to Render.com
+
+The project includes `render.yaml` at the root for Infrastructure-as-Code deployment.
+
+**Steps:**
+1. Push code to GitHub
+2. Log in to [Render Dashboard](https://dashboard.render.com)
+3. Click **New → Blueprint** and connect your GitHub repo
+4. Render reads `render.yaml` and creates the `storylens-api` web service
+5. Set secret environment variables in **Render Dashboard → Environment** (marked `sync: false` in `render.yaml`):
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `SUPABASE_ANON_KEY`
+   - `GEMINI_API_KEY`
+   - `HF_SPACE_URL`
+   - `HF_SPACE_TOKEN`
+   - `ALLOWED_ORIGINS`
+
+**Service Configuration (from render.yaml):**
+- Type: Web Service (Docker)
+- Region: Singapore (closest to Vietnam)
+- Plan: Free (512 MB RAM; note 30–60s cold start on free tier)
+- Health Check: `/health`
+- Auto-deploy: Enabled on push to `main`
+
+### 4.3 Local Backend Development
+
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
 ---
 
-## 6. Maintenance
-- **Cập nhật định kỳ:** Cập nhật các thư viện và phụ thuộc để đảm bảo bảo mật và hiệu suất.
-- **Giám sát hiệu suất:** Theo dõi các chỉ số CPU, RAM, Network I/O, và thời gian phản hồi API.
-- **Quản lý log:** Thường xuyên kiểm tra log để phát hiện và khắc phục sự cố.
-- **Tối ưu hóa chi phí:** Theo dõi chi phí sử dụng cloud và tối ưu hóa tài nguyên khi cần.
+## 5. Frontend Deployment (Vercel)
+
+### 5.1 Environment Variables
+Set these in Vercel project settings:
+
+```bash
+NEXT_PUBLIC_API_URL=https://storylens-api.onrender.com/v1
+```
+
+For local dev, create `frontend/.env.local`:
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000/v1
+```
+
+### 5.2 Deploy to Vercel
+
+**Option A – CLI:**
+```bash
+cd frontend
+npm install
+npx vercel --prod
+```
+
+**Option B – GitHub Integration (recommended):**
+1. Connect GitHub repo to Vercel project
+2. Set root directory to `frontend/`
+3. Framework: Next.js (auto-detected)
+4. Vercel auto-deploys on every push to `main`
+
+### 5.3 Local Frontend Development
+
+```bash
+cd frontend
+npm install
+npm run dev      # starts on http://localhost:3000
+```
+
+---
+
+## 6. AI Worker Deployment (HuggingFace Spaces)
+
+### 6.1 Prerequisites
+- HuggingFace account with a Space of type **Docker**
+- At least **16 GB RAM** tier (required for ML models)
+
+### 6.2 Deploy
+
+The AI worker is in the `ai_module/` directory.
+
+**Steps:**
+1. Create a new HuggingFace Space (Docker type, 16 GB RAM)
+2. Push the `ai_module/` contents to the Space repository:
+   ```bash
+   cd ai_module
+   git remote add hf https://huggingface.co/spaces/your-username/storylens-ai
+   git push hf main
+   ```
+3. HuggingFace builds the Docker image from `ai_module/Dockerfile`
+4. Set Space secrets (environment variables):
+   - `GEMINI_API_KEY`
+   - Any model download tokens if needed
+
+### 6.3 Keep-Alive
+HuggingFace Spaces on the free tier sleep after inactivity. The project includes a GitHub Actions workflow (`.github/workflows/`) that pings the Space periodically to prevent cold starts during active usage.
+
+---
+
+## 7. Docker Compose (Local Full-Stack Development)
+
+For running all services locally:
+
+```yaml
+# docker-compose.yml (create at project root)
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file: ./backend/.env
+    
+  ai_module:
+    build: ./ai_module
+    ports:
+      - "7860:7860"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000/v1
+```
+
+```bash
+docker-compose up --build
+```
+
+> Note: AI module requires significant RAM (4–8 GB+). Ensure Docker has sufficient memory allocation.
+
+---
+
+## 8. Post-Deployment Checklist
+
+- [ ] Backend health check returns `200`: `GET https://storylens-api.onrender.com/health`
+- [ ] Frontend loads without console errors
+- [ ] Registration flow creates user + free subscription in Supabase
+- [ ] Upload flow: image uploads to Supabase Storage, page record created, AI pipeline triggered
+- [ ] AI Worker responds: `GET https://your-space.hf.space/health`
+- [ ] Supabase Storage buckets are accessible and properly configured
+- [ ] CORS: Frontend can call API without errors (check browser Network tab)
+- [ ] Cookie auth: Login sets HTTP-only cookies, `/auth/me` returns user after login
+- [ ] Admin account: Set `role = 'admin'` for admin user directly in Supabase Dashboard
+
+---
+
+## 9. Monitoring & Maintenance
+
+### 9.1 Monitoring
+- **Render Dashboard:** Request logs, CPU/memory usage, deploy history
+- **Supabase Dashboard:** Database queries, storage usage, auth events
+- **Vercel Analytics:** Frontend performance, error rates
+- **HuggingFace Spaces:** Container logs, hardware usage
+
+### 9.2 Log Access
+```bash
+# Render logs via CLI
+render logs --service storylens-api --tail
+
+# Or via Render Dashboard → Logs tab
+```
+
+### 9.3 Database Maintenance
+- Run `supabase_patch.sql` for schema hotfixes
+- Monitor pgvector index performance as embeddings table grows
+- Archive old `credit_transactions` if table becomes very large
+
+### 9.4 Gemini API Key Rotation
+The backend automatically rotates through comma-separated keys in `GEMINI_API_KEY` when a key hits quota. To add more keys, update the environment variable in Render Dashboard (no redeploy needed if using Render env sync).
+
+### 9.5 Cost Optimization
+- Render free tier: 750 hours/month — sufficient for one service
+- Supabase free tier: 500 MB DB, 1 GB storage — upgrade if needed
+- Gemini API: Free quota per key; use multiple keys for higher throughput
+- HuggingFace Spaces: Free tier available; upgrade to persistent for production
