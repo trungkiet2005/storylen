@@ -26,6 +26,8 @@ import {
   getGlossary,
   upsertGlossaryEntry,
   deleteGlossaryEntry,
+  getAllRatings,
+  setRating as setRatingLS,
 } from "@/lib/localStore";
 
 interface WibuContextValue {
@@ -48,6 +50,11 @@ interface WibuContextValue {
   getGlossary: (seriesId: string) => GlossaryEntry[];
   upsertGlossaryEntry: (seriesId: string, entry: Omit<GlossaryEntry, "createdAt">) => void;
   deleteGlossaryEntry: (seriesId: string, key: string) => void;
+
+  // Ratings
+  ratings: Record<string, number>;
+  getRating: (seriesId: string) => number;
+  setRating: (seriesId: string, rating: number) => void;
 }
 
 const WibuContext = createContext<WibuContextValue | null>(null);
@@ -63,12 +70,15 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     lastReadDate: null,
     dailyHistory: {},
   });
+  const [ratingsMap, setRatingsMap] = useState<Record<string, number>>({});
 
   // Hydrate from localStorage on mount
   useEffect(() => {
     setBookmarks(getAllBookmarks());
     setAllProgress(getAllProgress());
     setStats(getReadingStats());
+    const ratings = getAllRatings();
+    setRatingsMap(Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, v.rating])));
   }, []);
 
   const toggleBookmark = useCallback((bm: Omit<Bookmark, "savedAt">) => {
@@ -101,6 +111,8 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     setStats(getReadingStats());
     setBookmarks(getAllBookmarks());
     setAllProgress(getAllProgress());
+    const ratings = getAllRatings();
+    setRatingsMap(Object.fromEntries(Object.entries(ratings).map(([k, v]) => [k, v.rating])));
   }, []);
 
   const getGlossaryFn = useCallback((seriesId: string) => getGlossary(seriesId), []);
@@ -111,6 +123,18 @@ export function WibuProvider({ children }: { children: ReactNode }) {
 
   const deleteFn = useCallback((seriesId: string, key: string) => {
     deleteGlossaryEntry(seriesId, key);
+  }, []);
+
+  const getRatingFn = useCallback((seriesId: string) => ratingsMap[seriesId] ?? 0, [ratingsMap]);
+
+  const setRatingFn = useCallback((seriesId: string, rating: number) => {
+    setRatingLS(seriesId, rating);
+    setRatingsMap(prev => {
+      const next = { ...prev };
+      if (rating <= 0) delete next[seriesId];
+      else next[seriesId] = rating;
+      return next;
+    });
   }, []);
 
   const value = useMemo<WibuContextValue>(
@@ -127,8 +151,11 @@ export function WibuProvider({ children }: { children: ReactNode }) {
       getGlossary: getGlossaryFn,
       upsertGlossaryEntry: upsertFn,
       deleteGlossaryEntry: deleteFn,
+      ratings: ratingsMap,
+      getRating: getRatingFn,
+      setRating: setRatingFn,
     }),
-    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn],
+    [bookmarks, toggleBookmark, isBookmarkedFn, allProgress, saveProgress, markRead, stats, addMinutes, refreshStats, getGlossaryFn, upsertFn, deleteFn, ratingsMap, getRatingFn, setRatingFn],
   );
 
   return <WibuContext.Provider value={value}>{children}</WibuContext.Provider>;

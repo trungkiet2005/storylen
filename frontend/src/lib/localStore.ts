@@ -225,3 +225,38 @@ export function deleteGlossaryEntry(seriesId: string, key: string) {
   if (all[seriesId]) delete all[seriesId][key];
   localStorage.setItem(GLOSSARY_KEY, JSON.stringify(all));
 }
+
+// ─── Series Ratings ───────────────────────────────────────────────────────────
+
+export interface SeriesRating {
+  rating: number; // 1-5
+  ratedAt: string;
+}
+
+const RATINGS_KEY = "sl-ratings";
+
+function readRatingsMap(): Record<string, SeriesRating> {
+  try {
+    return JSON.parse(localStorage.getItem(RATINGS_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function getRating(seriesId: string): number {
+  return readRatingsMap()[seriesId]?.rating ?? 0;
+}
+
+export function setRating(seriesId: string, rating: number) {
+  const map = readRatingsMap();
+  if (rating <= 0) {
+    delete map[seriesId];
+  } else {
+    map[seriesId] = { rating: Math.min(5, Math.max(1, rating)), ratedAt: new Date().toISOString() };
+  }
+  localStorage.setItem(RATINGS_KEY, JSON.stringify(map));
+}
+
+export function getAllRatings(): Record<string, SeriesRating> {
+  return readRatingsMap();
+}

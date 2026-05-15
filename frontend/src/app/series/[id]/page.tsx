@@ -9,6 +9,8 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useWibu } from "@/contexts/WibuContext";
+import { StarRating } from "@/components/StarRating";
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from "@/components/Animations";
 import {
   APIError,
@@ -45,6 +47,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const wibu = useWibu();
 
   const [series, setSeries] = useState<SeriesDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -278,6 +281,23 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                     >
                       {series.title}
                     </h1>
+
+                    {/* User rating */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, letterSpacing: "0.04em" }}>
+                        Đánh giá của bạn:
+                      </span>
+                      <StarRating
+                        value={wibu.getRating(series.series_id)}
+                        onChange={r => wibu.setRating(series.series_id, r)}
+                        size={18}
+                      />
+                      {wibu.getRating(series.series_id) > 0 && (
+                        <span style={{ fontSize: 11, color: "var(--gold)", fontWeight: 700 }}>
+                          {wibu.getRating(series.series_id)}/5
+                        </span>
+                      )}
+                    </div>
 
                     {series.description && (
                       <p style={{ fontSize: 13, color: "var(--fg-soft)", marginTop: 10, lineHeight: 1.6 }}>

@@ -10,6 +10,7 @@ import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWibu } from "@/contexts/WibuContext";
+import { StarRating } from "@/components/StarRating";
 import {
   AnimatedPage,
   FadeIn,
@@ -78,6 +79,7 @@ export default function SeriesListPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const wibu = useWibu();
 
   const [items, setItems] = useState<SeriesListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -492,6 +494,20 @@ export default function SeriesListPage() {
                                 }}
                               >
                                 {item.description}
+                              </div>
+                            )}
+                            {/* Star rating row */}
+                            {mounted && (
+                              <div
+                                style={{ marginTop: 6 }}
+                                onClick={e => e.preventDefault()}
+                              >
+                                <StarRating
+                                  value={wibu.getRating(item.series_id)}
+                                  onChange={r => wibu.setRating(item.series_id, r)}
+                                  size={13}
+                                  showClear={false}
+                                />
                               </div>
                             )}
                             {item.tags && item.tags.length > 0 && (
