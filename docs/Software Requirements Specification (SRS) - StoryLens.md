@@ -1,90 +1,166 @@
 # Software Requirements Specification (SRS) - StoryLens
 
 ## 1. Introduction
+
 ### 1.1 Purpose
-Tài liệu này đặc tả chi tiết các yêu cầu chức năng và phi chức năng cho hệ thống **StoryLens** - một nền tảng web hỗ trợ dịch manga bằng AI tích hợp RAG (Retrieval-Augmented Generation) để hỏi đáp nội dung. Tài liệu này phục vụ cho đội ngũ phát triển, kiểm thử và các bên liên quan để hiểu rõ cách thức hệ thống vận hành.
+This document specifies the functional and non-functional requirements for **StoryLens** — an AI-powered manga translation and Q&A web platform targeting Vietnamese readers. It serves as the reference for development, QA, and stakeholder alignment.
 
-### 1.2 Scope
-Hệ thống StoryLens bao gồm:
-- Module xử lý ảnh (Bubble Detection & OCR).
-- Module dịch thuật dựa trên ngữ cảnh (LLM-based Translation).
-- Module hiển thị (Overlay Reader).
-- Module hỏi đáp thông minh (RAG Q&A).
-- Hệ thống quản lý lịch sử và batch upload.
+### 1.2 Product Overview
+StoryLens allows users to upload manga image files, automatically detect and extract Japanese text from speech bubbles, translate them to Vietnamese (or other languages) using contextual AI, and display the translated text overlaid on the original images. Users can also ask questions about the manga content via a RAG-based Q&A interface. A credit/subscription system controls usage, and an admin dashboard provides platform management.
 
-### 1.3 Definitions, Acronyms, and Abbreviations
-| Thuật ngữ | Định nghĩa |
-| :--- | :--- |
-| **OCR** | Optical Character Recognition - Nhận dạng ký tự quang học. |
-| **RAG** | Retrieval-Augmented Generation - Kỹ thuật kết hợp tìm kiếm thông tin và sinh văn bản. |
-| **LLM** | Large Language Model - Mô hình ngôn ngữ lớn (ví dụ: Gemini). |
-| **Bbox** | Bounding Box - Khung bao quanh vùng chứa văn bản. |
-| **CER** | Character Error Rate - Tỷ lệ lỗi ký tự trong OCR. |
+### 1.3 User Classes
+
+| Class | Description |
+|-------|-------------|
+| **Casual Reader** | Uploads and reads translated manga; uses history and series features |
+| **Japanese Learner** | Uses Q&A feature to understand story context and language nuance |
+| **Content Creator** | Organizes translated manga into series with custom covers and tags |
+| **Admin** | Manages platform: monitors analytics, moderates content, manages users and credits |
 
 ---
 
-## 2. Overall Description
-### 2.1 Product Perspective
-StoryLens là một hệ thống độc lập, tương tác với các API bên ngoài (Gemini API) và sử dụng các mô hình AI cục bộ (YOLOv8, Manga-OCR). Hệ thống được thiết kế theo kiến trúc Layered Architecture để dễ dàng mở rộng.
+## 2. Functional Requirements
 
-### 2.2 Product Functions
-- **F01: Upload Manga:** Hỗ trợ tải ảnh đơn lẻ hoặc theo chương (batch).
-- **F02: AI Processing:** Tự động phát hiện bubble và trích xuất chữ Nhật.
-- **F03: Contextual Translation:** Dịch sang tiếng Việt giữ nguyên ngữ cảnh và xưng hô.
-- **F04: Overlay Display:** Hiển thị bản dịch đè lên ảnh gốc tại đúng vị trí.
-- **F05: RAG Q&A:** Cho phép người dùng hỏi về nội dung truyện dựa trên dữ liệu đã xử lý.
-- **F06: History Management:** Lưu trữ và xem lại các trang đã dịch.
+### F01 – User Authentication
+- **F01.1** Users can register with email, password, and username (3–32 chars, alphanumeric + underscore)
+- **F01.2** Users can log in with email/password; session is maintained via HTTP-only cookies
+- **F01.3** Users can update profile fields: full_name, display_name, bio, locale, timezone, date_of_birth, gender, country, phone, preferred_target_lang
+- **F01.4** Users can upload and remove a profile avatar (JPG/PNG/WebP)
+- **F01.5** Sessions persist via auto-refreshed access/refresh token cookies
+- **F01.6** Users can log out, which clears cookies and invalidates the Supabase session
 
-### 2.3 User Classes and Characteristics
-- **Người đọc phổ thông:** Cần sự đơn giản, nhanh chóng.
-- **Người học tiếng Nhật:** Cần độ chính xác cao, đối chiếu song ngữ.
-- **Content Creator:** Cần xử lý số lượng lớn (batch upload).
-- **Admin:** Quản lý hệ thống, theo dõi log và quota.
+### F02 – Image Upload
+- **F02.1** Users can upload one or more manga image files (JPG, PNG, WebP) in a single batch
+- **F02.2** Max file size per image: configured via `max_upload_size_mb` app setting (default: 10 MB)
+- **F02.3** Max batch size per upload is determined by the user's subscription plan
+- **F02.4** Users can optionally specify AI processing configuration (detector, OCR, translator, target language)
+- **F02.5** Users can optionally bind uploaded pages to an existing series/chapter or create a new chapter automatically
+- **F02.6** Upload triggers background AI processing; user receives `page_ids` and `batch_id` immediately (202 Accepted)
+- **F02.7** Each uploaded page costs 1 credit
+
+### F03 – AI Processing Pipeline
+- **F03.1** System detects text regions (speech bubbles) using a configurable detector model (default: YOLOv8)
+- **F03.2** System extracts Japanese text from detected bubbles using Manga-OCR
+- **F03.3** OCR accuracy target: Character Error Rate (CER) ≤ 5%
+- **F03.4** System removes original text from image via inpainting
+- **F03.5** System translates Japanese text to the target language (default: Vietnamese) using Gemini API with context awareness and xưng hô (pronoun) preservation
+- **F03.6** System renders translated text onto the inpainted image
+- **F03.7** System generates sentence embeddings for each translated bubble and stores them in pgvector
+- **F03.8** Page status progresses through: `pending` → `ocr_running` → `translating` → `completed` (or `failed`)
+- **F03.9** System reports processing progress as a 0–100 percentage
+- **F03.10** Processing timeout: 30 seconds per page; pages exceeding this are marked `failed`
+
+### F04 – Manga Reader & Overlay
+- **F04.1** Users can view processed pages with translated text overlaid on the original image
+- **F04.2** Users can toggle overlay visibility to compare original vs. translated
+- **F04.3** Users can view individual bubble data (bounding box, original Japanese, confidence score)
+- **F04.4** Users can manually edit a bubble's translation (1–5000 chars); edits are saved to `translation_history`
+- **F04.5** Users can view the translation history for any bubble (who changed what, when)
+
+### F05 – RAG Q&A
+- **F05.1** Users can ask natural language questions about any processed page or series
+- **F05.2** System retrieves the most relevant text chunks from pgvector using semantic similarity search
+- **F05.3** System generates an answer via Gemini API using retrieved chunks as context (RAG)
+- **F05.4** Response includes the answer text and source chunks for transparency
+- **F05.5** Q&A history is stored per user and paginated in the UI
+- **F05.6** Daily Q&A limit per user is controlled by app settings (`qa_daily_limit`, default: 50)
+
+### F06 – Series & Chapter Management
+- **F06.1** Users can create manga series with title, description, status (ongoing/completed/paused), tags (max 20), source and target languages, and a cover image
+- **F06.2** Users can create chapters within a series (chapter_number, title, description)
+- **F06.3** Users can assign processed pages to a chapter and set page ordering
+- **F06.4** Users can reorder chapters and pages
+- **F06.5** System auto-generates a cover image from the first page thumbnail if none is provided
+- **F06.6** Series `updated_at` is auto-bumped when chapters or pages are modified
+
+### F07 – History
+- **F07.1** Users can view a paginated history of all processed pages and series
+- **F07.2** History items include thumbnail, status, title, and last accessed timestamp
+- **F07.3** History supports filtering and pagination (limit + offset)
+
+### F08 – Credit & Subscription System
+- **F08.1** All users start on the `free` plan (150 monthly credits, 5 daily top-up)
+- **F08.2** Four plan tiers: free, basic, pro, premium (differing in monthly/daily credits and batch size)
+- **F08.3** Each image upload costs 1 credit; system rejects uploads if balance is insufficient
+- **F08.4** Daily free credits are automatically topped up via a scheduled trigger
+- **F08.5** Users can view their current balance, plan info, and last 10 transactions
+- **F08.6** Admin can manually grant credits to any user
+- **F08.7** All credit events are recorded in an append-only transaction ledger
+
+### F09 – Admin Dashboard
+- **F09.1** Admin can view analytics: daily new users, pages uploaded, Q&A activity (time-series)
+- **F09.2** Admin can view top users by pages or Q&A activity
+- **F09.3** Admin can view page processing status breakdown
+- **F09.4** Admin can list, search, and manage user accounts (view profile, ban, modify plan/credits)
+- **F09.5** Admin can view and moderate uploaded content
+- **F09.6** Admin can monitor system health (AI worker status, Supabase connectivity)
+- **F09.7** Admin can view a paginated audit log of all admin actions
+- **F09.8** Admin can modify app settings (registration toggle, maintenance mode, upload limits, Q&A limits)
 
 ---
 
-## 3. Functional Requirements
+## 3. Non-Functional Requirements
 
-### 3.1 Module Xử lý Ảnh (Image Processing)
-- **REQ-1.1:** Hệ thống phải phát hiện được các speech bubble trong ảnh manga với độ chính xác mAP >= 90%.
-- **REQ-1.2:** Hệ thống phải trích xuất được văn bản tiếng Nhật từ các bubble đã phát hiện (CER <= 5%).
-- **REQ-1.3:** Hệ thống phải lưu trữ tọa độ (x, y, w, h) của từng bubble để phục vụ overlay.
+### 3.1 Performance
+- UI interactive response: < 3 seconds
+- Single-page AI processing: < 30 seconds
+- Batch upload (10 images) enqueued: < 5 seconds
+- Q&A response: < 10 seconds
+- API rate limiting via SlowAPI (configurable per endpoint)
 
-### 3.2 Module Dịch thuật (Translation)
-- **REQ-2.1:** Hệ thống phải gửi văn bản gốc kèm ngữ cảnh (context) và glossary (nếu có) tới LLM.
-- **REQ-2.2:** Bản dịch phải tự nhiên, phù hợp với văn phong manga và giữ đúng đại từ xưng hô.
-- **REQ-2.3:** Hỗ trợ xử lý lỗi khi API dịch gặp sự cố hoặc hết quota.
+### 3.2 Scalability
+- Backend is horizontally scalable via Docker containers on Render
+- AI Worker runs on HuggingFace Spaces (separate from API server)
+- BoundedSemaphore limits concurrent AI pipeline threads to prevent OOM
 
-### 3.3 Module RAG Q&A
-- **REQ-3.1:** Hệ thống phải phân tách văn bản (chunking) và lưu vào Vector Database.
-- **REQ-3.2:** Khi người dùng đặt câu hỏi, hệ thống phải tìm kiếm các đoạn văn bản liên quan nhất.
-- **REQ-3.3:** Câu trả lời phải dựa trên dữ liệu thực tế từ truyện, không được "bịa" thông tin (hallucination).
+### 3.3 Availability
+- Frontend served from Vercel's global CDN (high availability)
+- Backend on Render free tier has cold starts (30–60s); frontend auto-retries with backoff
+- AI Worker on HuggingFace may cold-start; keep-alive workflow pings it periodically
 
-### 3.4 Module Giao diện (UI/UX)
-- **REQ-4.1:** Reader phải hỗ trợ bật/tắt lớp overlay bản dịch.
-- **REQ-4.2:** Hiển thị tiến độ xử lý (progress bar) cho từng bước: Upload -> OCR -> Translate.
-- **REQ-4.3:** Hỗ trợ xem lại lịch sử dịch theo session hoặc tài khoản.
+### 3.4 Security
+- Authentication via HTTP-only cookies (no token exposure to JavaScript)
+- RBAC: `user` and `admin` roles enforced at API layer
+- RLS policies on all user data tables in Supabase
+- Input validation on all endpoints (file types, sizes, string lengths)
+- Rate limiting on sensitive endpoints (register, login, upload)
+- No secrets hardcoded; all via environment variables
+
+### 3.5 Data Integrity
+- Credit transactions use an append-only ledger (never modified after insertion)
+- Stale pipeline pages are auto-marked `failed` on backend restart
+- Unique constraints on chapter numbers within a series
+
+### 3.6 Usability
+- UI supports Vietnamese as the primary language for target users
+- Progress indicators for AI processing (0–100%)
+- Toast notifications for errors and success states
+- Framer Motion animations for page transitions
+
+### 3.7 File Constraints
+- Supported image formats: JPG, PNG, WebP
+- Max file size per image: 10 MB (configurable in app_settings)
+- Max batch size: 5 (free), 20 (basic), 50 (pro), 100 (premium)
 
 ---
 
-## 4. Non-Functional Requirements
+## 4. External Interfaces
 
-### 4.1 Performance
-- Thời gian phản hồi UI < 3 giây.
-- Xử lý một trang đơn lẻ (OCR + Dịch) không quá 30 giây (tùy thuộc vào tốc độ API).
+### 4.1 Google Gemini API
+- Used for: translation and Q&A answer generation
+- Model: `gemini-2.5-flash`
+- Multi-key rotation on quota exhaustion (comma-separated `GEMINI_API_KEY`)
 
-### 4.2 Scalability
-- Hệ thống có thể mở rộng để hỗ trợ nhiều người dùng đồng thời bằng cách sử dụng hàng đợi (Queue) cho các tác vụ AI nặng.
+### 4.2 Supabase
+- Services used: PostgreSQL (data), pgvector (embeddings), Storage (images), Auth (users)
+- Access: service-role key from backend; anon key for direct client access where permitted
 
-### 4.3 Security
-- Không lưu trữ API Key ở phía Client.
-- Kiểm tra định dạng và dung lượng file upload (tối đa 10MB/ảnh).
+### 4.3 HuggingFace Spaces
+- Hosts AI Worker (Manga-OCR, YOLOv8, inpainting, translation rendering)
+- Accessed via HTTP from FastAPI backend; supports optional bearer token auth
 
-### 4.4 Reliability
-- Hệ thống phải có cơ chế retry khi gọi API thất bại.
-- Nếu một file trong batch bị lỗi, các file khác vẫn phải được xử lý bình thường.
+### 4.4 Vercel
+- Hosts Next.js frontend; auto-deploys on push to `main`
 
----
-
-## 5. Use Case Diagrams & Descriptions
-*(Chi tiết các Use Case đã được mô tả sơ bộ trong Vision Document và sẽ được cụ thể hóa trong tài liệu thiết kế chi tiết)*.
+### 4.5 Render.com
+- Hosts FastAPI backend as Docker container; auto-deploys via `render.yaml`

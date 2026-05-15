@@ -1,201 +1,334 @@
 # Database Schema - StoryLens
 
-## 1. Introduction
-### 1.1 Purpose
-Tài liệu này mô tả cấu trúc cơ sở dữ liệu cho hệ thống StoryLens, bao gồm các bảng, trường, kiểu dữ liệu, khóa chính, khóa ngoại và mối quan hệ giữa các bảng. Mục tiêu là cung cấp một bản thiết kế rõ ràng cho việc triển khai và quản lý cơ sở dữ liệu.
+## 1. Overview
 
-### 1.2 Scope
-Schema này bao gồm các bảng cần thiết để lưu trữ thông tin về người dùng, manga pages, dữ liệu xử lý (OCR, dịch), lịch sử và các thông tin liên quan đến RAG Q&A.
+**Database:** PostgreSQL via Supabase
+**Extensions:** `pgvector` (384-dimension embeddings), `uuid-ossp` (UUID generation)
+**Security Model:** Row-Level Security (RLS) enabled on all user data tables. The backend uses the Supabase service-role key to bypass RLS; ownership is enforced in application code.
 
 ---
 
-## 2. Entity-Relationship Diagram (Conceptual)
+## 2. Entity Relationship Summary
 
-```mermaid
-erDiagram
-    USER ||--o{ SESSION : has
-    USER ||--o{ MANGA_SERIES : creates
-    MANGA_SERIES ||--o{ MANGA_CHAPTER : contains
-    MANGA_CHAPTER ||--o{ MANGA_PAGE : contains
-    MANGA_PAGE ||--o{ BUBBLE_DATA : has
-    MANGA_PAGE ||--o{ QA_HISTORY : has
-    BUBBLE_DATA ||--o{ TRANSLATION_HISTORY : has
-    MANGA_PAGE ||--o{ PAGE_METADATA : has
-
-    USER { 
-        VARCHAR user_id PK
-        VARCHAR username
-        VARCHAR email
-        TIMESTAMP created_at
-    }
-    SESSION { 
-        VARCHAR session_id PK
-        VARCHAR user_id FK
-        TIMESTAMP created_at
-        TIMESTAMP expires_at
-    }
-    MANGA_SERIES { 
-        VARCHAR series_id PK
-        VARCHAR user_id FK
-        VARCHAR title
-        VARCHAR description
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
-    }
-    MANGA_CHAPTER { 
-        VARCHAR chapter_id PK
-        VARCHAR series_id FK
-        INT chapter_number
-        VARCHAR title
-        TIMESTAMP created_at
-    }
-    MANGA_PAGE { 
-        VARCHAR page_id PK
-        VARCHAR chapter_id FK
-        INT page_number
-        VARCHAR original_image_url
-        VARCHAR thumbnail_url
-        VARCHAR status
-        TIMESTAMP uploaded_at
-        TIMESTAMP processed_at
-    }
-    PAGE_METADATA { 
-        VARCHAR page_id PK, FK
-        VARCHAR ocr_model_version
-        VARCHAR translation_model_version
-        FLOAT ocr_confidence_avg
-        FLOAT translation_bleu_score
-    }
-    BUBBLE_DATA { 
-        VARCHAR bubble_id PK
-        VARCHAR page_id FK
-        INT x
-        INT y
-        INT width
-        INT height
-        VARCHAR original_text_jp
-        FLOAT ocr_confidence
-    }
-    TRANSLATION_HISTORY { 
-        VARCHAR translation_id PK
-        VARCHAR bubble_id FK
-        VARCHAR translated_text_vi
-        TIMESTAMP translated_at
-        VARCHAR llm_model_used
-    }
-    QA_HISTORY { 
-        VARCHAR qa_id PK
-        VARCHAR page_id FK
-        VARCHAR user_question
-        VARCHAR ai_answer
-        TIMESTAMP asked_at
-    }
+```
+profiles (1) ──────────────── (N) manga_series
+manga_series (1) ──────────── (N) manga_chapters
+manga_chapters (1) ─────────── (N) manga_pages
+manga_pages (1) ────────────── (1) page_metadata
+manga_pages (1) ────────────── (N) bubble_data
+bubble_data (1) ─────────────── (N) translation_history
+manga_pages (1) ────────────── (N) qa_history
+manga_pages (1) ────────────── (N) embeddings
+profiles (1) ──────────────── (1) user_subscriptions
+profiles (1) ──────────────── (N) credit_transactions
+subscription_plans (1) ──────── (N) user_subscriptions
+admin_audit_log (N) ─────────── (1) profiles (actor)
 ```
 
 ---
 
-## 3. Table Descriptions
+## 3. Core Tables
 
-### 3.1 `USER` Table
-Lưu trữ thông tin người dùng.
+### 3.1 `profiles`
+Extends Supabase Auth `auth.users`. Created automatically on registration.
 
-| Tên trường | Kiểu dữ liệu | Mô tả | Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `user_id` | `VARCHAR(36)` | ID duy nhất của người dùng | PRIMARY KEY |
-| `username` | `VARCHAR(50)` | Tên đăng nhập | UNIQUE, NOT NULL |
-| `email` | `VARCHAR(100)` | Địa chỉ email | UNIQUE, NOT NULL |
-| `created_at` | `TIMESTAMP` | Thời gian tạo tài khoản | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | `uuid` | PK, FK → `auth.users.id` | Matches Supabase Auth user ID |
+| `username` | `text` | UNIQUE, NOT NULL | 3–32 chars, alphanumeric + underscore |
+| `email` | `text` | UNIQUE, NOT NULL | User email (mirrors auth.users) |
+| `role` | `text` | DEFAULT `'user'` | `'user'` or `'admin'` |
+| `full_name` | `text` | nullable | Display full name |
+| `display_name` | `text` | nullable | Short display name |
+| `avatar_url` | `text` | nullable | URL to profile picture in Supabase Storage |
+| `bio` | `text` | nullable | User biography |
+| `locale` | `text` | nullable | Preferred UI language (`vi`, `en`, `ja`, `zh`, `ko`) |
+| `timezone` | `text` | nullable | IANA timezone string |
+| `date_of_birth` | `date` | nullable | — |
+| `gender` | `text` | nullable | `male`, `female`, `other`, `prefer_not_to_say` |
+| `country` | `text` | nullable | ISO country code |
+| `phone` | `text` | nullable | 6–20 chars |
+| `preferred_target_lang` | `text` | nullable | Default translation target (`VIN`, `ENG`, etc.) |
+| `plan_tier` | `text` | DEFAULT `'free'` | `free`, `basic`, `pro`, `premium` |
+| `credits_balance` | `integer` | DEFAULT `0` | Current credit balance |
+| `daily_credits_reset_at` | `timestamptz` | nullable | Next daily top-up timestamp |
+| `last_seen_at` | `timestamptz` | nullable | Last API activity |
+| `created_at` | `timestamptz` | DEFAULT `now()` | Registration time |
+| `updated_at` | `timestamptz` | DEFAULT `now()` | Last profile update |
 
-### 3.2 `SESSION` Table
-Lưu trữ thông tin phiên làm việc của người dùng.
+---
 
-| Tên trường | Kiểu dữ liệu | Mô tả | Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `session_id` | `VARCHAR(36)` | ID duy nhất của phiên | PRIMARY KEY |
-| `user_id` | `VARCHAR(36)` | ID người dùng | FOREIGN KEY (`USER.user_id`) |
-| `created_at` | `TIMESTAMP` | Thời gian tạo phiên | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
-| `expires_at` | `TIMESTAMP` | Thời gian hết hạn phiên | NOT NULL |
+### 3.2 `manga_series`
+Manga series owned by a user.
 
-### 3.3 `MANGA_SERIES` Table
-Lưu trữ thông tin về các series manga do người dùng tạo.
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `series_id` | `uuid` | PK, DEFAULT `gen_random_uuid()` | — |
+| `user_id` | `uuid` | FK → `profiles.id`, NOT NULL | Owner |
+| `title` | `text` | NOT NULL | 1–200 chars |
+| `description` | `text` | nullable | Up to 5000 chars |
+| `cover_image_url` | `text` | nullable | URL in `series-covers` bucket |
+| `status` | `text` | DEFAULT `'ongoing'` | `ongoing`, `completed`, `paused` |
+| `tags` | `text[]` | nullable | Max 20 tags, max 32 chars each, lowercase |
+| `source_language` | `text` | nullable | e.g., `JPN` |
+| `target_language` | `text` | nullable | e.g., `VIN` |
+| `created_at` | `timestamptz` | DEFAULT `now()` | — |
+| `updated_at` | `timestamptz` | DEFAULT `now()` | Auto-bumped when chapters/pages are added |
 
-| Tên trường | Kiểu dữ liệu | Mô tả | Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `series_id` | `VARCHAR(36)` | ID duy nhất của series | PRIMARY KEY |
-| `user_id` | `VARCHAR(36)` | ID người dùng sở hữu series | FOREIGN KEY (`USER.user_id`) |
-| `title` | `VARCHAR(255)` | Tiêu đề series | NOT NULL |
-| `description` | `TEXT` | Mô tả series | |
-| `created_at` | `TIMESTAMP` | Thời gian tạo series | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
-| `updated_at` | `TIMESTAMP` | Thời gian cập nhật cuối cùng | NOT NULL, DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP |
+**Indexes:** `(user_id, updated_at DESC)`, GIN index on `tags`
 
-### 3.4 `MANGA_CHAPTER` Table
-Lưu trữ thông tin về các chapter trong một series manga.
+---
 
-| Tên trường | Kiểu dữ liệu | Mô tả | Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `chapter_id` | `VARCHAR(36)` | ID duy nhất của chapter | PRIMARY KEY |
-| `series_id` | `VARCHAR(36)` | ID series mà chapter thuộc về | FOREIGN KEY (`MANGA_SERIES.series_id`), NOT NULL |
-| `chapter_number` | `INT` | Số thứ tự của chapter | NOT NULL |
-| `title` | `VARCHAR(255)` | Tiêu đề chapter | |
-| `created_at` | `TIMESTAMP` | Thời gian tạo chapter | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
+### 3.3 `manga_chapters`
+Chapters within a series.
 
-### 3.5 `MANGA_PAGE` Table
-Lưu trữ thông tin về từng trang manga.
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `chapter_id` | `uuid` | PK, DEFAULT `gen_random_uuid()` | — |
+| `series_id` | `uuid` | FK → `manga_series.series_id`, NOT NULL | Parent series |
+| `chapter_number` | `integer` | NOT NULL | >= 1; unique per series |
+| `title` | `text` | NOT NULL | Chapter title |
+| `description` | `text` | nullable | Chapter description |
+| `created_at` | `timestamptz` | DEFAULT `now()` | — |
+| `updated_at` | `timestamptz` | DEFAULT `now()` | Auto-bumped when pages are reordered |
 
-| Tên trường | Kiểu dữ liệu | Mô tả | Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `page_id` | `VARCHAR(36)` | ID duy nhất của trang | PRIMARY KEY |
-| `chapter_id` | `VARCHAR(36)` | ID chapter mà trang thuộc về | FOREIGN KEY (`MANGA_CHAPTER.chapter_id`) |
-| `page_number` | `INT` | Số thứ tự của trang trong chapter | NOT NULL |
-| `original_image_url` | `VARCHAR(255)` | URL ảnh gốc | NOT NULL |
-| `thumbnail_url` | `VARCHAR(255)` | URL ảnh thumbnail | |
-| `status` | `VARCHAR(50)` | Trạng thái xử lý (pending, ocr_failed, translated, completed) | NOT NULL |
-| `uploaded_at` | `TIMESTAMP` | Thời gian tải lên | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
-| `processed_at` | `TIMESTAMP` | Thời gian xử lý hoàn tất | |
+**Constraints:** `UNIQUE (series_id, chapter_number)`
 
-### 3.6 `PAGE_METADATA` Table
-Lưu trữ các thông tin metadata liên quan đến quá trình xử lý AI của từng trang.
+---
 
-| Tên trường | Kiểu dữ liệu | Mô tả | Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `page_id` | `VARCHAR(36)` | ID của trang | PRIMARY KEY, FOREIGN KEY (`MANGA_PAGE.page_id`) |
-| `ocr_model_version` | `VARCHAR(50)` | Phiên bản model OCR đã dùng | |
-| `translation_model_version` | `VARCHAR(50)` | Phiên bản model dịch đã dùng | |
-| `ocr_confidence_avg` | `FLOAT` | Độ tin cậy trung bình của OCR | |
-| `translation_bleu_score` | `FLOAT` | Điểm BLEU của bản dịch (nếu có) | |
+### 3.4 `manga_pages`
+Individual manga pages (uploaded images).
 
-### 3.7 `BUBBLE_DATA` Table
-Lưu trữ dữ liệu về từng bubble thoại trên trang manga.
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `page_id` | `uuid` | PK, DEFAULT `gen_random_uuid()` | — |
+| `user_id` | `uuid` | FK → `profiles.id`, NOT NULL | Owner |
+| `chapter_id` | `uuid` | FK → `manga_chapters.chapter_id`, nullable | `null` = orphan page (batch only) |
+| `batch_id` | `uuid` | nullable | Groups pages uploaded together |
+| `page_number` | `integer` | nullable | Order within chapter |
+| `original_image_url` | `text` | nullable | URL in originals storage bucket |
+| `translated_image_url` | `text` | nullable | URL to inpainted + rendered image |
+| `thumbnail_url` | `text` | nullable | URL to generated thumbnail |
+| `status` | `text` | DEFAULT `'pending'` | See status enum below |
+| `progress` | `integer` | DEFAULT `0` | 0–100, processing progress |
+| `error` | `text` | nullable | Error message if status = `failed` |
+| `uploaded_at` | `timestamptz` | DEFAULT `now()` | — |
+| `processed_at` | `timestamptz` | nullable | Completion time |
 
-| Tên trường | Kiểu dữ liệu | Mô tả | Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `bubble_id` | `VARCHAR(36)` | ID duy nhất của bubble | PRIMARY KEY |
-| `page_id` | `VARCHAR(36)` | ID trang mà bubble thuộc về | FOREIGN KEY (`MANGA_PAGE.page_id`), NOT NULL |
-| `x` | `INT` | Tọa độ X của bubble | NOT NULL |
-| `y` | `INT` | Tọa độ Y của bubble | NOT NULL |
-| `width` | `INT` | Chiều rộng của bubble | NOT NULL |
-| `height` | `INT` | Chiều cao của bubble | NOT NULL |
-| `original_text_jp` | `TEXT` | Văn bản tiếng Nhật gốc trong bubble | |
-| `ocr_confidence` | `FLOAT` | Độ tin cậy của OCR cho bubble này | |
+**Status Enum:** `pending` → `ocr_running` → (`ocr_failed` \| `translating`) → `translated` → `completed` \| `failed`
 
-### 3.8 `TRANSLATION_HISTORY` Table
-Lưu trữ lịch sử các bản dịch cho từng bubble.
+**RLS:** Users can only SELECT/UPDATE their own pages. Inserts/Deletes use service-role.
 
-| Tên trường | Kiểu dữ liệu | Mô tả | Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `translation_id` | `VARCHAR(36)` | ID duy nhất của bản dịch | PRIMARY KEY |
-| `bubble_id` | `VARCHAR(36)` | ID bubble được dịch | FOREIGN KEY (`BUBBLE_DATA.bubble_id`), NOT NULL |
-| `translated_text_vi` | `TEXT` | Văn bản đã dịch sang tiếng Việt | |
-| `translated_at` | `TIMESTAMP` | Thời gian dịch | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
-| `llm_model_used` | `VARCHAR(50)` | Model LLM đã dùng để dịch | |
+---
 
-### 3.9 `QA_HISTORY` Table
-Lưu trữ lịch sử các câu hỏi và trả lời RAG Q&A.
+### 3.5 `page_metadata`
+AI model versions and confidence scores for a processed page.
 
-| Tên trường | Kiểu dữ liệu | Mô tả | Ràng buộc |
-| :--- | :--- | :--- | :--- |
-| `qa_id` | `VARCHAR(36)` | ID duy nhất của phiên Q&A | PRIMARY KEY |
-| `page_id` | `VARCHAR(36)` | ID trang liên quan (nếu có) | FOREIGN KEY (`MANGA_PAGE.page_id`) |
-| `user_question` | `TEXT` | Câu hỏi của người dùng | NOT NULL |
-| `ai_answer` | `TEXT` | Câu trả lời của AI | |
-| `asked_at` | `TIMESTAMP` | Thời gian hỏi | NOT NULL, DEFAULT CURRENT_TIMESTAMP |
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `metadata_id` | `uuid` | PK | — |
+| `page_id` | `uuid` | FK → `manga_pages.page_id`, UNIQUE | One record per page |
+| `ocr_model_version` | `text` | nullable | e.g., `manga-ocr-0.1.0` |
+| `translation_model_version` | `text` | nullable | e.g., `gemini-2.5-flash` |
+| `avg_ocr_confidence` | `float` | nullable | Average bubble OCR confidence |
+| `avg_translation_confidence` | `float` | nullable | Average translation confidence |
+| `created_at` | `timestamptz` | DEFAULT `now()` | — |
+
+---
+
+### 3.6 `bubble_data`
+Speech bubbles detected on a page.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `bubble_id` | `uuid` | PK | — |
+| `page_id` | `uuid` | FK → `manga_pages.page_id`, NOT NULL | Parent page |
+| `x` | `float` | NOT NULL | Bounding box left edge (pixels) |
+| `y` | `float` | NOT NULL | Bounding box top edge (pixels) |
+| `width` | `float` | NOT NULL | Bounding box width (pixels) |
+| `height` | `float` | NOT NULL | Bounding box height (pixels) |
+| `original_text_jp` | `text` | nullable | Raw Japanese text from OCR |
+| `ocr_confidence` | `float` | nullable | 0.0–1.0 confidence score |
+| `created_at` | `timestamptz` | DEFAULT `now()` | — |
+
+**RLS:** Users can SELECT their own bubbles (via page → user ownership).
+
+---
+
+### 3.7 `translation_history`
+Audit trail of all translations per bubble (AI-generated and manual edits).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `translation_id` | `uuid` | PK | — |
+| `bubble_id` | `uuid` | FK → `bubble_data.bubble_id`, NOT NULL | Parent bubble |
+| `translated_text` | `text` | NOT NULL | Vietnamese (or target language) translation |
+| `llm_model_used` | `text` | nullable | Model that produced the translation |
+| `user_id` | `uuid` | FK → `profiles.id`, nullable | Non-null if manually edited by user |
+| `translated_at` | `timestamptz` | DEFAULT `now()` | — |
+
+---
+
+### 3.8 `qa_history`
+Questions asked by users about manga content, with AI answers.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `qa_id` | `uuid` | PK | — |
+| `user_id` | `uuid` | FK → `profiles.id`, NOT NULL | Questioner |
+| `page_id` | `uuid` | FK → `manga_pages.page_id`, nullable | Specific page context |
+| `series_id` | `uuid` | FK → `manga_series.series_id`, nullable | Series-level context |
+| `question` | `text` | NOT NULL | User's question (1–2000 chars) |
+| `answer` | `text` | NOT NULL | AI-generated answer |
+| `source_chunks` | `jsonb` | nullable | Source text chunks used for answer |
+| `asked_at` | `timestamptz` | DEFAULT `now()` | — |
+
+**RLS:** Users can only SELECT their own Q&A history.
+
+---
+
+### 3.9 `embeddings`
+pgvector embeddings for RAG semantic search.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `embedding_id` | `uuid` | PK | — |
+| `page_id` | `uuid` | FK → `manga_pages.page_id`, NOT NULL | Source page |
+| `series_id` | `uuid` | FK → `manga_series.series_id`, nullable | Parent series (for series-level search) |
+| `chunk_text` | `text` | NOT NULL | Text chunk that was embedded |
+| `embedding` | `vector(384)` | NOT NULL | all-MiniLM-L6-v2 embedding |
+| `created_at` | `timestamptz` | DEFAULT `now()` | — |
+
+**RPC:** `match_embeddings(query_embedding, match_threshold, match_count, filter_page_id, filter_series_id)` — returns ranked chunks by cosine similarity.
+
+**RLS:** Users can SELECT embeddings for pages they own.
+
+---
+
+## 4. Credit & Subscription Tables
+
+### 4.1 `subscription_plans`
+Read-only plan definitions.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | `text` | PK: `free`, `basic`, `pro`, `premium` |
+| `name` | `text` | Display name |
+| `price_vnd` | `integer` | Monthly price in Vietnamese Dong (0 = free) |
+| `monthly_credits` | `integer` | Credits granted on subscription/renewal |
+| `daily_credits` | `integer` | Free daily top-up credits |
+| `max_batch_size` | `integer` | Max images per upload batch |
+| `priority_weight` | `integer` | AI queue priority |
+| `bonus_credits` | `integer` | One-time bonus on first subscription |
+| `sort_order` | `integer` | UI display order |
+
+**Current Plan Data:**
+
+| Plan | Price (VND) | Monthly Credits | Daily Credits | Max Batch |
+|------|------------|----------------|--------------|-----------|
+| free | 0 | 150 | 5 | 5 |
+| basic | 49,000 | 300 | 20 | 20 |
+| pro | 99,000 | 1,000 | 50 | 50 |
+| premium | 249,000 | 3,000 | 100 | 100 |
+
+---
+
+### 4.2 `user_subscriptions`
+Active subscription per user.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | `uuid` | PK |
+| `user_id` | `uuid` | FK → `profiles.id`, UNIQUE (one active sub per user) |
+| `plan_id` | `text` | FK → `subscription_plans.id` |
+| `status` | `text` | `active`, `cancelled`, `expired` |
+| `started_at` | `timestamptz` | Subscription start |
+| `expires_at` | `timestamptz` | nullable — null = forever (free plan) |
+| `bonus_credits_given` | `boolean` | Whether one-time bonus was applied |
+| `updated_at` | `timestamptz` | Last status change |
+
+**Trigger:** New user registration automatically creates a `free` subscription record.
+
+---
+
+### 4.3 `credit_transactions`
+Append-only ledger. Never updated or deleted.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | `uuid` | PK |
+| `user_id` | `uuid` | FK → `profiles.id`, NOT NULL |
+| `amount` | `integer` | Positive = credit added, Negative = credit deducted |
+| `type` | `text` | `daily_reset`, `upload`, `qa`, `bonus`, `admin_grant`, `purchase`, `subscription` |
+| `reference_id` | `uuid` | nullable — references page_id, qa_id, etc. |
+| `note` | `text` | nullable — human-readable description |
+| `created_at` | `timestamptz` | DEFAULT `now()` |
+
+---
+
+## 5. Admin Tables
+
+### 5.1 `admin_audit_log`
+Immutable record of all admin actions.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | `uuid` | PK |
+| `actor_id` | `uuid` | FK → `profiles.id` — admin who performed the action |
+| `actor_email` | `text` | Snapshot of admin email at action time |
+| `action` | `text` | Action type (e.g., `ban_user`, `grant_credits`, `delete_content`) |
+| `target_type` | `text` | nullable — entity type affected (`user`, `page`, `series`) |
+| `target_id` | `text` | nullable — ID of affected entity |
+| `summary` | `text` | Human-readable description |
+| `metadata` | `jsonb` | nullable — additional context |
+| `ip_address` | `text` | nullable — admin client IP |
+| `user_agent` | `text` | nullable — admin browser UA |
+| `created_at` | `timestamptz` | DEFAULT `now()` |
+
+---
+
+### 5.2 `app_settings`
+Runtime-mutable feature flags and configuration.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `key` | `text` | PK — setting name |
+| `value` | `text` | Setting value (stored as text, parsed in code) |
+| `description` | `text` | nullable — human-readable description |
+| `updated_at` | `timestamptz` | Last change |
+| `updated_by` | `uuid` | FK → `profiles.id` — last admin who changed it |
+
+**Default Settings:**
+
+| Key | Default Value | Description |
+|-----|--------------|-------------|
+| `registration_enabled` | `true` | Allow new registrations |
+| `maintenance_mode` | `false` | Show maintenance banner |
+| `max_upload_size_mb` | `10` | Max image file size |
+| `default_target_lang` | `VIN` | Default translation target language |
+| `qa_daily_limit` | `50` | Max Q&A queries per user per day |
+| `upload_daily_limit` | `20` | Max uploads per user per day |
+
+---
+
+## 6. Analytics RPCs
+
+Supabase SQL functions for admin analytics queries:
+
+| Function | Parameters | Returns |
+|----------|-----------|---------|
+| `admin_daily_activity(days)` | Number of days to look back | Daily time-series: new users, pages uploaded, Q&A count |
+| `admin_top_users(metric, max_rows)` | `metric` = `pages` or `qa` | Users ranked by activity |
+| `admin_status_breakdown()` | — | Page count by processing status |
+| `admin_target_lang_breakdown()` | — | User count by preferred target language |
+
+---
+
+## 7. Storage Buckets
+
+| Bucket | Access | Contents |
+|--------|--------|---------|
+| `manga-originals` | Private (service-role only) | Raw uploaded manga images |
+| `manga-thumbnails` | Private (service-role only) | Auto-generated page thumbnails |
+| `avatars` | Public | User profile pictures |
+| `series-covers` | Public | Series cover images |
