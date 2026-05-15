@@ -1,100 +1,50 @@
 "use client";
 import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { Icon } from "./Icons";
 
-export function StarRating({
-  value,
-  onChange,
-  size = 14,
-  readOnly = false,
-  showClear = true,
-  ariaLabel = "Đánh giá bộ truyện",
-}: {
-  value: number;
-  onChange?: (rating: number) => void;
+interface StarRatingProps {
+  rating: number;
+  onChange?: (r: number) => void;
   size?: number;
-  readOnly?: boolean;
-  showClear?: boolean;
-  ariaLabel?: string;
-}) {
-  const [hover, setHover] = useState<number | null>(null);
-  const display = hover ?? value;
-  const interactive = !readOnly && !!onChange;
+  readonly?: boolean;
+}
+
+export function StarRating({ rating, onChange, size = 18, readonly = false }: StarRatingProps) {
+  const [hover, setHover] = useState(0);
+  const display = hover || rating;
 
   return (
     <div
-      role={interactive ? "radiogroup" : undefined}
-      aria-label={ariaLabel}
-      style={{ display: "inline-flex", alignItems: "center", gap: 2 }}
-      onMouseLeave={() => setHover(null)}
+      style={{ display: "inline-flex", gap: 2, lineHeight: 1 }}
+      onMouseLeave={() => !readonly && setHover(0)}
+      aria-label={`Xếp hạng ${rating}/5 sao`}
     >
-      {[1, 2, 3, 4, 5].map(i => {
-        const filled = display >= i;
-        if (interactive) {
-          return (
-            <motion.button
-              key={i}
-              type="button"
-              whileHover={{ scale: 1.15 }}
-              whileTap={{ scale: 0.92 }}
-              onMouseEnter={() => setHover(i)}
-              onClick={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                onChange?.(value === i ? 0 : i);
-              }}
-              role="radio"
-              aria-checked={value === i}
-              aria-label={`${i} sao`}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 1,
-                cursor: "pointer",
-                color: filled ? "var(--gold, #d6a52a)" : "var(--border-soft)",
-                display: "inline-flex",
-                lineHeight: 0,
-              }}
-            >
-              <Icon name={filled ? "star-fill" : "star"} size={size} />
-            </motion.button>
-          );
-        }
-        return (
-          <div
-            key={i}
-            style={{
-              color: filled ? "var(--gold, #d6a52a)" : "var(--border-soft)",
-              display: "inline-flex",
-              lineHeight: 0,
-              padding: 1,
-            }}
-          >
-            <Icon name={filled ? "star-fill" : "star"} size={size} />
-          </div>
-        );
-      })}
-      {interactive && showClear && value > 0 && (
-        <button
-          type="button"
-          onClick={e => { e.preventDefault(); e.stopPropagation(); onChange?.(0); }}
-          aria-label="Xoá đánh giá"
-          title="Xoá đánh giá"
+      {[1, 2, 3, 4, 5].map(n => (
+        <svg
+          key={n}
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill={n <= display ? "currentColor" : "none"}
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
           style={{
-            background: "none",
-            border: "none",
-            padding: 2,
-            marginLeft: 4,
-            cursor: "pointer",
-            color: "var(--muted)",
-            display: "inline-flex",
-            lineHeight: 0,
+            color: n <= display ? "#b58a3b" : "var(--border-soft)",
+            cursor: readonly ? "default" : "pointer",
+            transition: "color 0.1s, transform 0.1s",
+            transform: n <= display && !readonly ? "scale(1.15)" : "scale(1)",
           }}
+          onMouseEnter={() => !readonly && setHover(n)}
+          onClick={() => {
+            if (readonly || !onChange) return;
+            onChange(n === rating ? 0 : n);
+          }}
+          aria-label={`${n} sao`}
         >
-          <Icon name="x" size={size - 2} />
-        </button>
-      )}
+          <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+        </svg>
+      ))}
     </div>
   );
 }
