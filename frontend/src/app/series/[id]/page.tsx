@@ -180,7 +180,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
     <AnimatedPage>
       <div className="paper-grain" style={{ minHeight: "100vh" }}>
         <TopBar active="series" />
-        <div style={{ padding: "40px 56px", maxWidth: 1100, margin: "0 auto" }}>
+        <div className="page-shell" style={{ maxWidth: 1100, margin: "0 auto" }}>
           <Link href="/series" style={{ textDecoration: "none", display: "inline-block", marginBottom: 12 }}>
             <span style={{ fontSize: 12, color: "var(--muted)", display: "inline-flex", alignItems: "center", gap: 6 }}>
               <Icon name="arrow-left" size={11} /> Bộ truyện
@@ -219,12 +219,9 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
               {/* Header: cover + meta */}
               <FadeIn direction="up" distance={15}>
                 <div
-                  className="stroke-ink panel-shadow"
+                  className="stroke-ink panel-shadow series-header-grid"
                   style={{
                     background: "var(--panel)",
-                    display: "grid",
-                    gridTemplateColumns: "200px 1fr",
-                    gap: 24,
                     padding: 24,
                     marginBottom: 24,
                   }}

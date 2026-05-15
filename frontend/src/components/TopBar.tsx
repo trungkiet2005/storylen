@@ -16,7 +16,7 @@ export const Logo = ({ size = 22 }: { size?: number }) => (
       </svg>
       <div style={{ lineHeight: 1 }}>
         <div className="display" style={{ fontSize: size, letterSpacing: "-0.02em" }}>StoryLens</div>
-        <div className="caps-xs" style={{ color: "var(--muted)", marginTop: 3 }}>XÓA NHÒA RÀO CẢN NGÔN NGỮ</div>
+        <div className="caps-xs topbar-logo-sub" style={{ color: "var(--muted)", marginTop: 3 }}>XÓA NHÒA RÀO CẢN NGÔN NGỮ</div>
       </div>
     </div>
   </Link>
@@ -194,7 +194,21 @@ function UserMenu() {
 export const TopBar = ({ active, compact = false }: { active: string, compact?: boolean }) => {
   const [theme, setTheme] = useState("light");
   const [mounted, setMounted] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { isAdmin } = useAuth();
+
+  // Close mobile nav on route change
+  useEffect(() => { setMobileOpen(false); }, [active]);
+
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
 
   // Hydrate from localStorage on mount
   useEffect(() => {
@@ -226,57 +240,168 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
   ];
 
   return (
-    <header
-      role="banner"
-      style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: compact ? "10px 20px" : "14px 28px",
-        borderBottom: "2px solid var(--border)",
-        background: "var(--panel)",
-        position: "sticky", top: 0, zIndex: 100,
-        backdropFilter: "blur(12px)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <Logo />
-        <nav aria-label="Main navigation" style={{ display: "flex", gap: 2, marginLeft: 20 }}>
-          {items.map(it => (
-            <Link href={it.href} key={it.id} style={{ textDecoration: 'none' }}>
-              <div
-                className="tab"
-                data-active={active === it.id}
-                role="link"
-                aria-current={active === it.id ? "page" : undefined}
-                style={{ cursor: 'pointer' }}
-              >
-                <Icon name={it.icon} size={14} aria-hidden="true" />
-                <span className="nav-label">{it.label}</span>
-              </div>
-            </Link>
-          ))}
-        </nav>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {/* Credit badge — only for logged-in users */}
-        {mounted && <CreditBadge />}
-
-        {/* Theme toggle: light → dark → sepia → light */}
-        {mounted && (
+    <>
+      <header
+        role="banner"
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: compact ? "10px 20px" : "12px clamp(16px, 3vw, 28px)",
+          borderBottom: "2px solid var(--border)",
+          background: "var(--panel)",
+          position: "sticky", top: 0, zIndex: 100,
+          backdropFilter: "blur(12px)",
+          gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          {/* Hamburger — visible only on mobile (<640px) via CSS */}
           <button
-            className="btn btn-sm btn-ghost"
-            onClick={toggleTheme}
-            aria-label="Đổi giao diện"
-            title={theme === "light" ? "Dark mode" : theme === "dark" ? "Sepia mode" : "Light mode"}
-            style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.02em" }}
+            className="topbar-hamburger"
+            onClick={() => setMobileOpen(v => !v)}
+            aria-label={mobileOpen ? "Đóng menu" : "Mở menu"}
+            aria-expanded={mobileOpen}
           >
-            {theme === "dark" ? <Icon name="sun" size={15}/> : theme === "sepia" ? <Icon name="leaf" size={15}/> : <Icon name="moon" size={15}/>}
+            <Icon name={mobileOpen ? "x" : "menu"} size={18} />
           </button>
-        )}
 
-        {/* Auth: login buttons or user menu */}
-        {mounted && <UserMenu />}
-      </div>
-    </header>
+          <Logo />
+
+          {/* Desktop nav — hidden on mobile via CSS */}
+          <nav aria-label="Main navigation" className="topbar-desktop-nav" style={{ marginLeft: 12 }}>
+            {items.map(it => (
+              <Link href={it.href} key={it.id} style={{ textDecoration: 'none' }}>
+                <div
+                  className="tab"
+                  data-active={active === it.id}
+                  role="link"
+                  aria-current={active === it.id ? "page" : undefined}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Icon name={it.icon} size={14} aria-hidden="true" />
+                  <span className="nav-label">{it.label}</span>
+                </div>
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {mounted && <CreditBadge />}
+
+          {mounted && (
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={toggleTheme}
+              aria-label="Đổi giao diện"
+              title={theme === "light" ? "Dark mode" : theme === "dark" ? "Sepia mode" : "Light mode"}
+              style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.02em" }}
+            >
+              {theme === "dark" ? <Icon name="sun" size={15}/> : theme === "sepia" ? <Icon name="leaf" size={15}/> : <Icon name="moon" size={15}/>}
+            </button>
+          )}
+
+          {mounted && <UserMenu />}
+        </div>
+      </header>
+
+      {/* ── Mobile full-screen nav drawer ─────────────────────────────────── */}
+      {mobileOpen && (
+        <div
+          role="dialog"
+          aria-label="Menu điều hướng"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "var(--panel)",
+            zIndex: 150,
+            display: "flex",
+            flexDirection: "column",
+            overflowY: "auto",
+            animation: "slideInLeft 0.18s ease",
+          }}
+        >
+          {/* Drawer header */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "12px 20px",
+              borderBottom: "2px solid var(--border)",
+              position: "sticky",
+              top: 0,
+              background: "var(--panel)",
+              zIndex: 1,
+            }}
+          >
+            <Logo />
+            <button
+              className="topbar-hamburger"
+              style={{ display: "flex" }}
+              onClick={() => setMobileOpen(false)}
+              aria-label="Đóng menu"
+            >
+              <Icon name="x" size={18} />
+            </button>
+          </div>
+
+          {/* Nav items */}
+          <nav aria-label="Mobile navigation" style={{ padding: "12px 8px", flex: 1 }}>
+            {items.map(it => (
+              <Link
+                href={it.href}
+                key={it.id}
+                style={{ textDecoration: "none" }}
+                onClick={() => setMobileOpen(false)}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "14px 20px",
+                    fontSize: 15,
+                    fontWeight: active === it.id ? 700 : 500,
+                    color: active === it.id ? "var(--accent)" : "var(--fg-soft)",
+                    borderLeft: active === it.id ? "3px solid var(--accent)" : "3px solid transparent",
+                    background: active === it.id ? "var(--bg-2)" : "transparent",
+                    borderRadius: "0 var(--radius) var(--radius) 0",
+                    marginBottom: 2,
+                    cursor: "pointer",
+                    transition: "background 0.1s, color 0.1s",
+                  }}
+                >
+                  <Icon name={it.icon} size={18} />
+                  {it.label}
+                </div>
+              </Link>
+            ))}
+          </nav>
+
+          {/* Bottom: theme + user section */}
+          <div
+            style={{
+              padding: "16px 20px",
+              borderTop: "2px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            {mounted && (
+              <button
+                className="btn btn-sm"
+                onClick={toggleTheme}
+                aria-label="Đổi giao diện"
+                style={{ fontSize: 13 }}
+              >
+                {theme === "dark" ? <><Icon name="sun" size={14}/> Light</> : theme === "sepia" ? <><Icon name="leaf" size={14}/> Light</> : <><Icon name="moon" size={14}/> Dark</>}
+              </button>
+            )}
+            {mounted && <UserMenu />}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

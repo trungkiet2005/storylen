@@ -115,7 +115,7 @@ export default function BookmarksPage() {
     <AnimatedPage>
       <div className="paper-grain" style={{ minHeight: "100vh" }}>
         <TopBar active="bookmarks" />
-        <div style={{ padding: "40px 56px" }}>
+        <div className="page-shell">
           <FadeIn direction="up" distance={20} delay={0.1}>
             <SectionHeader
               kanji="栞"

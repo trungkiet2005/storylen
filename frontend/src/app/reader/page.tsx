@@ -763,10 +763,20 @@ function ReaderContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageIdParam]);
 
-  const CANVAS_W = 520;
+  const [canvasW, setCanvasW] = useState(520);
+  useEffect(() => {
+    const update = () => {
+      const vw = window.innerWidth;
+      setCanvasW(vw < 480 ? vw - 16 : vw < 768 ? vw - 32 : 520);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  const CANVAS_W = canvasW;
   const computedHeight = imgNaturalSize ? CANVAS_W * (imgNaturalSize.h / imgNaturalSize.w) : 740;
 
-  const SIDE_W = 360;
+  const SIDE_W = Math.min(360, Math.floor((canvasW - 20) / 2));
   const computedSideH = imgNaturalSize ? SIDE_W * (imgNaturalSize.h / imgNaturalSize.w) : 520;
   const translatedImageUrl = pageData?.translated_image_url || null;
   const mainImageUrl = pageData?.original_image_url
@@ -887,7 +897,7 @@ function ReaderContent() {
     <div style={{ height: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {!fullscreen && <TopBar active="reader" compact />}
 
-      <div style={{ display: "grid", gridTemplateColumns: `${hasMultiplePages ? "72px" : ""} 1fr ${showContext ? "320px" : "0px"}`, flex: 1, overflow: "hidden", transition: "grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+      <div style={{ display: "grid", gridTemplateColumns: `${hasMultiplePages ? "72px" : ""} 1fr ${showContext ? "clamp(280px, 30vw, 360px)" : "0px"}`, flex: 1, overflow: "hidden", transition: "grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1)" }}>
 
         {/* ── Left Rail: Dynamic Thumbnails ── */}
         {hasMultiplePages && (
@@ -939,7 +949,7 @@ function ReaderContent() {
         <div
           ref={mainRef}
           className="scroll"
-          style={{ display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto", padding: "20px 32px", gap: 16 }}
+          style={{ display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto", padding: "20px clamp(8px, 3vw, 32px)", gap: 16 }}
         >
           {/* Series breadcrumb (when page belongs to a series) */}
           {pageData?.metadata?.series_id && (
@@ -1320,10 +1330,11 @@ function ReaderContent() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 30 }}
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="reader-context-overlay"
               style={{
                 background: "var(--bg-2)",
                 borderLeft: "2px solid var(--border)",
-                minWidth: 320,
+                minWidth: 280,
                 display: "flex",
                 flexDirection: "column",
                 overflow: "hidden",

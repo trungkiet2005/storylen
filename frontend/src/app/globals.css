@@ -353,7 +353,64 @@ input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 
 button:disabled { opacity: 0.45; cursor: not-allowed !important; }
 button:disabled:hover { transform: none !important; box-shadow: none !important; }
 
-/* ---------- Responsive helpers ---------- */
+/* ---------- Responsive spacing system ---------- */
+:root {
+  --px: clamp(16px, 5vw, 56px);
+  --py: clamp(24px, 3.5vw, 40px);
+}
+
+/* Fluid page wrapper — drop into any page instead of padding: "40px 56px" */
+.page-shell {
+  padding: var(--py) var(--px);
+}
+
+/* ---------- Responsive layout helpers ---------- */
+
+/* 2-col → 1-col on mobile */
+.series-header-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* Stats / goal cards: auto-fit with sensible min */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+  gap: 16px;
+}
+
+/* ---------- TopBar mobile menu ---------- */
+.topbar-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px; height: 40px;
+  padding: 0;
+  background: none;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  color: var(--fg);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  transition: box-shadow .08s;
+}
+.topbar-hamburger:hover { box-shadow: 2px 2px 0 0 var(--border); }
+
+.topbar-desktop-nav {
+  display: flex;
+  gap: 2px;
+}
+
+.topbar-logo-sub { display: block; }
+
+/* Mobile full-screen nav drawer */
+.topbar-mobile-drawer {
+  display: none; /* hidden by default; shown via JS class or state */
+}
+
+/* ---------- Responsive hero ---------- */
 .hero-mockup-wrapper {
   position: absolute;
   right: 56px;
@@ -367,15 +424,74 @@ button:disabled:hover { transform: none !important; box-shadow: none !important;
   z-index: 5;
 }
 
+/* ---------- Media queries ---------- */
+
+/* Tablet and below */
+@media (max-width: 900px) {
+  .nav-label { display: none; }
+
+  .hero-mockup-wrapper { display: none !important; }
+
+  .series-header-grid {
+    grid-template-columns: 160px 1fr;
+    gap: 16px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .topbar-hamburger { display: flex; }
+  .topbar-desktop-nav { display: none !important; }
+  .topbar-logo-sub { display: none; }
+
+  .series-header-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Stack goals side by side becomes column */
+  .goals-row {
+    flex-direction: column !important;
+  }
+
+  /* Heatmap scrolls horizontally instead of wrapping */
+  .heatmap-row {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    padding-bottom: 4px;
+  }
+}
+
 @media (max-width: 1200px) {
   .hero-mockup-wrapper {
     display: none !important;
   }
 }
 
-@media (max-width: 900px) {
-  /* TopBar collapses nav labels */
-  .nav-label { display: none; }
+/* ---------- Touch-target sizes ---------- */
+@media (pointer: coarse) {
+  .tab { padding: 12px 14px; min-height: 44px; }
+  .btn { min-height: 44px; }
+  .btn-sm { min-height: 36px; }
+}
+
+/* ---------- Reader responsive canvas ---------- */
+.reader-canvas-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* On mobile the context/glossary sidebar slides in as an overlay */
+@media (max-width: 768px) {
+  .reader-context-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    z-index: 130;
+    overflow-y: auto;
+    background: var(--panel);
+    border-left: none !important;
+    animation: slideInRight 0.2s ease;
+  }
 }
 
 /* ---------- Scrollbar global ---------- */

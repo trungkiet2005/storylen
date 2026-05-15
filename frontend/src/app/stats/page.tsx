@@ -161,7 +161,7 @@ function ActivityHeatmap({ dailyHistory }: { dailyHistory: Record<string, number
       <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10, letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700 }}>
         Hoạt động 30 ngày qua
       </div>
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      <div className="heatmap-row" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
         {days.map(day => {
           const count = dailyHistory[day] ?? 0;
           const intensity = count === 0 ? 0 : Math.max(0.15, count / max);
@@ -241,7 +241,7 @@ export default function StatsPage() {
     <AnimatedPage>
       <div className="paper-grain" style={{ minHeight: "100vh" }}>
         <TopBar active="stats" />
-        <div style={{ padding: "40px 56px" }}>
+        <div className="page-shell">
           <FadeIn direction="up" distance={20} delay={0.1}>
             <SectionHeader
               kanji="統"
@@ -320,7 +320,7 @@ export default function StatsPage() {
 
               {/* Goals: daily + weekly */}
               <FadeIn direction="up" distance={15} delay={0.13}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginBottom: 24 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 16, marginBottom: 24 }}>
                   <GoalCard
                     label="Mục tiêu hôm nay"
                     iconName="zap"
@@ -361,7 +361,7 @@ export default function StatsPage() {
               {/* Stat cards */}
               <StaggerContainer
                 staggerDelay={0.06}
-                style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 16, marginBottom: 32 }}
+                style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(180px, 100%), 1fr))", gap: 16, marginBottom: 32 }}
               >
                 <StaggerItem direction="up" distance={15}>
                   <StatCard label="Trang đã đọc" value={stats.totalPagesRead} unit="trang" icon="book" color="var(--accent)" />

@@ -232,7 +232,7 @@ function MangaPipelineShowcase() {
       </div>
 
       {/* Navigation tabs controls */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(140px, 100%), 1fr))', gap: 8 }}>
         {steps.map((s) => (
           <button
             key={s.id}
@@ -409,7 +409,7 @@ export default function Home() {
       {/* ── Hero Section ── */}
       <div style={{ padding: 40 }}>
         <FadeIn duration={0.7} direction="none">
-          <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "var(--bg-2)", position: "relative", overflow: "hidden", padding: "80px 56px", minHeight: 620 }}>
+          <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "var(--bg-2)", position: "relative", overflow: "hidden", padding: "clamp(36px, 8vw, 80px) clamp(20px, 6vw, 56px)", minHeight: 480 }}>
             
             {/* Giant letter bg */}
             <motion.div 
@@ -435,7 +435,7 @@ export default function Home() {
               </FadeIn>
               
               <FadeIn delay={0.3} direction="up" distance={30}>
-                <h1 className="display" style={{ fontSize: 62, margin: "18px 0 0", lineHeight: 1.15, letterSpacing: "0.02em" }}>
+                <h1 className="display" style={{ fontSize: "clamp(36px, 8vw, 62px)", margin: "18px 0 0", lineHeight: 1.15, letterSpacing: "0.02em" }}>
                   <span style={{ whiteSpace: 'nowrap' }}>ĐỌC TRUYỆN,</span><br/>
                   <span style={{ whiteSpace: 'nowrap' }}>KHÔNG CÒN</span><br/>
                   <span style={{ color: "var(--accent)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>rào cản.</span>
@@ -540,14 +540,14 @@ export default function Home() {
       </FadeIn>
 
       {/* ── Editorial Section ── */}
-      <div style={{ padding: "20px 56px 40px", display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 48, alignItems: "center" }}>
+      <div style={{ padding: "20px clamp(16px, 5vw, 56px) 40px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(320px, 100%), 1fr))", gap: "clamp(24px, 4vw, 48px)", alignItems: "center" }}>
         <div>
           <FadeIn>
             <KanjiDivider kanji="★" label="Quy trình · Process"/>
           </FadeIn>
           
           <FadeIn delay={0.1}>
-            <h2 className="display" style={{ fontSize: 54, margin: "0 0 16px" }}>
+            <h2 className="display" style={{ fontSize: "clamp(28px, 6vw, 54px)", margin: "0 0 16px" }}>
               Trải nghiệm dịch thuật <span style={{ color: "var(--accent)" }}>tức thì.</span>
             </h2>
           </FadeIn>
@@ -590,7 +590,7 @@ export default function Home() {
 
       {/* ── CTA Footer ── */}
       <FadeIn className="w-full" distance={40} duration={0.6}>
-        <div style={{ padding: "40px 56px 80px", textAlign: "center" }}>
+        <div className="page-shell" style={{ textAlign: "center", paddingBottom: "clamp(40px, 8vw, 80px)" }}>
           <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "var(--ink)", color: "var(--paper)", padding: "60px 40px", position: "relative", overflow: "hidden" }}>
             <div className="halftone" style={{ position: "absolute", inset: 0, opacity: 0.2 }}/>
             <div style={{ position: "relative" }}>
@@ -603,7 +603,7 @@ export default function Home() {
               >
                 LET&apos;S START
               </motion.div>
-              <h2 className="display" style={{ fontSize: 64, color: "var(--paper)", marginBottom: 20 }}>
+              <h2 className="display" style={{ fontSize: "clamp(32px, 8vw, 64px)", color: "var(--paper)", marginBottom: 20 }}>
                 Sẵn sàng trải nghiệm<br/>
                 <motion.span 
                   initial={{ color: "var(--paper)" }}

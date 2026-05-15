@@ -174,7 +174,7 @@ export default function SeriesListPage() {
     <AnimatedPage>
       <div className="paper-grain" style={{ minHeight: "100vh" }}>
         <TopBar active="series" />
-        <div style={{ padding: "40px 56px" }}>
+        <div className="page-shell">
           <FadeIn direction="up" distance={20} delay={0.1}>
             <SectionHeader
               kanji="本"
@@ -204,7 +204,7 @@ export default function SeriesListPage() {
                   padding: "8px 12px",
                   border: "2px solid var(--border)",
                   background: "var(--panel)",
-                  flex: 1,
+                  flex: "1 1 220px",
                   maxWidth: 360,
                 }}
               >

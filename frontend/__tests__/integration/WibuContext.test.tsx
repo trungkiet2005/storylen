@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React, { type ReactNode } from "react";
@@ -88,7 +88,7 @@ function BookmarkToggle() {
     <>
       <button
         onClick={() =>
-          toggleBookmark({ pageId: "p1", seriesId: "s1", chapterId: "c1", pageIndex: 0 })
+          toggleBookmark({ pageId: "p1", seriesId: "s1", seriesTitle: null, pageNumber: null, chapterNumber: null, thumbnailUrl: null, note: "" })
         }
       >
         toggle
@@ -337,7 +337,7 @@ describe("WibuContext integration", () => {
           <>
             <button
               onClick={() =>
-                toggleBookmark({ pageId: "bm1", seriesId: "s1", chapterId: "c1", pageIndex: 0 })
+                toggleBookmark({ pageId: "bm1", seriesId: "s1", seriesTitle: null, pageNumber: null, chapterNumber: null, thumbnailUrl: null, note: "" })
               }
             >
               add bm

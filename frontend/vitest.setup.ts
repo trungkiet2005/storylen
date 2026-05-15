@@ -17,8 +17,8 @@ beforeEach(() => {
 
 // framer-motion's animate-presence uses ResizeObserver in some paths
 if (typeof globalThis.ResizeObserver === "undefined") {
-  // @ts-expect-error - minimal polyfill for jsdom
-  globalThis.ResizeObserver = class {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).ResizeObserver = class {
     observe() {}
     unobserve() {}
     disconnect() {}
