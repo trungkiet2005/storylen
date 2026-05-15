@@ -1317,7 +1317,29 @@ function ReaderContent() {
 
                   {/* Translation edits */}
                   <div>
-                    <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 8 }}>Sửa bản dịch</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div className="caps-xs" style={{ color: "var(--accent)" }}>Sửa bản dịch</div>
+                      {pageData && pageData.processed_data.length > 0 && (
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          style={{ padding: "3px 6px", fontSize: 10 }}
+                          onClick={async () => {
+                            const text = pageData.processed_data
+                              .map((b, i) => `[${i + 1}] ${editTexts[b.bubble_id] ?? b.translated_text}`)
+                              .join("\n\n");
+                            try {
+                              await navigator.clipboard.writeText(text);
+                              toast(`Đã copy ${pageData.processed_data.length} bubble.`, "success");
+                            } catch {
+                              toast("Không thể copy.", "error");
+                            }
+                          }}
+                          title="Copy tất cả bản dịch của trang"
+                        >
+                          <Icon name="copy" size={10}/> Copy tất cả
+                        </button>
+                      )}
+                    </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {(pageData?.processed_data || []).map((bubble, index) => {
                         const history = historyByBubble[bubble.bubble_id] || [];
@@ -1325,18 +1347,58 @@ function ReaderContent() {
                         const isSaving = savingBubbleId === bubble.bubble_id;
                         const isHistoryLoading = historyLoadingBubbleId === bubble.bubble_id;
 
+                        const currentTranslated = editTexts[bubble.bubble_id] ?? bubble.translated_text;
                         return (
                           <div key={bubble.bubble_id} className="stroke-ink" style={{ background: "var(--panel)", padding: 10 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
                               <span className="mono" style={{ fontSize: 11, fontWeight: 800 }}>#{index + 1}</span>
-                              <button
-                                className="btn btn-sm btn-ghost"
-                                style={{ padding: "3px 6px", fontSize: 11 }}
-                                onClick={() => toggleTranslationHistory(bubble)}
-                                aria-label="Xem lịch sử sửa dịch"
-                              >
-                                <Icon name="history" size={12}/> {isHistoryOpen ? "Ẩn" : "Lịch sử"}
-                              </button>
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <button
+                                  className="btn btn-sm btn-ghost"
+                                  style={{ padding: "3px 6px", fontSize: 11 }}
+                                  onClick={async () => {
+                                    if (!bubble.original_text) return;
+                                    try {
+                                      await navigator.clipboard.writeText(bubble.original_text);
+                                      toast("Đã copy bản gốc.", "success");
+                                    } catch {
+                                      toast("Không thể copy.", "error");
+                                    }
+                                  }}
+                                  disabled={!bubble.original_text}
+                                  title="Copy bản gốc"
+                                  aria-label="Copy bản gốc"
+                                >
+                                  <Icon name="copy" size={11}/> Gốc
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-ghost"
+                                  style={{ padding: "3px 6px", fontSize: 11 }}
+                                  onClick={async () => {
+                                    const text = currentTranslated;
+                                    if (!text) return;
+                                    try {
+                                      await navigator.clipboard.writeText(text);
+                                      toast("Đã copy bản dịch.", "success");
+                                    } catch {
+                                      toast("Không thể copy.", "error");
+                                    }
+                                  }}
+                                  disabled={!currentTranslated}
+                                  title="Copy bản dịch"
+                                  aria-label="Copy bản dịch"
+                                >
+                                  <Icon name="copy" size={11}/> Dịch
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-ghost"
+                                  style={{ padding: "3px 6px", fontSize: 11 }}
+                                  onClick={() => toggleTranslationHistory(bubble)}
+                                  aria-label="Xem lịch sử sửa dịch"
+                                >
+                                  <Icon name="history" size={12}/> {isHistoryOpen ? "Ẩn" : "Lịch sử"}
+                                </button>
+                              </div>
                             </div>
 
                             <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.4, marginBottom: 8 }}>
