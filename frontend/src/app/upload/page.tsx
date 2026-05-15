@@ -7,7 +7,7 @@ import { Icon } from '@/components/Icons';
 import { useToast } from '@/components/Toast';
 import {
   uploadImages,
-  getBatchStatus,
+  subscribeBatchProgress,
   PageStatus,
   APIError,
   healthCheck,
@@ -26,6 +26,7 @@ import {
   type SeriesDetail,
 } from '@/lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from '@/components/Animations';
 import { useAuth } from '@/contexts/AuthContext';
@@ -537,17 +538,14 @@ function UploadPageInner() {
       setSelectedFiles(fakePlaceholders);
       setState("processing");
 
-      let attempts = 0;
-      const maxAttempts = 150;
-      const poll = setInterval(async () => {
-        try {
-          const batchStatus = await getBatchStatus(batchId);
-          let terminalCount = 0;
-
+      // Subscribe to live progress (WebSocket — falls back to polling if WS fails).
+      // Same handle returned for both transports, so cleanup is uniform.
+      const sub = subscribeBatchProgress(
+        batchId,
+        (batchStatus: BatchStatus) => {
           setSelectedFiles(prev => prev.map(f => {
             const remote = batchStatus.pages.find(p => p.page_id === f.pageId);
             if (!remote) return f;
-            if (["completed", "failed", "ocr_failed"].includes(remote.status)) terminalCount++;
             if (f.status !== remote.status) {
               if (remote.status === "completed") addLog(`✓ Xong: ${f.name}`, "success");
               else if (["failed", "ocr_failed"].includes(remote.status)) addLog(`✕ Lỗi: ${f.name}`, "error");
@@ -555,16 +553,14 @@ function UploadPageInner() {
             }
             return { ...f, status: remote.status, progress: remote.progress, error: remote.error };
           }));
-
-          attempts++;
-          if (terminalCount === pageIds.length || attempts >= maxAttempts) {
-            clearInterval(poll);
-            setState("done");
-            addLog("=== HOÀN THÀNH SCRAPE & DỊCH THUẬT ===", "system");
-            toast("Đã scrape và dịch xong toàn bộ chapter!", "success");
-          }
-        } catch { /* ignore polling errors */ }
-      }, 2500);
+        },
+        () => {
+          setState("done");
+          addLog("=== HOÀN THÀNH SCRAPE & DỊCH THUẬT ===", "system");
+          toast("Đã scrape và dịch xong toàn bộ chapter!", "success");
+          sub.close();
+        },
+      );
     } catch (err) {
       const msg = err instanceof APIError ? err.message : "Lỗi khi scrape chapter.";
       setErrorMsg(msg);
@@ -643,60 +639,39 @@ function UploadPageInner() {
 
       setState("processing");
 
-      // Start polling the batch
-      let attempts = 0;
-      const maxAttempts = 150; // ~5 minutes
-      
-      const poll = setInterval(async () => {
-        try {
-          const batchStatus: BatchStatus = await getBatchStatus(batchId);
-          
-          // Update file statuses based on current data
-          let terminalCount = 0;
-          
-          setSelectedFiles(prev => {
-            return prev.map(file => {
-              const remote = batchStatus.pages.find(p => p.page_id === file.pageId);
-              if (!remote) return file;
-              
-              const isTerminal = ["completed", "failed", "ocr_failed"].includes(remote.status);
-              if (isTerminal) terminalCount++;
-
-              // Logging if transition to completed
-              if (file.status !== remote.status) {
-                if (remote.status === "completed") {
-                  addLog(`✓ Xử lý xong: ${file.name}`, 'success');
-                } else if (remote.status === "failed" || remote.status === "ocr_failed") {
-                  addLog(`✕ Lỗi: ${file.name} - ${remote.error || 'Lỗi pipeline'}`, 'error');
-                } else if (remote.status === "ocr_running") {
-                  addLog(`● Phát hiện vùng chữ: ${file.name}`, 'info');
-                } else if (remote.status === "translating") {
-                  addLog(`→ Đang dịch thuật AI: ${file.name}`, 'info');
-                }
+      // Live progress over WebSocket (auto-falls back to polling on handshake failure).
+      const sub = subscribeBatchProgress(
+        batchId,
+        (batchStatus: BatchStatus) => {
+          setSelectedFiles(prev => prev.map(file => {
+            const remote = batchStatus.pages.find(p => p.page_id === file.pageId);
+            if (!remote) return file;
+            if (file.status !== remote.status) {
+              if (remote.status === "completed") {
+                addLog(`✓ Xử lý xong: ${file.name}`, 'success');
+              } else if (remote.status === "failed" || remote.status === "ocr_failed") {
+                addLog(`✕ Lỗi: ${file.name} - ${remote.error || 'Lỗi pipeline'}`, 'error');
+              } else if (remote.status === "ocr_running") {
+                addLog(`● Phát hiện vùng chữ: ${file.name}`, 'info');
+              } else if (remote.status === "translating") {
+                addLog(`→ Đang dịch thuật AI: ${file.name}`, 'info');
               }
-
-              return {
-                ...file,
-                status: remote.status,
-                progress: remote.progress,
-                error: remote.error,
-              };
-            });
-          });
-
-          attempts++;
-          
-          const allDone = terminalCount === selectedFiles.length;
-          if (allDone || attempts >= maxAttempts) {
-            clearInterval(poll);
-            setState("done");
-            addLog("=== HOÀN THÀNH TẤT CẢ TRANG TRUYỆN ===", 'system');
-            toast("Tất cả trang đã được xử lý xong!", "success");
-          }
-        } catch (e) {
-          console.error("Batch status poll error", e);
-        }
-      }, 2500);
+            }
+            return {
+              ...file,
+              status: remote.status,
+              progress: remote.progress,
+              error: remote.error,
+            };
+          }));
+        },
+        () => {
+          setState("done");
+          addLog("=== HOÀN THÀNH TẤT CẢ TRANG TRUYỆN ===", 'system');
+          toast("Tất cả trang đã được xử lý xong!", "success");
+          sub.close();
+        },
+      );
 
     } catch (err) {
       if (err instanceof APIError && err.status === 0) {
@@ -937,13 +912,18 @@ function UploadPageInner() {
                                     onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = "var(--accent)"; }}
                                     onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = "var(--border)"; }}
                                   >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
+                                    {/* Remote MangaDex / mangaread URL — Next/Image lets us serve
+                                        AVIF/WebP transcodes from the optimizer for free. We pass an
+                                        explicit width/height and use `unoptimized` only if the
+                                        runtime forbids the optimizer (offline dev). */}
+                                    <Image
                                       src={url}
                                       alt={`Trang ${i + 1}`}
+                                      width={70}
+                                      height={90}
                                       referrerPolicy="no-referrer"
                                       style={{ height: 90, width: "auto", display: "block", objectFit: "cover" }}
-                                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                                     />
                                     <div style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: 10, fontWeight: 700, padding: "1px 4px" }}>
                                       {i + 1}
