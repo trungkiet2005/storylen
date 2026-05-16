@@ -196,7 +196,90 @@ app.include_router(ws.router,      prefix=API_PREFIX)
 
 @app.get("/health", tags=["meta"])
 def health():
+    """Liveness probe — cheap, never touches dependencies.
+
+    Used by Render / Vercel uptime monitors. Never reports `degraded` so a
+    transient Supabase/Gemini blip doesn't cause the container to be killed.
+    """
     return {"status": "ok", "version": settings.APP_VERSION}
+
+
+@app.get("/health/deep", tags=["meta"])
+def health_deep():
+    """Readiness probe — verifies upstream dependencies.
+
+    Returns:
+      - `200 {status:"healthy", checks:{...}}` when everything is reachable
+      - `200 {status:"degraded", checks:{...}}` when at least one optional
+        dependency is failing (the API still works for cached paths)
+      - `503 {status:"unhealthy", checks:{...}}` when a critical dependency
+        (Supabase) is unreachable — request load balancer to drain traffic
+
+    Distinct from `/health` so liveness probes can stay simple while
+    readiness checks can be expensive. Mount this on uptime dashboards.
+    """
+    import time
+    from fastapi import Response
+    from fastapi.responses import JSONResponse
+
+    checks: dict[str, dict[str, object]] = {}
+
+    # ── Supabase (critical) ──────────────────────────────────────────────
+    t0 = time.perf_counter()
+    try:
+        from app.database import get_supabase
+        get_supabase().table("manga_pages").select("page_id").limit(1).execute()
+        checks["supabase"] = {"status": "ok", "latency_ms": int((time.perf_counter() - t0) * 1000)}
+    except Exception as exc:
+        checks["supabase"] = {"status": "fail", "error": str(exc)[:200]}
+
+    # ── Gemini API key pool (critical) ───────────────────────────────────
+    keys = [k for k in settings.GEMINI_API_KEY.split(",") if k.strip()]
+    checks["gemini"] = (
+        {"status": "ok", "key_count": len(keys)}
+        if keys
+        else {"status": "fail", "error": "no API keys configured"}
+    )
+
+    # ── AI Module (optional — degrades gracefully if down) ──────────────
+    t0 = time.perf_counter()
+    try:
+        import httpx
+        with httpx.Client(timeout=3.0) as c:
+            r = c.get(f"{settings.AI_MODULE_URL.rstrip('/')}/health")
+            checks["ai_module"] = {
+                "status": "ok" if r.status_code < 500 else "degraded",
+                "http_status": r.status_code,
+                "latency_ms": int((time.perf_counter() - t0) * 1000),
+            }
+    except Exception as exc:
+        checks["ai_module"] = {"status": "degraded", "error": str(exc)[:160]}
+
+    # ── Roll-up ─────────────────────────────────────────────────────────
+    critical_ok = (
+        checks["supabase"].get("status") == "ok"
+        and checks["gemini"].get("status") == "ok"
+    )
+    any_degraded = any(c.get("status") in ("degraded", "fail") for c in checks.values())
+
+    if not critical_ok:
+        overall = "unhealthy"
+        status_code = 503
+    elif any_degraded:
+        overall = "degraded"
+        status_code = 200
+    else:
+        overall = "healthy"
+        status_code = 200
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": overall,
+            "version": settings.APP_VERSION,
+            "checks": checks,
+        },
+    )
 
 
 @app.get("/", tags=["meta"])

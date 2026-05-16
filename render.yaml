@@ -13,6 +13,11 @@ services:
     branch: main
     autoDeploy: true
 
+    # Pre-deploy hook applies any pending Supabase migrations BEFORE the new
+    # version starts serving traffic, so the app never sees a schema it doesn't
+    # know about. The script is idempotent (every migration uses IF NOT EXISTS).
+    preDeployCommand: python -m app.scripts.apply_migrations
+
     envVars:
       # ─── Supabase ──────────────────────────────────────────────────────
       - key: SUPABASE_URL
@@ -20,6 +25,10 @@ services:
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       - key: SUPABASE_ANON_KEY
+        sync: false
+      # Required by apply_migrations script. Format:
+      # postgresql://postgres.<ref>:<pwd>@aws-0-<region>.pooler.supabase.com:6543/postgres
+      - key: SUPABASE_DB_URL
         sync: false
 
       # ─── Gemini ────────────────────────────────────────────────────────
@@ -31,6 +40,24 @@ services:
         sync: false    # e.g. https://huynhtrungkiet09032005-ai-storylen.hf.space
       - key: AI_MODULE_TOKEN
         sync: false    # optional: HF read token if Space is private
+
+      # ─── Multi-replica state (optional) ────────────────────────────────
+      # When set, pipeline cancellation, event-bus replay, and rate-limit
+      # storage move from in-process dicts to Redis. Leave empty for free tier.
+      - key: REDIS_URL
+        sync: false
+
+      # ─── Stripe (optional — leave empty to disable checkout) ──────────
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_BASIC
+        sync: false
+      - key: STRIPE_PRICE_PRO
+        sync: false
+      - key: STRIPE_PRICE_PREMIUM
+        sync: false
 
       # ─── App ───────────────────────────────────────────────────────────
       - key: DEBUG

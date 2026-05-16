@@ -903,8 +903,13 @@ def delete_account(
 
 
 @router.get("/export-data")
-def export_user_data(user: AuthUser = Depends(get_current_user)):
-    """GDPR data export — returns a JSON dump of everything we know about the user."""
+@limiter.limit("3/hour")
+def export_user_data(request: Request, user: AuthUser = Depends(get_current_user)):
+    """GDPR data export — returns a JSON dump of everything we know about the user.
+
+    Rate-limited to 3 exports per hour per user (or IP for anon attempts) to
+    prevent abuse — the endpoint does up to a dozen full-table scans.
+    """
     sb = get_supabase()
     uid = user.id
     export: dict[str, Any] = {
