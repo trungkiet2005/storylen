@@ -21,6 +21,7 @@ class ProcessingStatus(str, Enum):
     TRANSLATED = "translated"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 # ─── Upload ────────────────────────────────────────────────────────────────────

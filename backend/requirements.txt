@@ -19,6 +19,9 @@ httpx>=0.27.0
 # ─── Rate limiting ────────────────────────────────────────────────────────────
 slowapi>=0.1.9
 
+# ─── Payments (optional — endpoints return 503 if STRIPE_SECRET_KEY empty) ───
+stripe>=8.0.0
+
 # ─── HTML parsing (manga chapter scraper) ────────────────────────────────────
 beautifulsoup4>=4.12.0
 lxml>=5.2.0               # Fast BS4 parser

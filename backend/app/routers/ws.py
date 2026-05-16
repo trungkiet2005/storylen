@@ -117,6 +117,21 @@ async def batch_progress(websocket: WebSocket, batch_id: str):
 
     await websocket.accept()
 
+    # ── Event-bus replay: send any events the client may have missed ─────
+    # Client may pass `?since=<epoch>` so reconnects skip events already seen.
+    try:
+        since_raw = websocket.query_params.get("since")
+        since = float(since_raw) if since_raw else None
+    except Exception:
+        since = None
+    try:
+        from app.services.pipeline_control import subscribe as _replay
+        replay_events = _replay(batch_id, since)
+        if replay_events:
+            await websocket.send_json({"type": "replay", "events": replay_events})
+    except Exception as exc:
+        logger.debug("event replay skipped for %s: %s", batch_id, exc)
+
     last_sig: tuple | None = None
     last_ping = asyncio.get_event_loop().time()
 

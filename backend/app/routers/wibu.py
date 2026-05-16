@@ -211,6 +211,11 @@ def add_bookmark(body: BookmarkIn, user: AuthUser = Depends(get_current_user)):
     row = {**body.model_dump(), "user_id": user.id, "saved_at": datetime.now(timezone.utc).isoformat()}
     result = sb.table("user_bookmarks").upsert(row, on_conflict="user_id,page_id").execute()
     saved = result.data[0] if result.data else row
+    try:
+        from app.services.achievements import check_and_unlock
+        check_and_unlock(user.id)
+    except Exception:
+        pass
     return BookmarkOut(**_strip(saved))
 
 
