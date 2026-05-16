@@ -22,6 +22,14 @@ slowapi>=0.1.9
 # ─── Payments (optional — endpoints return 503 if STRIPE_SECRET_KEY empty) ───
 stripe>=8.0.0
 
+# ─── Multi-replica state (optional — set REDIS_URL to activate) ──────────────
+# Powers cross-replica cancellation, event-bus replay, and rate-limit storage.
+# Without REDIS_URL the code transparently falls back to in-memory dicts.
+redis>=5.0.0
+
+# ─── DB migrations (used by app.scripts.apply_migrations preDeployCommand) ───
+psycopg[binary]>=3.1.0
+
 # ─── HTML parsing (manga chapter scraper) ────────────────────────────────────
 beautifulsoup4>=4.12.0
 lxml>=5.2.0               # Fast BS4 parser

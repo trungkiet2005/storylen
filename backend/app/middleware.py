@@ -68,6 +68,77 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class CSRFMiddleware(BaseHTTPMiddleware):
+    """Double-submit token CSRF protection on cookie-authenticated mutations.
+
+    Threat model: SameSite=none cookies (required for cross-domain Vercel ↔
+    Render setup) only stop *cross-origin* fetch requests in modern browsers.
+    A double-submit CSRF token adds a belt to the suspenders.
+
+    Implementation:
+      - On any safe request (GET/HEAD/OPTIONS), if no ``csrf_token`` cookie
+        is present, set one with a 32-byte random value (cookie is readable
+        by JS via ``document.cookie`` because the frontend echoes it in a
+        header on writes — that's the whole point of double-submit).
+      - On mutating requests (POST/PUT/PATCH/DELETE), require the
+        ``X-CSRF-Token`` header to match the ``csrf_token`` cookie.
+      - Exempt: Stripe webhook (verified by signature), WebSocket handshake,
+        public read endpoints under ``/v1/library`` and ``/v1/share``.
+    """
+
+    EXEMPT_PATH_PREFIXES = (
+        "/v1/credits/webhook",   # Stripe — verified by signature
+        "/v1/library",            # public reads
+        "/v1/share",              # public share GET
+        "/v1/ws/",                # WebSocket upgrade
+        "/health",
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+    )
+
+    SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+    def __init__(self, app: ASGIApp, cookie_name: str = "csrf_token") -> None:
+        super().__init__(app)
+        self.cookie_name = cookie_name
+
+    def _is_exempt(self, path: str) -> bool:
+        return any(path.startswith(p) for p in self.EXEMPT_PATH_PREFIXES)
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        method = request.method.upper()
+
+        # Issue a CSRF cookie on first safe request so the frontend has a value
+        # to echo back on subsequent mutations.
+        existing = request.cookies.get(self.cookie_name)
+
+        if method in self.SAFE_METHODS or self._is_exempt(path):
+            response = await call_next(request)
+            if not existing:
+                token = uuid.uuid4().hex + uuid.uuid4().hex  # 64 hex chars
+                response.set_cookie(
+                    key=self.cookie_name,
+                    value=token,
+                    httponly=False,  # JS must read it to echo back
+                    secure=True,
+                    samesite="none",
+                    path="/",
+                    max_age=60 * 60 * 24 * 30,  # 30 days
+                )
+            return response
+
+        # Mutating, non-exempt path → require the header match the cookie.
+        header_token = request.headers.get("x-csrf-token", "")
+        if not existing or not header_token or header_token != existing:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "CSRF token missing or invalid."},
+            )
+        return await call_next(request)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security-relevant response headers to every reply.
 

@@ -6,6 +6,7 @@ import { WibuProvider } from "@/contexts/WibuContext";
 import { I18nProvider } from "@/contexts/I18nContext";
 import { AchievementToaster } from "@/components/AchievementToaster";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 
 export const metadata: Metadata = {
   title: "StoryLens — Đọc Truyện Tranh Đa Ngôn Ngữ Bằng AI",
@@ -43,6 +44,7 @@ export default function RootLayout({
               <ToastProvider>
                 <AchievementToaster />
                 <OnboardingOverlay />
+                <ServiceWorkerRegistrar />
                 {children}
               </ToastProvider>
             </WibuProvider>
