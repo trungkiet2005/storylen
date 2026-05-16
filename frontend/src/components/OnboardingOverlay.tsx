@@ -35,6 +35,22 @@ const STEPS: Step[] = [
   },
 ];
 
+/** Cookie name mirrors the localStorage key so a user who clears one but not
+ *  the other still won't see onboarding again. Cookie persists 1 year. */
+const COOKIE_NAME = "sl_onboarded";
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function writeCookie(name: string, value: string, days: number) {
+  if (typeof document === "undefined") return;
+  const exp = new Date(Date.now() + days * 86400_000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${exp}; path=/; SameSite=Lax`;
+}
+
 export function OnboardingOverlay() {
   const { isAuthenticated, isLoading } = useAuth();
   const [open, setOpen] = useState(false);
@@ -43,7 +59,10 @@ export function OnboardingOverlay() {
   useEffect(() => {
     if (isLoading || !isAuthenticated) return;
     try {
+      // Either signal counts as "done" — be lenient so clearing one storage
+      // doesn't re-popup onboarding for returning users.
       if (window.localStorage.getItem(KEY) === "1") return;
+      if (readCookie(COOKIE_NAME) === "1") return;
       setOpen(true);
     } catch { /* ignore */ }
   }, [isAuthenticated, isLoading]);
@@ -51,6 +70,7 @@ export function OnboardingOverlay() {
   function close() {
     setOpen(false);
     try { window.localStorage.setItem(KEY, "1"); } catch { /* ignore */ }
+    writeCookie(COOKIE_NAME, "1", 365);
   }
 
   if (!open) return null;
