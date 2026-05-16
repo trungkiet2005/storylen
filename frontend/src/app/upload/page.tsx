@@ -1119,14 +1119,38 @@ function UploadPageInner() {
                           </div>
                         </div>
                         
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           {state === "done" && (
                             <motion.button whileHover={{ scale: 1.03 }} className="btn btn-sm btn-primary" onClick={resetUpload}>
                               <Icon name="upload" size={12}/> Upload thêm
                             </motion.button>
                           )}
                           {state === "processing" && (
-                            <span className="chip chip-accent animate-pulse">DỊCH TỰ ĐỘNG LIVE</span>
+                            <>
+                              <span className="chip chip-accent animate-pulse">DỊCH TỰ ĐỘNG LIVE</span>
+                              {batchId && (
+                                <motion.button
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  type="button"
+                                  className="btn btn-sm"
+                                  style={{ color: "var(--accent)", borderColor: "var(--accent)" }}
+                                  onClick={async () => {
+                                    if (!batchId) return;
+                                    if (!confirm("Huỷ tất cả trang đang dịch trong batch này?")) return;
+                                    try {
+                                      const { cancelBatch } = await import("@/lib/api");
+                                      const res = await cancelBatch(batchId);
+                                      addLog(`✗ ${res.message}`, "info");
+                                    } catch (err) {
+                                      addLog(`Huỷ thất bại: ${err instanceof Error ? err.message : "lỗi"}`, "error");
+                                    }
+                                  }}
+                                >
+                                  <Icon name="x" size={12}/> Huỷ batch
+                                </motion.button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>

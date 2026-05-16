@@ -684,54 +684,13 @@ export default function ProfilePage() {
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.2, ease: "easeOut" }}
                     >
-                      <h2 className="display" style={{ fontSize: 24, marginBottom: 24 }}>Bảo mật</h2>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                        <div>
-                          <label className="caps-xs" style={labelStyle}>Mật khẩu hiện tại</label>
-                          <motion.input
-                            whileFocus={{ borderColor: "var(--accent)", boxShadow: "0 0 0 2px rgba(200,16,46,0.1)" }}
-                            type="password"
-                            placeholder="••••••••"
-                            style={inputStyle}
-                          />
-                        </div>
-                        <div>
-                          <label className="caps-xs" style={labelStyle}>Mật khẩu mới</label>
-                          <motion.input
-                            whileFocus={{ borderColor: "var(--accent)", boxShadow: "0 0 0 2px rgba(200,16,46,0.1)" }}
-                            type="password"
-                            placeholder="Tối thiểu 8 ký tự..."
-                            style={inputStyle}
-                          />
-                        </div>
-                        <motion.button
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                          className="btn btn-primary"
-                          style={{ alignSelf: "flex-start", padding: "10px 20px" }}
-                          onClick={() => toast("Đổi mật khẩu sẽ khả dụng sớm!", "info")}
-                        >
-                          Đổi mật khẩu
-                        </motion.button>
-
-                        <motion.div
-                          initial={{ scale: 0.98, opacity: 0.9 }}
-                          whileHover={{ scale: 1, opacity: 1 }}
-                          style={{ marginTop: 8, padding: "16px", background: "rgba(200,16,46,0.06)", border: "2px solid rgba(200,16,46,0.3)", borderRadius: "var(--radius-sm)", transition: "transform 0.2s" }}
-                        >
-                          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--accent)", marginBottom: 8 }}>Vùng nguy hiểm</div>
-                          <div style={{ fontSize: 13, color: "var(--fg-soft)", marginBottom: 12 }}>Xóa tài khoản là hành động không thể hoàn tác. Tất cả dữ liệu của bạn sẽ bị xóa vĩnh viễn.</div>
-                          <motion.button
-                            whileHover={{ scale: 1.05, background: "rgba(200,16,46,0.1)" }}
-                            whileTap={{ scale: 0.95 }}
-                            className="btn btn-sm"
-                            style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
-                            onClick={() => toast("Tính năng xóa tài khoản cần xác nhận email. Sẽ được hỗ trợ sớm.", "error")}
-                          >
-                            Xóa tài khoản
-                          </motion.button>
-                        </motion.div>
-                      </div>
+                      <h2 className="display" style={{ fontSize: 24, marginBottom: 16 }}>Bảo mật & Tài khoản</h2>
+                      <p style={{ fontSize: 14, color: "var(--fg-soft)", marginBottom: 20, lineHeight: 1.6 }}>
+                        Đổi mật khẩu, đổi email, tải dữ liệu cá nhân hoặc xoá vĩnh viễn tài khoản trong trang quản lý bảo mật chuyên dụng.
+                      </p>
+                      <Link href="/profile/security" className="btn btn-primary" style={{ alignSelf: "flex-start", padding: "10px 22px", display: "inline-flex" }}>
+                        Mở trang bảo mật →
+                      </Link>
                     </motion.div>
                   )}
                 </AnimatePresence>

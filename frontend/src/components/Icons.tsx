@@ -10,7 +10,8 @@ export type IconName =
   | "moon" | "sun"
   | "star" | "star-fill" | "chart" | "leaf" | "fire" | "trophy" | "pdf" | "tag" | "close"
   | "chevron-right" | "chevron-left" | "chevron-down" | "chevron-up"
-  | "link" | "magic" | "zap";
+  | "link" | "magic" | "zap"
+  | "bell" | "share" | "globe";
 
 export const Icon = ({ name, size = 18, stroke = 2, className = "" }: { name: IconName | string, size?: number, stroke?: number, className?: string }) => {
   const P = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: stroke, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, className };
@@ -87,6 +88,9 @@ export const Icon = ({ name, size = 18, stroke = 2, className = "" }: { name: Ic
     case "link": return <svg {...P}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
     case "magic": return <svg {...P}><path d="m15 5 4 4"/><path d="M13 7 8.7 2.7a2.41 2.41 0 0 0-3.4 0L2.7 5.3a2.41 2.41 0 0 0 0 3.4L7 13"/><path d="m8 6 2-2"/><path d="m2 22 5.5-1.5L21 7a2.12 2.12 0 0 0-3-3L4.5 17.5Z"/><path d="m18 16 2-2"/><path d="m17 11 4.3 4.3c.94.94.94 2.46 0 3.4l-2.6 2.6c-.94.94-2.46.94-3.4 0L11 17"/></svg>;
     case "zap": return <svg {...P}><polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"/></svg>;
+    case "bell": return <svg {...P}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>;
+    case "share": return <svg {...P}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>;
+    case "globe": return <svg {...P}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>;
     default: return <svg {...P}><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>;
   }
 };

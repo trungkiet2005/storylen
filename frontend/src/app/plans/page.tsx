@@ -4,7 +4,7 @@ import Link from "next/link";
 import { TopBar } from "@/components/TopBar";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
-import { getPlans, type PlanInfo } from "@/lib/api";
+import { getPlans, type PlanInfo, createCheckoutSession, createBillingPortalSession } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 
 const PLAN_COLORS: Record<string, string> = {
@@ -283,6 +283,34 @@ export default function PlansPage() {
 
   const currentPlan = user?.plan_tier ?? "free";
 
+  const handleUpgrade = useCallback(async (plan: PlanInfo) => {
+    try {
+      const res = await createCheckoutSession(plan.id);
+      if (res.checkout_url) {
+        window.location.href = res.checkout_url;
+      } else {
+        setContactPlan(plan);
+      }
+    } catch (err) {
+      // Stripe not configured → fall back to contact-admin modal.
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("chưa được cấu hình") || msg.includes("503")) {
+        setContactPlan(plan);
+      } else {
+        toast(msg || "Không tạo được phiên thanh toán.", "error");
+      }
+    }
+  }, [toast]);
+
+  const handleManageBilling = useCallback(async () => {
+    try {
+      const res = await createBillingPortalSession();
+      if (res.checkout_url) window.location.href = res.checkout_url;
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Không mở được cổng quản lý.", "error");
+    }
+  }, [toast]);
+
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
       <TopBar active="plans" />
@@ -306,11 +334,19 @@ export default function PlansPage() {
           </p>
 
           {user && (
-            <div style={{ marginTop: 18, display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 16px", border: "1.5px solid var(--border-soft)", background: "var(--bg-2)", fontSize: 13, color: "var(--fg-soft)" }}>
+            <div style={{ marginTop: 18, display: "inline-flex", alignItems: "center", gap: 10, padding: "8px 16px", border: "1.5px solid var(--border-soft)", background: "var(--bg-2)", fontSize: 13, color: "var(--fg-soft)", flexWrap: "wrap" }}>
               Số dư hiện tại:
               <strong style={{ color: "var(--fg)", fontSize: 15 }}>{user.credits_balance} credit</strong>
               <span style={{ color: "var(--border-soft)" }}>·</span>
               Gói: <strong style={{ color: PLAN_COLORS[currentPlan] ?? "var(--muted)" }}>{currentPlan.toUpperCase()}</strong>
+              {currentPlan !== "free" && (
+                <>
+                  <span style={{ color: "var(--border-soft)" }}>·</span>
+                  <button type="button" onClick={handleManageBilling} style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+                    Quản lý thanh toán →
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -335,7 +371,7 @@ export default function PlansPage() {
                 key={plan.id}
                 plan={plan}
                 isCurrent={currentPlan === plan.id}
-                onContact={setContactPlan}
+                onContact={handleUpgrade}
               />
             ))}
           </div>
