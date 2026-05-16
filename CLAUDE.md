@@ -417,6 +417,61 @@ in production. Auth errors return localized Vietnamese messages.
 
 ---
 
+## Backups & Disaster Recovery
+
+### What we back up
+
+| Data                       | Source              | Frequency       | Retention   |
+| -------------------------- | ------------------- | --------------- | ----------- |
+| All Postgres tables        | Supabase PITR (Pro) | Continuous WAL  | 7 days      |
+| Manual schema snapshots    | `pg_dump`           | Before each migration | Until next | 
+| Storage buckets            | Supabase Storage    | Versioned       | Until purged|
+| User-uploaded raw images   | `manga-originals`   | Versioning ON   | 30 days soft-delete |
+
+### Backup commands
+
+```powershell
+# Manual logical dump — run before a risky migration.
+$env:PGPASSWORD = "<service-role-jwt-password>"
+pg_dump -h <host> -U postgres -d postgres -F c -f "storylens-$(Get-Date -Format yyyyMMdd-HHmm).dump"
+
+# Restore to a fresh project (DR drill):
+pg_restore -h <new-host> -U postgres -d postgres --clean --if-exists storylens-YYYYMMDD-HHmm.dump
+```
+
+### Incident runbooks
+
+**Backend down (Render returns 5xx)**
+1. Check Render dashboard → recent deploys → rollback to previous green build.
+2. Verify `/health/deep` reports `supabase: ok, gemini: ok`.
+3. If Supabase pool exhausted: Render → restart service.
+
+**Database connection lost**
+1. Supabase dashboard → Database → Roles → check pool size.
+2. If 100% saturated: scale up pool (Supabase Pro) or kill long-running queries
+   via SQL Editor `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE state='idle in transaction' AND now() - state_change > INTERVAL '5 minutes';`.
+
+**Gemini quota exhausted**
+1. Add additional keys to `GEMINI_API_KEY` (comma-separated).
+2. Hit `POST /v1/admin/health/gemini/reload` to pick up without restart.
+
+**AI module unreachable**
+1. Check HuggingFace Space → Logs.
+2. If sleeping (free tier): browse the public Space URL once to wake it.
+3. Backend handles gracefully — `/health/deep` reports `ai_module: degraded`.
+
+**Mass cancellation needed** (e.g. runaway upload)
+1. `POST /v1/status/batch/{batch_id}/cancel` if you have the batch ID.
+2. Otherwise: Supabase SQL Editor:
+   `UPDATE manga_pages SET status='cancelled', error='Manual cleanup' WHERE status IN ('pending', 'ocr_running', 'translating');`
+
+### DR drill cadence
+
+- **Quarterly**: restore latest dump to a fresh Supabase project, verify
+  `pytest -q` passes against it, document any drift.
+
+---
+
 ## Admin Features
 
 Admin dashboard at `/admin` — restricted to users with `role=admin`.
