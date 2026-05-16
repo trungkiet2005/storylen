@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedPage, FadeIn } from "@/components/Animations";
+import { AnimatedBackground } from "@/components/AnimatedBackground";
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 
@@ -97,7 +98,8 @@ export default function RegisterPage() {
             overflow: "hidden",
           }}
         >
-          <div className="halftone-coarse" style={{ position: "absolute", inset: 0, opacity: 0.14 }} />
+          <AnimatedBackground bounded playlist="mystic" intervalMs={22_000} overlay={0.78} />
+          <div className="halftone-coarse" style={{ position: "absolute", inset: 0, opacity: 0.14, zIndex: 1 }} />
           <motion.div
             initial={{ opacity: 0, scale: 0.6, rotate: 15 }}
             animate={{ opacity: 0.1, scale: 1, rotate: 0 }}

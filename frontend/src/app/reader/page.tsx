@@ -734,6 +734,19 @@ function ReaderContent() {
         setHistoryByBubble({});
         setOpenHistoryBubbleId(null);
         toast("Đã tải dữ liệu trang", "success");
+        // Save reading session so the home page can offer "Tiếp tục đọc".
+        try {
+          // dynamic import keeps this away from SSR
+          import("@/lib/api").then(({ saveNativeReading }) => {
+            saveNativeReading({
+              ref: data.page_id,
+              kind: "page",
+              label:
+                (data.metadata?.series_id ? `Trang #${data.metadata?.page_number ?? "?"}` : "Trang đã dịch"),
+              cover_url: data.thumbnail_url || data.original_image_url || null,
+            });
+          });
+        } catch { /* ignore */ }
       })
       .catch(err => {
         const msg = err instanceof APIError ? err.message : "Không thể tải dữ liệu trang.";

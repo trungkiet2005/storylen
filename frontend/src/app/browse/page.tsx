@@ -5,6 +5,7 @@ import { TopBar } from "@/components/TopBar";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/Animations";
+import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   mdxPopular,
@@ -558,20 +559,34 @@ export default function BrowsePage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg)" }}>
+    <div className="browse-anim-wrap" style={{ minHeight: "100vh" }}>
+      <AnimatedBackground playlist="cultivation" intervalMs={28_000} overlay={0.82} hideOnMobile />
       <TopBar active="browse" />
 
-      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "clamp(16px,3vw,32px)" }}>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "clamp(16px,3vw,32px)", position: "relative", zIndex: 1 }}>
         <FadeIn>
-          {/* Page header */}
+          {/* Page header — sits on top of animated bg, so use paper text + shadow */}
           <div style={{ marginBottom: 24 }}>
             <div
               className="display"
-              style={{ fontSize: "clamp(22px,3vw,32px)", letterSpacing: "-0.02em", marginBottom: 4 }}
+              style={{
+                fontSize: "clamp(22px,3vw,32px)",
+                letterSpacing: "-0.02em",
+                marginBottom: 6,
+                color: "var(--paper)",
+                textShadow: "0 2px 12px rgba(0,0,0,0.7), 0 1px 3px rgba(0,0,0,0.9)",
+              }}
             >
               Kho Truyện
             </div>
-            <div style={{ fontSize: 13, color: "var(--muted)" }}>
+            <div
+              style={{
+                fontSize: 13,
+                color: "rgba(245,239,227,0.85)",
+                textShadow: "0 1px 6px rgba(0,0,0,0.7)",
+                fontWeight: 500,
+              }}
+            >
               Dữ liệu thực từ MangaDex · Mọi ngôn ngữ · Nhấn vào truyện để chọn chương
             </div>
           </div>

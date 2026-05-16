@@ -10,6 +10,8 @@ import { KanjiDivider } from '@/components/KanjiDivider';
 import { Footer } from '@/components/Footer';
 import { useToast } from '@/components/Toast';
 import { FadeIn, StaggerContainer, StaggerItem, ScaleIn } from '@/components/Animations';
+import { ResumeReading } from '@/components/ResumeReading';
+import { AnimatedBackground } from '@/components/AnimatedBackground';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Suspense } from 'react';
 
@@ -406,36 +408,41 @@ export default function Home() {
       </Suspense>
       <TopBar active="home" />
 
+      <ResumeReading />
+
       {/* ── Hero Section ── */}
       <div style={{ padding: "clamp(16px, 4vw, 40px)" }}>
         <FadeIn duration={0.7} direction="none">
-          <div className="stroke-ink-thick panel-shadow-lg hero-inner" style={{ background: "var(--bg-2)", position: "relative", overflow: "hidden", padding: "clamp(32px, 7vw, 80px) clamp(20px, 6vw, 56px)" }}>
-            
+          <div className="stroke-ink-thick panel-shadow-lg hero-inner" style={{ background: "#0a0708", position: "relative", overflow: "hidden", padding: "clamp(32px, 7vw, 80px) clamp(20px, 6vw, 56px)", color: "var(--paper)" }}>
+
+            {/* Rotating anime background — high-action shōnen mix */}
+            <AnimatedBackground bounded playlist="action" intervalMs={18_000} overlay={0.72} />
+
             {/* Giant letter bg */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 1.1 }} 
-              animate={{ opacity: 0.14, scale: 1 }} 
+            <motion.div
+              initial={{ opacity: 0, scale: 1.1 }}
+              animate={{ opacity: 0.18, scale: 1 }}
               transition={{ duration: 1.5, ease: "easeOut" }}
-              style={{ position: "absolute", right: -40, top: -60, fontFamily: "var(--font-serif)", fontSize: 520, fontWeight: 800, color: "var(--accent)", lineHeight: 0.8, pointerEvents: "none" }}
+              style={{ position: "absolute", right: -40, top: -60, fontFamily: "var(--font-serif)", fontSize: 520, fontWeight: 800, color: "var(--accent)", lineHeight: 0.8, pointerEvents: "none", zIndex: 1 }}
             >
               S
             </motion.div>
-            
+
             {/* Halftone corner */}
-            <div className="halftone-coarse" style={{ position: "absolute", left: 0, bottom: 0, width: 300, height: 300, color: "var(--ink)", opacity: 0.6 }}/>
+            <div className="halftone-coarse" style={{ position: "absolute", left: 0, bottom: 0, width: 300, height: 300, color: "var(--paper)", opacity: 0.3, zIndex: 1 }}/>
 
             {/* Floating Manga Stack Design Mockup */}
             <FloatingMangaStack />
 
-            <div style={{ position: "relative", maxWidth: 700 }}>
+            <div style={{ position: "relative", maxWidth: 700, zIndex: 2 }}>
               <FadeIn delay={0.2} direction="right">
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "var(--ink)", color: "var(--paper)", fontSize: 11, letterSpacing: "0.2em", fontWeight: 700 }}>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", background: "var(--accent)", color: "var(--paper)", fontSize: 11, letterSpacing: "0.2em", fontWeight: 700 }}>
                   XÓA NHÒA RÀO CẢN NGÔN NGỮ · STORYLENS VOL. 1
                 </div>
               </FadeIn>
-              
+
               <FadeIn delay={0.3} direction="up" distance={30}>
-                <h1 className="display" style={{ fontSize: "clamp(36px, 8vw, 62px)", margin: "18px 0 0", lineHeight: 1.15, letterSpacing: "0.02em" }}>
+                <h1 className="display" style={{ fontSize: "clamp(36px, 8vw, 62px)", margin: "18px 0 0", lineHeight: 1.15, letterSpacing: "0.02em", color: "var(--paper)", textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>
                   <span style={{ whiteSpace: 'nowrap' }}>ĐỌC TRUYỆN,</span><br/>
                   <span style={{ whiteSpace: 'nowrap' }}>KHÔNG CÒN</span><br/>
                   <span style={{ color: "var(--accent)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>rào cản.</span>
@@ -443,7 +450,7 @@ export default function Home() {
               </FadeIn>
 
               <FadeIn delay={0.4} direction="up">
-                <p className="serif" style={{ fontSize: 20, marginTop: 24, maxWidth: 540, lineHeight: 1.5 }}>
+                <p className="serif" style={{ fontSize: 20, marginTop: 24, maxWidth: 540, lineHeight: 1.5, color: "rgba(245,239,227,0.85)", textShadow: "0 1px 6px rgba(0,0,0,0.4)" }}>
                   Bản dịch giữ nguyên nhịp điệu, ngữ khí nhân vật, và giọng văn gốc — nhờ ngữ cảnh được AI học từ toàn bộ chương truyện.
                 </p>
               </FadeIn>
@@ -482,9 +489,9 @@ export default function Home() {
                   <div>
                     <svg width="100" height="40">
                       {Array.from({length: 20}).map((_, i) => (
-                        <rect key={i} x={i * 5} y="0" width={i % 3 === 0 ? 2 : 3} height="32" fill="var(--ink)"/>
+                        <rect key={i} x={i * 5} y="0" width={i % 3 === 0 ? 2 : 3} height="32" fill="var(--paper)"/>
                       ))}
-                      <text x="50" y="40" textAnchor="middle" fontSize="9" fontFamily="var(--font-mono)" fill="var(--ink)">4 901234 567894</text>
+                      <text x="50" y="40" textAnchor="middle" fontSize="9" fontFamily="var(--font-mono)" fill="var(--paper)">4 901234 567894</text>
                     </svg>
                   </div>
                 </div>
@@ -510,13 +517,13 @@ export default function Home() {
 
           <div style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'clamp(20px, 4vw, 40px) clamp(16px, 4vw, 48px)', color: 'var(--paper)', gap: 16 }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '3px 8px', border: '1px solid var(--paper)', fontSize: 10, fontFamily: 'var(--font-mono)', letterSpacing: '0.1em', color: 'var(--accent)', marginBottom: 12, fontWeight: 700 }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: 'var(--accent)', fontSize: 10.5, fontFamily: 'var(--font-mono)', letterSpacing: '0.12em', color: 'var(--paper)', marginBottom: 12, fontWeight: 800, boxShadow: '2px 2px 0 0 rgba(0,0,0,0.4)' }}>
                 CONTEXTUAL_READING
               </div>
-              <h3 className="display" style={{ fontSize: 'clamp(22px, 5vw, 42px)', color: 'var(--paper)', margin: 0, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+              <h3 className="display" style={{ fontSize: 'clamp(22px, 5vw, 42px)', color: 'var(--paper)', margin: 0, textShadow: '0 2px 8px rgba(0,0,0,0.85), 0 1px 3px rgba(0,0,0,0.9)' }}>
                 Dịch có tư duy. Đọc không gián đoạn.
               </h3>
-              <p className="serif" style={{ fontSize: 'clamp(13px, 2vw, 15px)', color: 'rgba(245,239,227,0.8)', margin: '8px 0 0' }}>
+              <p className="serif" style={{ fontSize: 'clamp(13px, 2vw, 15px)', color: 'rgba(245,239,227,0.95)', margin: '8px 0 0', textShadow: '0 1px 6px rgba(0,0,0,0.8)', fontWeight: 500 }}>
                 Bảo tồn nguyên vẹn tinh thần bản gốc với mạng nơ-ron ngữ cảnh thông minh.
               </p>
             </div>

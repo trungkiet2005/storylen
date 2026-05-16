@@ -6,6 +6,8 @@ import { Icon } from './Icons';
 import { useAuth, getAvatarInitial, getDisplayName } from '@/contexts/AuthContext';
 import { useToast } from './Toast';
 import { CreditBadge } from './CreditBadge';
+import { NotificationBell } from './NotificationBell';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export const Logo = ({ size = 22 }: { size?: number }) => (
   <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -15,7 +17,7 @@ export const Logo = ({ size = 22 }: { size?: number }) => (
         <text x="20" y="29" textAnchor="middle" fontSize="24" fontFamily="var(--font-serif)" fontWeight={800} fill="var(--paper)" transform="rotate(-4 20 20)">S</text>
       </svg>
       <div style={{ lineHeight: 1 }}>
-        <div className="display" style={{ fontSize: size, letterSpacing: "-0.02em" }}>StoryLens</div>
+        <div className="display topbar-logo-name" style={{ fontSize: size, letterSpacing: "-0.02em" }}>StoryLens</div>
         <div className="caps-xs topbar-logo-sub" style={{ color: "var(--muted)", marginTop: 3 }}>XÓA NHÒA RÀO CẢN NGÔN NGỮ</div>
       </div>
     </div>
@@ -68,6 +70,7 @@ function UserMenu() {
         onClick={() => setOpen(v => !v)}
         aria-label="Tài khoản người dùng"
         aria-expanded={open}
+        className="topbar-user-btn"
         style={{
           display: "flex",
           alignItems: "center",
@@ -98,10 +101,12 @@ function UserMenu() {
         >
           {!user.avatar_url && initial}
         </div>
-        <span style={{ fontSize: 13, fontWeight: 600, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <span className="topbar-username" style={{ fontSize: 13, fontWeight: 600, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {displayName}
         </span>
-        <Icon name="arrow-right" size={11} />
+        <span className="topbar-user-chev" style={{ display: "inline-flex" }}>
+          <Icon name="arrow-right" size={11} />
+        </span>
       </button>
 
       {/* Dropdown */}
@@ -191,7 +196,7 @@ function UserMenu() {
 
 // ─── TopBar ───────────────────────────────────────────────────────────────────
 
-export const TopBar = ({ active, compact = false }: { active: string, compact?: boolean }) => {
+export const TopBar = ({ active = "", compact = false }: { active?: string, compact?: boolean }) => {
   const [theme, setTheme] = useState("light");
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -286,12 +291,18 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
           </nav>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          {mounted && (
+            <span className="topbar-mobile-hide" style={{ display: "inline-flex" }}>
+              <LanguageSwitcher />
+            </span>
+          )}
+          {mounted && <NotificationBell />}
           {mounted && <CreditBadge />}
 
           {mounted && (
             <button
-              className="btn btn-sm btn-ghost"
+              className="btn btn-sm btn-ghost topbar-mobile-hide"
               onClick={toggleTheme}
               aria-label="Đổi giao diện"
               title={theme === "light" ? "Dark mode" : theme === "dark" ? "Sepia mode" : "Light mode"}
@@ -379,7 +390,7 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
             ))}
           </nav>
 
-          {/* Bottom: theme + user section */}
+          {/* Bottom: language + theme + user section */}
           <div
             style={{
               padding: "16px 20px",
@@ -387,18 +398,23 @@ export const TopBar = ({ active, compact = false }: { active: string, compact?: 
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
             }}
           >
-            {mounted && (
-              <button
-                className="btn btn-sm"
-                onClick={toggleTheme}
-                aria-label="Đổi giao diện"
-                style={{ fontSize: 13 }}
-              >
-                {theme === "dark" ? <><Icon name="sun" size={14}/> Light</> : theme === "sepia" ? <><Icon name="leaf" size={14}/> Light</> : <><Icon name="moon" size={14}/> Dark</>}
-              </button>
-            )}
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {mounted && <LanguageSwitcher />}
+              {mounted && (
+                <button
+                  className="btn btn-sm"
+                  onClick={toggleTheme}
+                  aria-label="Đổi giao diện"
+                  style={{ fontSize: 13 }}
+                >
+                  {theme === "dark" ? <><Icon name="sun" size={14}/> Light</> : theme === "sepia" ? <><Icon name="leaf" size={14}/> Light</> : <><Icon name="moon" size={14}/> Dark</>}
+                </button>
+              )}
+            </div>
             {mounted && <UserMenu />}
           </div>
         </div>
