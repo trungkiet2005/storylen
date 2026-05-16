@@ -2,21 +2,40 @@
 import React, { useState } from "react";
 
 interface StarRatingProps {
-  rating: number;
+  /** Preferred prop name. */
+  rating?: number;
+  /** Backwards-compatible alias used by some callers. */
+  value?: number;
   onChange?: (r: number) => void;
   size?: number;
+  /** Preferred — lowercase to match HTML attribute style. */
   readonly?: boolean;
+  /** Backwards-compatible alias. */
+  readOnly?: boolean;
+  /** Accepted for forward-compat. Currently the clear-rating action lives in
+   *  the parent (passing `0` to onChange resets), so this prop is a no-op. */
+  showClear?: boolean;
 }
 
-export function StarRating({ rating, onChange, size = 18, readonly = false }: StarRatingProps) {
+export function StarRating({
+  rating,
+  value,
+  onChange,
+  size = 18,
+  readonly,
+  readOnly,
+}: StarRatingProps) {
+  const ratingValue = rating ?? value ?? 0;
+  const isReadonly = Boolean(readonly ?? readOnly ?? false);
+
   const [hover, setHover] = useState(0);
-  const display = hover || rating;
+  const display = hover || ratingValue;
 
   return (
     <div
       style={{ display: "inline-flex", gap: 2, lineHeight: 1 }}
-      onMouseLeave={() => !readonly && setHover(0)}
-      aria-label={`Xếp hạng ${rating}/5 sao`}
+      onMouseLeave={() => !isReadonly && setHover(0)}
+      aria-label={`Xếp hạng ${ratingValue}/5 sao`}
     >
       {[1, 2, 3, 4, 5].map(n => (
         <svg
@@ -31,14 +50,14 @@ export function StarRating({ rating, onChange, size = 18, readonly = false }: St
           strokeLinejoin="round"
           style={{
             color: n <= display ? "#b58a3b" : "var(--border-soft)",
-            cursor: readonly ? "default" : "pointer",
+            cursor: isReadonly ? "default" : "pointer",
             transition: "color 0.1s, transform 0.1s",
-            transform: n <= display && !readonly ? "scale(1.15)" : "scale(1)",
+            transform: n <= display && !isReadonly ? "scale(1.15)" : "scale(1)",
           }}
-          onMouseEnter={() => !readonly && setHover(n)}
+          onMouseEnter={() => !isReadonly && setHover(n)}
           onClick={() => {
-            if (readonly || !onChange) return;
-            onChange(n === rating ? 0 : n);
+            if (isReadonly || !onChange) return;
+            onChange(n === ratingValue ? 0 : n);
           }}
           aria-label={`${n} sao`}
         >

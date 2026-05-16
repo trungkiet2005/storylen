@@ -6,12 +6,21 @@ import { READING_LIST_META } from "@/lib/localStore";
 import type { ReadingListStatus } from "@/lib/localStore";
 
 interface ReadingListPickerProps {
-  seriesId: string;
-  current: ReadingListStatus | null;
+  /** Identifier of the series — passed through so callers can wire onChange
+   *  without an extra closure. Made optional for backwards compat. */
+  seriesId?: string;
+  /** Preferred prop name. */
+  current?: ReadingListStatus | null;
+  /** Backwards-compatible alias used by some callers. */
+  value?: ReadingListStatus | null;
   onChange: (status: ReadingListStatus | null) => void;
+  /** Accepted for forward-compat; visual size tweaks live in the parent
+   *  styling for now, so this is currently a no-op. */
+  size?: "sm" | "md" | "lg" | number;
 }
 
-export function ReadingListPicker({ seriesId: _seriesId, current, onChange }: ReadingListPickerProps) {
+export function ReadingListPicker({ current, value, onChange }: ReadingListPickerProps) {
+  const currentValue = current ?? value ?? null;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -23,7 +32,7 @@ export function ReadingListPicker({ seriesId: _seriesId, current, onChange }: Re
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const meta = current ? READING_LIST_META[current] : null;
+  const meta = currentValue ? READING_LIST_META[currentValue] : null;
 
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
@@ -66,30 +75,30 @@ export function ReadingListPicker({ seriesId: _seriesId, current, onChange }: Re
                 <button
                   key={status}
                   onClick={() => {
-                    onChange(current === status ? null : status);
+                    onChange(currentValue === status ? null : status);
                     setOpen(false);
                   }}
                   style={{
                     display: "flex", alignItems: "center", gap: 8,
                     width: "100%", padding: "9px 14px",
-                    background: current === status ? "var(--bg-2)" : "transparent",
+                    background: currentValue === status ? "var(--bg-2)" : "transparent",
                     border: "none", cursor: "pointer",
                     fontSize: 13, color: m.color,
                     fontFamily: "var(--font-sans)", fontWeight: 600,
                     textAlign: "left",
                   }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--bg-2)"; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = current === status ? "var(--bg-2)" : "transparent"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = currentValue === status ? "var(--bg-2)" : "transparent"; }}
                 >
                   <Icon name={m.icon} size={13} />
                   {m.label}
-                  {current === status && (
+                  {currentValue === status && (
                     <span style={{ marginLeft: "auto", fontSize: 10, opacity: 0.6 }}>✓</span>
                   )}
                 </button>
               )
             )}
-            {current && (
+            {currentValue && (
               <>
                 <div style={{ height: 1, background: "var(--border-soft)", margin: "2px 0" }} />
                 <button
