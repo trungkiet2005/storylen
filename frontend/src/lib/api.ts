@@ -58,12 +58,17 @@ export interface BatchStatus {
   pages: PageStatus[];
 }
 
+export type ReviewStatus = "pending" | "approved" | "rejected";
+
 export interface BubbleData {
   bubble_id: string;
   bbox: [number, number, number, number]; // [x, y, w, h]
   original_text: string;
   translated_text: string;
   confidence: number;
+  review_status?: ReviewStatus;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
 }
 
 export interface PageData {
@@ -262,8 +267,22 @@ export async function uploadImages(
 
   return request<UploadResponse>("/upload", {
     method: "POST",
+    headers: { "Idempotency-Key": newIdempotencyKey() },
     body: fd,
   });
+}
+
+/**
+ * Build a fresh Idempotency-Key header value. Backend dedupes retries with the
+ * same key for ~10 minutes, so a network flake doesn't double-charge credits.
+ * Uses `crypto.randomUUID` where available; falls back to Math.random for very
+ * old runtimes that aren't realistic for us anymore.
+ */
+function newIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export async function getAIModuleOptions(): Promise<AIModuleOptions> {
@@ -299,7 +318,10 @@ export async function scrapeChapter(
 ): Promise<UploadResponse> {
   return request<UploadResponse>("/scrape", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": newIdempotencyKey(),
+    },
     body: JSON.stringify({
       chapter_url: chapterUrl,
       series_id: opts.seriesId ?? null,
@@ -310,7 +332,352 @@ export async function scrapeChapter(
   });
 }
 
+// ─── MangaDex proxy ───────────────────────────────────────────────────────────
+
+export interface MdxCoverArt {
+  type: "cover_art";
+  attributes: { fileName: string; volume?: string };
+}
+
+export interface MdxTag {
+  attributes: { name: { en: string }; group: string };
+}
+
+export interface MdxManga {
+  id: string;
+  attributes: {
+    title: Record<string, string>;
+    description: Record<string, string>;
+    status: "ongoing" | "completed" | "hiatus" | "cancelled";
+    lastChapter?: string;
+    tags: MdxTag[];
+  };
+  relationships: Array<MdxCoverArt | { type: string; attributes?: Record<string, unknown> }>;
+}
+
+export interface MdxMangaList {
+  data: MdxManga[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface MdxChapter {
+  id: string;
+  attributes: {
+    chapter?: string;
+    title?: string;
+    pages: number;
+    publishAt: string;
+    translatedLanguage?: string;
+  };
+  relationships: Array<{ type: string; attributes?: { name?: string } }>;
+}
+
+export interface MdxChapterList {
+  data: MdxChapter[];
+  total: number;
+}
+
+export interface MdxAtHomeServer {
+  baseUrl: string;
+  chapter: {
+    hash: string;
+    data: string[];
+    dataSaver: string[];
+  };
+}
+
+export function mdxImageProxy(rawUrl: string): string {
+  return `${BASE_URL}/mdx/cover-proxy?url=${encodeURIComponent(rawUrl)}`;
+}
+
+/**
+ * Direct CDN URL for manga covers. uploads.mangadex.org does NOT enforce
+ * hotlink protection on covers, so we can load them straight from the CDN
+ * (saves a backend hop and a chunked-transfer hand-off). Matches the demo.
+ * Chapter PAGE images, by contrast, must still go through `mdxImageProxy`.
+ */
+export function mdxCoverUrl(mangaId: string, fileName: string): string {
+  return `https://uploads.mangadex.org/covers/${mangaId}/${fileName}.512.jpg`;
+}
+
+export function mdxPageUrls(server: MdxAtHomeServer): string[] {
+  const { baseUrl, chapter } = server;
+  const useSaver = chapter.dataSaver?.length > 0;
+  const files = useSaver ? chapter.dataSaver : chapter.data;
+  const quality = useSaver ? "data-saver" : "data";
+  return files.map((f) =>
+    mdxImageProxy(`${baseUrl}/${quality}/${chapter.hash}/${f}`),
+  );
+}
+
+/**
+ * Map a MangaDex translatedLanguage code (ISO 639-1, sometimes with a region
+ * tag like "pt-br" or "zh-hk") to a flag emoji. Falls back to a generic globe
+ * when the code is unknown.
+ */
+const LANG_FLAG: Record<string, string> = {
+  vi: "🇻🇳", en: "🇬🇧", "en-us": "🇺🇸",
+  ja: "🇯🇵", "ja-ro": "🇯🇵",
+  ko: "🇰🇷", "ko-ro": "🇰🇷",
+  zh: "🇨🇳", "zh-hk": "🇭🇰", "zh-ro": "🇨🇳", "zh-tw": "🇹🇼",
+  fr: "🇫🇷", de: "🇩🇪", it: "🇮🇹", nl: "🇳🇱",
+  es: "🇪🇸", "es-la": "🇲🇽",
+  pt: "🇵🇹", "pt-br": "🇧🇷",
+  ru: "🇷🇺", uk: "🇺🇦", pl: "🇵🇱", cs: "🇨🇿", sk: "🇸🇰",
+  bg: "🇧🇬", ro: "🇷🇴", hu: "🇭🇺", el: "🇬🇷", fi: "🇫🇮",
+  sv: "🇸🇪", no: "🇳🇴", da: "🇩🇰", lt: "🇱🇹",
+  tr: "🇹🇷", ar: "🇸🇦", fa: "🇮🇷", he: "🇮🇱",
+  hi: "🇮🇳", bn: "🇧🇩", ta: "🇮🇳",
+  th: "🇹🇭", id: "🇮🇩", ms: "🇲🇾", fil: "🇵🇭", "tl-ph": "🇵🇭",
+  my: "🇲🇲", vi_vn: "🇻🇳",
+};
+
+export function mdxLanguageFlag(code: string | undefined | null): string {
+  if (!code) return "🌐";
+  return LANG_FLAG[code.toLowerCase()] ?? "🌐";
+}
+
+export function mdxMangaTitle(manga: MdxManga): string {
+  const t = manga.attributes.title;
+  return t["vi"] || t["en"] || t["ja-ro"] || Object.values(t)[0] || "Unknown";
+}
+
+export function mdxCoverFromManga(manga: MdxManga): string | null {
+  const cover = manga.relationships.find((r) => r.type === "cover_art") as MdxCoverArt | undefined;
+  if (!cover?.attributes?.fileName) return null;
+  return mdxCoverUrl(manga.id, cover.attributes.fileName);
+}
+
+// ─── Reading-state persistence (last opened chapter) ─────────────────────────
+
+const READING_KEY = "storylens.reading";
+
+export interface MdxReadingState {
+  mangaId: string;
+  mangaTitle: string;
+  chapterId: string;
+  chapterLabel: string;
+}
+
+export function mdxSaveReading(state: MdxReadingState): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(READING_KEY, JSON.stringify(state));
+  } catch {
+    // localStorage may be unavailable in some embed/iframe contexts — silent ok.
+  }
+}
+
+export function mdxLoadReading(): MdxReadingState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(READING_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const { mangaId, mangaTitle, chapterId, chapterLabel } = parsed as Partial<MdxReadingState>;
+    if (!chapterId) return null;
+    return {
+      mangaId: mangaId ?? "",
+      mangaTitle: mangaTitle ?? "",
+      chapterId,
+      chapterLabel: chapterLabel ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function mdxPopular(limit = 24): Promise<MdxMangaList> {
+  return request<MdxMangaList>(`/mdx/manga/popular?limit=${limit}`);
+}
+
+export async function mdxSearch(opts: {
+  title?: string;
+  tags?: string[];
+  limit?: number;
+  offset?: number;
+}): Promise<MdxMangaList> {
+  const params = new URLSearchParams({
+    limit: String(opts.limit ?? 24),
+    offset: String(opts.offset ?? 0),
+  });
+  if (opts.title) params.set("title", opts.title);
+  (opts.tags ?? []).forEach((t) => params.append("includedTags", t));
+  return request<MdxMangaList>(`/mdx/manga?${params}`);
+}
+
+export async function mdxChapters(
+  mangaId: string,
+  limit = 100,
+  offset = 0,
+): Promise<MdxChapterList> {
+  return request<MdxChapterList>(
+    `/mdx/manga/${mangaId}/chapters?limit=${limit}&offset=${offset}`,
+  );
+}
+
+export async function mdxChapterPages(chapterId: string): Promise<MdxAtHomeServer> {
+  return request<MdxAtHomeServer>(`/mdx/chapter/${chapterId}/pages`);
+}
+
+export interface MdxChapterDetailRel {
+  type: string;
+  id: string;
+  attributes?: Record<string, unknown>;
+}
+
+export interface MdxChapterDetail {
+  data: {
+    id: string;
+    type: "chapter";
+    attributes: {
+      chapter?: string;
+      title?: string;
+      pages?: number;
+      translatedLanguage?: string;
+    };
+    relationships: MdxChapterDetailRel[];
+  };
+}
+
+/** Fetch a single chapter's metadata (used to recover mangaId from chapterId). */
+export async function mdxChapter(chapterId: string): Promise<MdxChapterDetail> {
+  return request<MdxChapterDetail>(`/mdx/chapter/${chapterId}`);
+}
+
 // ─── Status polling ───────────────────────────────────────────────────────────
+
+// ─── Batch progress: WebSocket with polling fallback ─────────────────────────
+
+export interface BatchProgressHandle {
+  /** Close the underlying WebSocket / polling timer. Safe to call repeatedly. */
+  close: () => void;
+}
+
+/**
+ * Subscribe to live updates for one batch. Returns a handle whose `.close()`
+ * tears down whatever transport ended up active.
+ *
+ * Tries WebSocket first (single push channel — see backend ws.py). If the
+ * handshake fails (older deploy, auth expired, proxy strips Upgrade), falls
+ * back to 2.5s polling so the caller doesn't have to care which transport
+ * is actually carrying the traffic.
+ */
+export function subscribeBatchProgress(
+  batchId: string,
+  onUpdate: (status: BatchStatus) => void,
+  onTerminal?: () => void,
+): BatchProgressHandle {
+  let closed = false;
+  let ws: WebSocket | null = null;
+  let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+  const cleanup = () => {
+    closed = true;
+    if (ws) { try { ws.close(); } catch { /* ignore */ } ws = null; }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  };
+
+  const startPolling = () => {
+    if (closed) return;
+    const tick = async () => {
+      if (closed) return;
+      try {
+        const status = await getBatchStatus(batchId);
+        onUpdate(status);
+        const allDone = status.pages.every((p) =>
+          ["completed", "failed", "ocr_failed", "error"].includes(p.status),
+        );
+        if (allDone) {
+          onTerminal?.();
+          cleanup();
+        }
+      } catch {
+        // Transient network — keep polling, the next tick will retry.
+      }
+    };
+    void tick();
+    pollTimer = setInterval(tick, 2500);
+  };
+
+  // Track latest event timestamp so reconnect skips events already seen.
+  let lastEventAt: number | null = null;
+  const sessionKey = `storylens.batch-since.${batchId}`;
+  try {
+    const cached = window.localStorage.getItem(sessionKey);
+    if (cached) lastEventAt = Number(cached);
+  } catch { /* ignore */ }
+
+  // Build a ws:// or wss:// URL from BASE_URL so we follow whatever scheme +
+  // host the REST API uses (so dev + prod just work without a separate env var).
+  let wsUrl: string;
+  try {
+    const httpUrl = new URL(`${BASE_URL}/ws/batch/${batchId}`);
+    httpUrl.protocol = httpUrl.protocol === "https:" ? "wss:" : "ws:";
+    if (lastEventAt) httpUrl.searchParams.set("since", String(lastEventAt));
+    wsUrl = httpUrl.toString();
+  } catch {
+    startPolling();
+    return { close: cleanup };
+  }
+
+  try {
+    ws = new WebSocket(wsUrl);
+  } catch {
+    startPolling();
+    return { close: cleanup };
+  }
+
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "batch" && msg.data) {
+        onUpdate(msg.data as BatchStatus);
+        lastEventAt = Date.now() / 1000;
+        try { window.localStorage.setItem(sessionKey, String(lastEventAt)); } catch { /* ignore */ }
+      } else if (msg.type === "replay" && Array.isArray(msg.events)) {
+        // Server pushed events we missed during disconnect. We don't have a
+        // BatchStatus snapshot in these — the next "batch" frame will refresh
+        // the full view, so just log + advance the cursor.
+        lastEventAt = Date.now() / 1000;
+        try { window.localStorage.setItem(sessionKey, String(lastEventAt)); } catch { /* ignore */ }
+      } else if (msg.type === "done") {
+        onTerminal?.();
+        try { window.localStorage.removeItem(sessionKey); } catch { /* ignore */ }
+      }
+      // type === "ping" / "error" → no action needed at this layer.
+    } catch {
+      // Drop malformed frames quietly — they shouldn't happen.
+    }
+  };
+
+  ws.onerror = () => {
+    // Browsers don't expose the close code in onerror — onclose handles fallback.
+  };
+
+  ws.onclose = (ev) => {
+    if (closed) return;
+    // Auth failure or "not found" from the server → fall back to polling, which
+    // will exercise the REST endpoint (and its own 401 path) and give us better
+    // error semantics than silently retrying the WS handshake.
+    if (ev.code === 4401 || ev.code === 4404) {
+      startPolling();
+      return;
+    }
+    // 1000 = normal close (terminal already signalled via "done" frame).
+    if (ev.code === 1000) {
+      cleanup();
+      return;
+    }
+    // Anything else → fall back so the user still sees progress.
+    startPolling();
+  };
+
+  return { close: cleanup };
+}
 
 export async function getPageStatus(pageId: string): Promise<PageStatus> {
   return request<PageStatus>(`/status/${pageId}`);
@@ -387,6 +754,23 @@ export async function updateBubbleTranslation(
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ translated_text: translatedText }),
+  });
+}
+
+/**
+ * Studio review action — set a bubble's QC status (approved / rejected / pending).
+ * Optionally pipes through an edited translation in the same call (recorded as a
+ * new translation_history revision).
+ */
+export async function updateBubbleReview(
+  pageId: string,
+  bubbleId: string,
+  payload: { review_status: ReviewStatus; translated_text?: string },
+): Promise<BubbleData> {
+  return request<BubbleData>(`/page/${pageId}/bubbles/${bubbleId}/review`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
 }
 
@@ -1236,5 +1620,285 @@ export async function saveWibuProgress(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  });
+}
+
+// ─── Account self-service ────────────────────────────────────────────────────
+
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}
+
+export async function changeEmail(
+  newEmail: string,
+  currentPassword: string,
+): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/change-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ new_email: newEmail, current_password: currentPassword }),
+  });
+}
+
+export async function deleteAccount(
+  password: string,
+  confirm: string,
+): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/delete-account", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password, confirm }),
+  });
+}
+
+export function exportUserDataUrl(): string {
+  return `${BASE_URL}/auth/export-data`;
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  url: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+export interface NotificationListResponse {
+  total: number;
+  unread: number;
+  items: Notification[];
+}
+
+export async function listNotifications(limit = 50): Promise<NotificationListResponse> {
+  return request<NotificationListResponse>(`/notifications?limit=${limit}`);
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  return request<void>(`/notifications/${encodeURIComponent(id)}/read`, { method: "POST" });
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  return request<void>("/notifications/read-all", { method: "POST" });
+}
+
+export async function deleteNotification(id: string): Promise<void> {
+  return request<void>(`/notifications/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+// ─── Share links ─────────────────────────────────────────────────────────────
+
+export interface ShareLink {
+  share_id: string;
+  page_id: string;
+  url: string;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export async function createShareLink(
+  pageId: string,
+  expiresInHours?: number,
+): Promise<ShareLink> {
+  return request<ShareLink>("/share", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ page_id: pageId, expires_in_hours: expiresInHours ?? null }),
+  });
+}
+
+export async function getSharedPage(shareId: string): Promise<PageData> {
+  return request<PageData>(`/share/${encodeURIComponent(shareId)}`);
+}
+
+// ─── Full-text search ────────────────────────────────────────────────────────
+
+export interface SearchHit {
+  page_id: string;
+  page_number: number | null;
+  series_id: string | null;
+  series_title: string | null;
+  chapter_id: string | null;
+  chapter_number: number | null;
+  snippet: string;
+  thumbnail_url: string | null;
+}
+
+export interface SearchResponse {
+  query: string;
+  total: number;
+  hits: SearchHit[];
+}
+
+export async function searchBubbles(query: string, limit = 30): Promise<SearchResponse> {
+  const params = new URLSearchParams({ q: query, limit: String(limit) });
+  return request<SearchResponse>(`/search?${params}`);
+}
+
+// ─── Pipeline cancellation ───────────────────────────────────────────────────
+
+export async function cancelPage(pageId: string): Promise<{ message: string }> {
+  return request<{ message: string }>(`/status/${encodeURIComponent(pageId)}/cancel`, {
+    method: "POST",
+  });
+}
+
+export async function cancelBatch(batchId: string): Promise<{ message: string; cancelled: number }> {
+  return request<{ message: string; cancelled: number }>(
+    `/status/batch/${encodeURIComponent(batchId)}/cancel`,
+    { method: "POST" },
+  );
+}
+
+// ─── Chapter publish / public library ────────────────────────────────────────
+
+export async function publishChapter(chapterId: string): Promise<{ message: string; published_at: string }> {
+  return request<{ message: string; published_at: string }>(
+    `/chapters/${encodeURIComponent(chapterId)}/publish`,
+    { method: "POST" },
+  );
+}
+
+export async function unpublishChapter(chapterId: string): Promise<{ message: string }> {
+  return request<{ message: string }>(
+    `/chapters/${encodeURIComponent(chapterId)}/unpublish`,
+    { method: "POST" },
+  );
+}
+
+export interface LibrarySeriesItem {
+  series_id: string;
+  title: string;
+  description: string | null;
+  cover_image_url: string | null;
+  author: string | null;
+  tags: string[];
+  published_chapter_count: number;
+  latest_published_at: string | null;
+}
+
+export interface LibraryResponse {
+  total: number;
+  items: LibrarySeriesItem[];
+}
+
+export async function getPublicLibrary(limit = 50, offset = 0): Promise<LibraryResponse> {
+  return request<LibraryResponse>(`/library?limit=${limit}&offset=${offset}`);
+}
+
+export interface LibraryChapter {
+  chapter_id: string;
+  chapter_number: number | null;
+  title: string | null;
+  published_at: string | null;
+  cover_image_url: string | null;
+}
+
+export async function getPublicSeriesChapters(seriesId: string): Promise<{
+  series: { series_id: string; title: string; description: string | null; cover_image_url: string | null; author: string | null; tags: string[] };
+  chapters: LibraryChapter[];
+}> {
+  return request(`/library/${encodeURIComponent(seriesId)}/chapters`);
+}
+
+export interface LibraryChapterPage {
+  page_id: string;
+  page_number: number | null;
+  original_image_url: string | null;
+  thumbnail_url: string | null;
+}
+
+export async function getPublicChapterPages(chapterId: string): Promise<{
+  chapter: { chapter_id: string; series_id: string; chapter_number: number | null; title: string | null; published_at: string };
+  pages: LibraryChapterPage[];
+}> {
+  return request(`/library/chapters/${encodeURIComponent(chapterId)}`);
+}
+
+// ─── Reading session resume (localStorage) ───────────────────────────────────
+
+const READING_NATIVE_KEY = "storylens.native-reading";
+
+export interface NativeReadingState {
+  /** Identifier used by the reader URL (page_id, chapter_id, or series_id). */
+  ref: string;
+  /** Where we last were: "page" | "chapter" | "series". */
+  kind: "page" | "chapter" | "series";
+  /** Display label so resume UX is human-readable. */
+  label: string;
+  /** ISO timestamp of last save. */
+  at: string;
+  /** Optional cover for UI. */
+  cover_url?: string | null;
+}
+
+export function saveNativeReading(state: Omit<NativeReadingState, "at">): void {
+  if (typeof window === "undefined") return;
+  try {
+    const next: NativeReadingState = { ...state, at: new Date().toISOString() };
+    window.localStorage.setItem(READING_NATIVE_KEY, JSON.stringify(next));
+  } catch { /* localStorage may be disabled */ }
+}
+
+export function loadNativeReading(): NativeReadingState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(READING_NATIVE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<NativeReadingState>;
+    if (!parsed.ref || !parsed.kind || !parsed.label) return null;
+    return {
+      ref: String(parsed.ref),
+      kind: parsed.kind,
+      label: String(parsed.label),
+      at: String(parsed.at ?? ""),
+      cover_url: parsed.cover_url ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearNativeReading(): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.removeItem(READING_NATIVE_KEY); } catch { /* ignore */ }
+}
+
+// ─── Stripe checkout ─────────────────────────────────────────────────────────
+
+export interface CheckoutSessionResponse {
+  checkout_url: string;
+}
+
+export async function createCheckoutSession(planId: string): Promise<CheckoutSessionResponse> {
+  return request<CheckoutSessionResponse>("/credits/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan_id: planId }),
+  });
+}
+
+export async function createBillingPortalSession(): Promise<CheckoutSessionResponse> {
+  return request<CheckoutSessionResponse>("/credits/billing-portal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
   });
 }

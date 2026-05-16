@@ -52,9 +52,28 @@ def _update_status(
     if status == ProcessingStatus.COMPLETED:
         payload["processed_at"] = datetime.now(timezone.utc).isoformat()
     try:
-        supabase.table("manga_pages").update(payload).eq("page_id", page_id).execute()
+        result = supabase.table("manga_pages").update(payload).eq("page_id", page_id).execute()
     except Exception as exc:
         logger.error("Failed to update status for page %s: %s", page_id, exc)
+        return
+
+    # Event bus push for live WS clients (best-effort; replay survives ~5min).
+    try:
+        from app.services.pipeline_control import publish as _pub
+        batch_id = (result.data or [{}])[0].get("batch_id") if result.data else None
+        if not batch_id:
+            row = supabase.table("manga_pages").select("batch_id").eq("page_id", page_id).limit(1).execute()
+            batch_id = (row.data or [{}])[0].get("batch_id") if row.data else None
+        if batch_id:
+            _pub(batch_id, {
+                "type": "page",
+                "page_id": page_id,
+                "status": status.value,
+                "progress": payload["progress"],
+                "error": error,
+            })
+    except Exception as exc:
+        logger.debug("event publish skipped: %s", exc)
 
 
 def _safe_bbox(bbox: Any) -> list[int]:
@@ -115,11 +134,21 @@ def process_page(
 
     try:
         # ── Step 1: Notify frontend processing has started ─────────────────
+        from app.services.pipeline_control import (
+            CancelledError,
+            clear as _clear_cancel,
+            raise_if_cancelled,
+            register as _register_cancel,
+        )
+        _register_cancel(page_id)
+        raise_if_cancelled(page_id)
         _update_status(page_id, ProcessingStatus.OCR_RUNNING, 10)
 
         # ── Step 2: Call HF Space — does all heavy lifting ─────────────────
         logger.info("Delegating page %s to ai_module", page_id)
+        raise_if_cancelled(page_id)
         ai_result = call_translate(page_id, original_image_url, ai_config)
+        raise_if_cancelled(page_id)
         raw_bubbles = ai_result.get("bubbles", [])
         rendered_image_bytes = ai_result.get("rendered_image_bytes")
         if not isinstance(rendered_image_bytes, bytes) or not rendered_image_bytes:
@@ -232,6 +261,27 @@ def process_page(
 
         _update_status(page_id, ProcessingStatus.COMPLETED, 100)
 
+        # Best-effort notification + achievement check (failures must not break pipeline).
+        try:
+            owner = supabase.table("manga_pages").select("user_id").eq("page_id", page_id).limit(1).execute()
+            user_id = (owner.data or [{}])[0].get("user_id")
+            if user_id:
+                from app.routers.notifications import emit_notification
+                emit_notification(
+                    user_id,
+                    type="translation",
+                    title="Dịch xong rồi!",
+                    body="Một trang truyện vừa được dịch thành công.",
+                    url=f"/reader/{page_id}",
+                )
+                try:
+                    from app.services.achievements import check_and_unlock
+                    check_and_unlock(user_id)
+                except Exception as ex:
+                    logger.info("Achievement check skipped: %s", ex)
+        except Exception as ex:
+            logger.info("Post-pipeline notify skipped: %s", ex)
+
         return [
             BubbleResult(
                 bubble_id=b.get("bubble_id") or str(uuid.uuid4()),
@@ -243,7 +293,33 @@ def process_page(
             for b in raw_bubbles
         ]
 
+    except CancelledError:
+        logger.info("Pipeline cancelled for page %s", page_id)
+        _update_status(
+            page_id,
+            ProcessingStatus.CANCELLED,
+            0,
+            error="Đã huỷ theo yêu cầu của bạn.",
+        )
+        _clear_cancel(page_id)
+        return []
     except Exception as exc:
         logger.exception("Pipeline failed for page %s", page_id)
         _update_status(page_id, ProcessingStatus.FAILED, 0, error=str(exc))
+        try:
+            owner = supabase.table("manga_pages").select("user_id").eq("page_id", page_id).limit(1).execute()
+            user_id = (owner.data or [{}])[0].get("user_id")
+            if user_id:
+                from app.routers.notifications import emit_notification
+                emit_notification(
+                    user_id,
+                    type="translation_failed",
+                    title="Dịch thất bại",
+                    body=str(exc)[:160],
+                )
+        except Exception:
+            pass
+        _clear_cancel(page_id)
         raise
+    finally:
+        _clear_cancel(page_id)

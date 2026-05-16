@@ -734,6 +734,19 @@ function ReaderContent() {
         setHistoryByBubble({});
         setOpenHistoryBubbleId(null);
         toast("Đã tải dữ liệu trang", "success");
+        // Save reading session so the home page can offer "Tiếp tục đọc".
+        try {
+          // dynamic import keeps this away from SSR
+          import("@/lib/api").then(({ saveNativeReading }) => {
+            saveNativeReading({
+              ref: data.page_id,
+              kind: "page",
+              label:
+                (data.metadata?.series_id ? `Trang #${data.metadata?.page_number ?? "?"}` : "Trang đã dịch"),
+              cover_url: data.thumbnail_url || data.original_image_url || null,
+            });
+          });
+        } catch { /* ignore */ }
       })
       .catch(err => {
         const msg = err instanceof APIError ? err.message : "Không thể tải dữ liệu trang.";
@@ -1456,27 +1469,37 @@ function ReaderContent() {
 
                   {/* Translation edits */}
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 6, flexWrap: "wrap" }}>
                       <div className="caps-xs" style={{ color: "var(--accent)" }}>Sửa bản dịch</div>
                       {pageData && pageData.processed_data.length > 0 && (
-                        <button
-                          className="btn btn-sm btn-ghost"
-                          style={{ padding: "3px 6px", fontSize: 10 }}
-                          onClick={async () => {
-                            const text = pageData.processed_data
-                              .map((b, i) => `[${i + 1}] ${editTexts[b.bubble_id] ?? b.translated_text}`)
-                              .join("\n\n");
-                            try {
-                              await navigator.clipboard.writeText(text);
-                              toast(`Đã copy ${pageData.processed_data.length} bubble.`, "success");
-                            } catch {
-                              toast("Không thể copy.", "error");
-                            }
-                          }}
-                          title="Copy tất cả bản dịch của trang"
-                        >
-                          <Icon name="copy" size={10}/> Copy tất cả
-                        </button>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <Link
+                            href={`/studio/${pageData.page_id}`}
+                            className="btn btn-sm btn-primary"
+                            style={{ padding: "3px 8px", fontSize: 10, textDecoration: "none" }}
+                            title="Mở Studio QC để duyệt từng bubble"
+                          >
+                            <Icon name="check" size={10}/> Studio QC
+                          </Link>
+                          <button
+                            className="btn btn-sm btn-ghost"
+                            style={{ padding: "3px 6px", fontSize: 10 }}
+                            onClick={async () => {
+                              const text = pageData.processed_data
+                                .map((b, i) => `[${i + 1}] ${editTexts[b.bubble_id] ?? b.translated_text}`)
+                                .join("\n\n");
+                              try {
+                                await navigator.clipboard.writeText(text);
+                                toast(`Đã copy ${pageData.processed_data.length} bubble.`, "success");
+                              } catch {
+                                toast("Không thể copy.", "error");
+                              }
+                            }}
+                            title="Copy tất cả bản dịch của trang"
+                          >
+                            <Icon name="copy" size={10}/> Copy tất cả
+                          </button>
+                        </div>
                       )}
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

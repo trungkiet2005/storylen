@@ -66,3 +66,45 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
                     },
                 )
         return await call_next(request)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security-relevant response headers to every reply.
+
+    Mirrors what Next.js sets on the frontend so the API surface is consistent
+    when accessed directly (e.g. via /docs, /openapi.json, or curl).
+    Cross-origin policy is intentionally permissive because the API is hit by
+    a different origin (Vercel) under CORS.
+    """
+
+    HEADERS = {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Permissions-Policy": (
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        ),
+        # HSTS is only meaningful when served via HTTPS; harmless on localhost
+        # since browsers ignore it on http://. Two years + preload-ready.
+        "Strict-Transport-Security": (
+            "max-age=63072000; includeSubDomains; preload"
+        ),
+        # API doesn't render HTML, so a tight CSP keeps the auto-generated
+        # /docs page safe and blocks accidental HTML injection elsewhere.
+        "Content-Security-Policy": (
+            "default-src 'none'; "
+            "img-src 'self' data: https://fastapi.tiangolo.com; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "script-src 'self' https://cdn.jsdelivr.net; "
+            "connect-src 'self'; "
+            "font-src 'self' data: https://cdn.jsdelivr.net; "
+            "frame-ancestors 'none'; "
+            "base-uri 'none'"
+        ),
+    }
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        for key, value in self.HEADERS.items():
+            response.headers.setdefault(key, value)
+        return response

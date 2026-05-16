@@ -21,13 +21,14 @@ from threading import BoundedSemaphore, Thread
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, UploadFile
 
 from app.config import get_settings
 from app.database import get_supabase
 from app.models.schemas import ProcessingStatus, UploadResponse
 from app.rate_limit import limiter
 from app.routers.auth import AuthUser, get_current_user
+from app.services import idempotency
 from app.services.ai_pipeline import process_page
 from app.services.credit_service import check_batch_size, check_has_credits, deduct
 from app.services.image_validation import verify_image_bytes
@@ -246,6 +247,7 @@ async def upload_manga_images(
     chapter_id: str | None = Form(default=None),
     new_chapter_title: str | None = Form(default=None),
     user: AuthUser = Depends(get_current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     """
     Upload one or more manga images (JPG / PNG / WebP).
@@ -255,7 +257,16 @@ async def upload_manga_images(
     - series_id + chapter_id → attach pages to that chapter
     - series_id + new_chapter_title → create a new chapter and attach
     - series_id only → append to the latest chapter (or auto-create chapter 1)
+
+    Pass an `Idempotency-Key` header to make this safely retryable: a duplicate
+    request with the same key within 10 minutes returns the original response
+    instead of re-charging credits or re-uploading the same images.
     """
+    # Idempotency replay — must happen BEFORE consuming any file bytes or credits.
+    idem_key = idempotency.normalise_key(user.id, idempotency_key, endpoint="upload")
+    cached = idempotency.get(idem_key)
+    if cached is not None:
+        return cached
     if not files:
         raise HTTPException(status_code=400, detail="No files provided.")
     ai_config_data = _parse_ai_config(ai_config)
@@ -399,10 +410,12 @@ async def upload_manga_images(
         except Exception:
             pass
 
-    return UploadResponse(
+    response = UploadResponse(
         message=(
             f"Upload successful. Processing started for {len(page_ids)} page(s)."
         ),
         page_ids=page_ids,
         batch_id=batch_id,
     )
+    idempotency.put(idem_key, response)
+    return response

@@ -1,0 +1,52 @@
+# =============================================================================
+# StoryLens Demo — .gitignore
+# =============================================================================
+
+# --- Secrets (NEVER commit) ---
+secrets/keys.json
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# --- App runtime data ---
+storylens.db
+storylens.db-shm
+storylens.db-wal
+chromadb/
+artifacts/
+uploads/
+outputs/
+
+# --- Env ---
+.env
+.env.local
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+.dockerignore
+
+# --- Tests ---
+.pytest_cache/
+.coverage
+htmlcov/

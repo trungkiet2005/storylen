@@ -17,6 +17,7 @@ export function CreditBadge() {
     <Link href="/plans" style={{ textDecoration: "none" }}>
       <div
         title="Credits còn lại — nhấn để xem gói đăng ký"
+        className="topbar-credit-badge"
         style={{
           display: "flex",
           alignItems: "center",
@@ -50,15 +51,15 @@ export function CreditBadge() {
         </svg>
 
         {/* Balance */}
-        <span style={{ color: isLow ? "var(--accent)" : "var(--fg)" }}>
+        <span className="topbar-credit-balance" style={{ color: isLow ? "var(--accent)" : "var(--fg)" }}>
           {credits_balance}
         </span>
 
         {/* Divider */}
-        <span style={{ color: "var(--border)", margin: "0 1px" }}>·</span>
+        <span className="topbar-credit-divider" style={{ color: "var(--border)", margin: "0 1px" }}>·</span>
 
         {/* Plan tier */}
-        <span style={{ color: planColor, letterSpacing: "0.04em" }}>
+        <span className="topbar-credit-plan" style={{ color: planColor, letterSpacing: "0.04em" }}>
           {planLabel}
         </span>
       </div>

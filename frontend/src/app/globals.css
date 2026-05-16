@@ -444,6 +444,23 @@ button:disabled:hover { transform: none !important; box-shadow: none !important;
   .topbar-desktop-nav { display: none !important; }
   .topbar-logo-sub { display: none; }
 
+  /* Hide non-essential header controls — they're surfaced inside the drawer. */
+  .topbar-mobile-hide { display: none !important; }
+
+  /* Logo wordmark shrinks so the cluster fits at 360px. */
+  .topbar-logo-name { font-size: 17px !important; }
+
+  /* Credit badge: show count + icon only, drop the plan tag to save width. */
+  .topbar-credit-plan { display: none !important; }
+  .topbar-credit-divider { display: none !important; }
+
+  /* Username text in the user menu disappears; the avatar carries identity. */
+  .topbar-username { display: none !important; }
+
+  /* User menu button: avatar-only, tighter padding. */
+  .topbar-user-btn { padding: 2px !important; border-color: transparent !important; }
+  .topbar-user-btn .topbar-user-chev { display: none !important; }
+
   .series-header-grid {
     grid-template-columns: 1fr;
   }
@@ -467,6 +484,69 @@ button:disabled:hover { transform: none !important; box-shadow: none !important;
   }
 }
 
+/* Very narrow phones (≤380px) — drop the credit balance text too,
+   leave only the coin icon to free up space for avatar + bell. */
+@media (max-width: 380px) {
+  .topbar-credit-balance { display: none !important; }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Animated anime background slideshow (component: AnimatedBackground.tsx)
+   ─────────────────────────────────────────────────────────────────────── */
+.anim-bg-root {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+/* Bounded variant fills the nearest positioned ancestor instead of the viewport. */
+.anim-bg-root.anim-bg-bounded {
+  position: absolute;
+  z-index: 0;
+}
+.anim-bg-slide {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transform: scale(1.05);
+  transition: opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity, transform;
+}
+.anim-bg-slide.active {
+  opacity: 1;
+  animation: animBgZoom 30s ease-in-out infinite alternate;
+}
+.anim-bg-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+@keyframes animBgZoom {
+  from { transform: scale(1.02); }
+  to   { transform: scale(1.12); }
+}
+
+/* Respect reduced-motion preference: keep slideshow but kill the zoom. */
+@media (prefers-reduced-motion: reduce) {
+  .anim-bg-slide.active { animation: none; transform: none; }
+  .anim-bg-slide { transition: opacity 0.3s linear; }
+}
+
+/* Optional: hide on mobile when component opts in (saves bandwidth). */
+@media (max-width: 640px) {
+  .anim-bg-root[data-hide-mobile="1"] { display: none; }
+}
+
+/* When the animated background is mounted anywhere on the page, drop the
+   solid paper background so the slideshow shows through. Noise/halftone
+   overlay is preserved by the grain-overlay element in layout.tsx. */
+body:has(.anim-bg-root) .paper-grain {
+  background-color: transparent;
+}
+
 @media (max-width: 1200px) {
   .hero-mockup-wrapper {
     display: none !important;
@@ -482,7 +562,8 @@ button:disabled:hover { transform: none !important; box-shadow: none !important;
   align-items: flex-end;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--muted);
+  color: rgba(245, 239, 227, 0.7);
+  z-index: 2;
 }
 
 /* Ensure hero has enough bottom padding for poster tags on desktop */

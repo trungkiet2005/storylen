@@ -1,9 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WibuProvider } from "@/contexts/WibuContext";
+import { I18nProvider } from "@/contexts/I18nContext";
 import { AchievementToaster } from "@/components/AchievementToaster";
+import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 
 export const metadata: Metadata = {
   title: "StoryLens — Đọc Truyện Tranh Đa Ngôn Ngữ Bằng AI",
@@ -18,6 +20,13 @@ export const metadata: Metadata = {
     locale: "vi_VN",
   },
   robots: { index: true, follow: true },
+  manifest: "/manifest.webmanifest",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#c8102e",
 };
 
 export default function RootLayout({
@@ -28,14 +37,17 @@ export default function RootLayout({
   return (
     <html lang="vi" data-theme="light">
       <body suppressHydrationWarning>
-        <AuthProvider>
-          <WibuProvider>
-            <ToastProvider>
-              <AchievementToaster />
-              {children}
-            </ToastProvider>
-          </WibuProvider>
-        </AuthProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <WibuProvider>
+              <ToastProvider>
+                <AchievementToaster />
+                <OnboardingOverlay />
+                {children}
+              </ToastProvider>
+            </WibuProvider>
+          </AuthProvider>
+        </I18nProvider>
         {/* Film grain overlay */}
         <div className="grain-overlay" aria-hidden="true" />
       </body>

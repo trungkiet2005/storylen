@@ -2,17 +2,20 @@
 
 ## What This Project Is
 
-StoryLens is a production web app that lets users upload manga pages, runs an AI pipeline to detect and translate speech bubbles (Japanese/Chinese → Vietnamese), then serves a reader interface with translation overlays and a RAG-powered Q&A system.
+StoryLens is a production web app that lets users upload manga pages, runs an AI
+pipeline to detect and translate speech bubbles (Japanese/Chinese → Vietnamese),
+then serves a reader interface with translation overlays and a RAG-powered Q&A
+system. Users can also publish their translated chapters to a public library.
 
 **Three deployable services:**
 
-| Service | Stack | Port | Deploy target |
-|---------|-------|------|---------------|
-| `frontend/` | Next.js 16 + React 19 + TypeScript | 3000 | Vercel |
-| `backend/` | FastAPI + Python 3.11 + Supabase | 8000 | Render (Docker) |
-| `ai_module/` | FastAPI + PyTorch + YOLOv8 + manga-ocr | 8001 | HuggingFace Spaces |
+| Service       | Stack                                         | Port | Deploy target          |
+| ------------- | --------------------------------------------- | ---- | ---------------------- |
+| `frontend/`   | Next.js 16 + React 19 + TypeScript            | 3000 | Vercel                 |
+| `backend/`    | FastAPI + Python 3.11 + Supabase              | 8000 | Render (Docker)        |
+| `ai_module/`  | FastAPI + PyTorch + YOLOv8 + manga-ocr        | 8001 | HuggingFace Spaces     |
 
-**Database:** Supabase PostgreSQL with pgvector extension (vector search for RAG).
+**Database:** Supabase PostgreSQL with pgvector + pg_trgm extensions.
 
 ---
 
@@ -20,37 +23,50 @@ StoryLens is a production web app that lets users upload manga pages, runs an AI
 
 ```
 storylen/
-├── frontend/              # Next.js web app
+├── frontend/                  # Next.js web app
 │   ├── src/
-│   │   ├── app/           # App Router pages (login, upload, reader, qa, admin…)
-│   │   ├── components/    # Shared React components
-│   │   ├── contexts/      # AuthContext, WibuContext
-│   │   └── lib/           # api.ts (fetch wrapper), constants.ts, localStore.ts
-│   └── __tests__/         # Vitest + React Testing Library
+│   │   ├── app/               # App Router pages (login, upload, reader, qa,
+│   │   │                      #   library, review/[pageId], share/[shareId],
+│   │   │                      #   forgot-password, reset-password,
+│   │   │                      #   notifications, profile/security, admin/…)
+│   │   ├── components/        # AnimatedBackground, NotificationBell,
+│   │   │                      #   LanguageSwitcher, OnboardingOverlay,
+│   │   │                      #   ResumeReading, TopBar, …
+│   │   ├── contexts/          # AuthContext, WibuContext, I18nContext
+│   │   └── lib/               # api.ts (fetch wrapper), wallpaper-playlists.ts
+│   ├── e2e/                   # Playwright E2E tests (auth, home, edge cases,
+│   │                          #   mobile, protected-pages)
+│   ├── __tests__/             # Vitest + React Testing Library
+│   ├── public/wallpapers/     # Themed anime backgrounds (dragonball, xianxia,
+│   │                          #   demon-slayer, blue-lock, jujutsu, naruto)
+│   └── playwright.config.ts
 ├── backend/
 │   └── app/
-│       ├── main.py        # FastAPI entry, middleware, router registration
-│       ├── config.py      # Pydantic Settings — all env vars live here
-│       ├── database.py    # Supabase client singleton
-│       ├── routers/       # 10 routers: auth, upload, pages, status, qa, history,
-│       │                  #   series, credits, ai_module, wibu + admin/
-│       ├── services/      # Business logic: ai_pipeline, rag, credit_service, hf_client
+│       ├── main.py            # FastAPI entry, middleware, router registration
+│       ├── config.py          # Pydantic Settings — all env vars live here
+│       ├── database.py        # Supabase client singleton
+│       ├── middleware.py      # RequestID, BodySizeLimit, SecurityHeaders
+│       ├── routers/           # auth, upload, pages, status, qa, history,
+│       │                      #   series, credits, ai_module, wibu,
+│       │                      #   notifications, share, search, payments,
+│       │                      #   library, admin/
+│       ├── services/          # ai_pipeline, rag, credit_service, hf_client,
+│       │                      #   pipeline_control (cancel + event bus),
+│       │                      #   achievements, idempotency
 │       ├── models/schemas.py  # Pydantic request/response models
 │       └── storage/supabase_storage.py
-├── ai_module/             # Standalone ML service (heavy: ~4GB Docker image)
-│   ├── manga_translator/  # YOLOv8 detection, manga-ocr, lama_large inpainting
-│   └── server/            # FastAPI routes for translation
-├── docs/                  # SAD, SRS, API spec, DB schema, deployment guide
-├── supabase/              # Supabase config
-├── render.yaml            # Render IaC (backend Docker deploy, Singapore region)
-└── .github/workflows/     # CI: tsc typecheck + vitest + eslint on frontend changes
+├── ai_module/                 # Standalone ML service (heavy: ~4GB Docker image)
+├── docs/                      # SAD, SRS, API spec, DB schema, deployment guide
+├── supabase/                  # Supabase config
+├── render.yaml                # Render IaC (backend Docker deploy, Singapore)
+└── .github/workflows/ci.yml   # CI: tsc + vitest + eslint + build + Playwright + pytest
 ```
 
 ---
 
 ## Local Development
 
-### 1 — Backend
+### Backend
 
 ```powershell
 cd backend
@@ -61,22 +77,21 @@ cp .env.example .env          # fill in secrets
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Health check: `GET http://127.0.0.1:8000/health`  
-Interactive docs: `http://127.0.0.1:8000/docs`
+Health check: `GET http://127.0.0.1:8000/health`
+Interactive docs: `http://127.0.0.1:8000/docs` (only when `DEBUG=true`)
 
-### 2 — Frontend
+### Frontend
 
 ```powershell
 cd frontend
 npm install
-# create .env.local:
-# NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/v1
+# create .env.local from .env.example
 npm run dev
 ```
 
 Open `http://localhost:3000`
 
-### 3 — AI Module (optional, heavy)
+### AI Module (optional, heavy)
 
 ```powershell
 cd ai_module
@@ -84,7 +99,8 @@ pip install -r requirements.txt
 python main.py --host 127.0.0.1 --port 8001
 ```
 
-Without the AI module running locally, point `AI_MODULE_URL` in `backend/.env` at the HuggingFace Space URL.
+Without the AI module running locally, point `AI_MODULE_URL` in `backend/.env`
+at the HuggingFace Space URL.
 
 ---
 
@@ -93,51 +109,66 @@ Without the AI module running locally, point `AI_MODULE_URL` in `backend/.env` a
 ### Frontend
 
 ```powershell
-npm run dev          # dev server
+npm run dev          # dev server (port 3000)
 npm run build        # production build
-npx tsc --noEmit     # typecheck only (CI uses this)
-npm test             # vitest run (single pass)
+npx tsc --noEmit     # typecheck only
+npm test             # vitest (unit + RTL component tests)
 npm run test:watch   # vitest watch
+npm run test:e2e     # Playwright E2E (spins up its own dev server on 3100)
+npm run test:e2e:ui  # Playwright UI mode
 npm run lint         # ESLint
 ```
 
-Tests live in `frontend/__tests__/` (components, unit, integration) and use `jsdom` environment. Setup file: `frontend/vitest.setup.ts`.
+Playwright config: [`frontend/playwright.config.ts`](frontend/playwright.config.ts).
+Run against an existing dev server on 3000:
+`PLAYWRIGHT_NO_SERVER=1 PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e`.
 
 ### Backend
 
 ```powershell
 uvicorn app.main:app --reload          # dev
+pytest -q                              # all tests
 python smoke_test.py                   # basic integration check
 docker build -t storylens-api .        # build image
-docker run -p 8000:8000 --env-file .env storylens-api
 ```
 
 ---
 
 ## Environment Variables
 
-All backend config is validated by `app/config.py` (Pydantic Settings). Missing required vars crash on startup.
+All backend config is validated by `app/config.py` (Pydantic Settings).
+Missing required vars crash on startup in production.
 
 ### Critical backend vars
 
 ```
 SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY
-GEMINI_API_KEY           # comma-separated list for key rotation
+GEMINI_API_KEY                # comma-separated for key rotation
 GEMINI_MODEL=gemini-2.5-flash
-AI_MODULE_URL            # http://localhost:8001 or HF Space URL
-AI_MODULE_TRANSLATOR=gemini
-AI_MODULE_TARGET_LANG=VIN
+AI_MODULE_URL                 # http://localhost:8001 or HF Space URL
 MAX_FILE_SIZE_MB=10
 ALLOWED_EXTENSIONS=jpg,jpeg,png,webp
 RATE_LIMIT_UPLOAD=30/minute
-AUTH_COOKIE_SECURE=false  # true in production (cross-domain HTTPS)
-AUTH_COOKIE_SAMESITE=lax  # none in production
+AUTH_COOKIE_SECURE=false      # true in production (cross-domain HTTPS)
+AUTH_COOKIE_SAMESITE=lax      # none in production
+# Account flows
+PASSWORD_RESET_REDIRECT_URL=http://localhost:3000/reset-password
+FRONTEND_BASE_URL=http://localhost:3000
+# Stripe (optional — leave blank to disable checkout)
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_BASIC=
+STRIPE_PRICE_PRO=
+STRIPE_PRICE_PREMIUM=
 ```
 
-### Frontend
+### Frontend (`.env.local`)
 
 ```
-NEXT_PUBLIC_API_URL=https://storylens-api.onrender.com/v1
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000/v1
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=…       # used only by /reset-password page
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 ---
@@ -146,61 +177,141 @@ NEXT_PUBLIC_API_URL=https://storylens-api.onrender.com/v1
 
 ### Upload & Translation Pipeline
 
-1. User drops image(s) → `POST /v1/upload` → images stored in Supabase Storage (`manga-originals`)
-2. Background thread (semaphore-limited) calls AI Module (`POST /translate/with-form/image`)
+1. User drops image(s) → `POST /v1/upload` → Supabase Storage (`manga-originals`)
+2. Background thread (semaphore-limited) calls AI Module `/translate/with-form/image`
 3. AI Module: YOLOv8 detects bubbles → manga-ocr reads text → lama_large inpaints → Gemini translates
-4. Result (translated PNG) stored in `manga-thumbnails`, metadata saved to `manga_pages` + `bubble_data`
-5. Sentence embeddings computed and stored in `embeddings` (pgvector)
-6. Frontend polls `GET /v1/status/{page_id}` until `status=completed`
+4. Result (translated PNG) stored in `manga-thumbnails`, metadata in
+   `manga_pages` + `bubble_data`
+5. Sentence embeddings → `embeddings` (pgvector)
+6. Frontend receives progress via WebSocket (`/v1/ws/batch/{batch_id}`) with
+   polling fallback. Event bus replays missed events on reconnect.
+
+**Cooperative cancellation:** `POST /v1/status/{page_id}/cancel` flips a
+`threading.Event` checked at safe checkpoints in `ai_pipeline.process_page`.
 
 ### RAG Q&A
 
 1. User question → `POST /v1/qa` → vector embedding via Gemini embedding model
-2. `pgvector` cosine search in `embeddings` table → top-k bubble texts retrieved
-3. Context + question sent to Gemini (round-robin across multiple API keys)
+2. pgvector cosine search in `embeddings` table → top-k bubble texts
+3. Context + question → Gemini (round-robin across multiple API keys)
 4. 1 credit deducted per successful answer
 
 ### Auth Flow
 
-- Supabase Auth (email/password). Backend issues HTTP-only cookie after login — no JS token access.
-- Backend uses service-role key to bypass RLS for all DB operations.
-- `AuthContext` on frontend tracks session; unauthenticated → redirect to `/login`.
+- Supabase Auth (email/password). Backend issues HTTP-only cookie after login —
+  no JS token access.
+- Self-service: `/forgot-password` (Supabase recovery email), `/reset-password`
+  (uses access token from email hash), `/profile/security` (change password,
+  change email, GDPR export, delete account).
+- `AuthContext` tracks session; unauthenticated → redirect to `/login`.
+
+### Public Library
+
+- Owners call `POST /v1/chapters/{id}/publish` to make a chapter visible at
+  `/library`. Read-only endpoints (`GET /v1/library`, `/v1/library/{id}/chapters`,
+  `/v1/library/chapters/{id}`) are anonymous.
+- DB flag: `manga_chapters.published_at` (NULL = private).
 
 ### Credit System
 
 - FREE tier: 5 credits/day, reset at 00:00 `Asia/Ho_Chi_Minh`
 - Paid tiers: monthly pool (basic / pro / premium)
 - 1 credit = 1 image translation OR 1 Q&A query
-- Logic in `backend/app/services/credit_service.py`
+- Self-service upgrade via Stripe Checkout (`/v1/credits/checkout`) if
+  `STRIPE_SECRET_KEY` is set; otherwise returns 503 + UI falls back to
+  contact-admin modal.
 
-### Gamification ("Wibu" system)
+### Gamification ("Wibu") + Achievements
 
-- Bookmarks, star ratings, reading progress, achievements tracked via `wibu` router
-- Frontend state lives in `WibuContext` + `localStore.ts` (localStorage sync)
-- Backend tables: `bookmarks`, `ratings`, `achievements`
+- Bookmarks, ratings, reading lists, goals tracked via `wibu` router.
+- Achievement auto-unlock: server-side `app/services/achievements.py` runs
+  after pipeline completes, Q&A, or bookmark add. Newly-unlocked badges
+  emit notifications.
+
+### Notifications
+
+- In-app, persisted in `notifications` table. Bell icon polls every 60s.
+- Emitted from: pipeline complete/fail, achievement unlock, Stripe webhook.
+- Endpoints: `GET /v1/notifications`, `POST .../{id}/read`, `POST .../read-all`,
+  `DELETE .../{id}`.
+
+### Reading Session Resume
+
+- `frontend/src/lib/api.ts`: `saveNativeReading` / `loadNativeReading` writes
+  the last page/chapter/series to localStorage. `<ResumeReading />` on the
+  home page surfaces a "Tiếp tục đọc" pill.
+
+### Share Links
+
+- `POST /v1/share` (owner) issues an opaque `share_id` with optional TTL.
+- `GET /v1/share/{share_id}` is public; renders at `/share/[shareId]`.
 
 ---
 
-## Database (Supabase PostgreSQL + pgvector)
+## Database (Supabase PostgreSQL + pgvector + pg_trgm)
 
 Key tables:
 
-| Table | Purpose |
-|-------|---------|
-| `profiles` | User metadata (username, avatar, locale, timezone) |
-| `manga_series` | Series owned by user |
-| `manga_chapters` | Chapters within a series |
-| `manga_pages` | Individual pages, status, translated image URL |
-| `bubble_data` | OCR bounding boxes, original/translated text, confidence |
-| `embeddings` | pgvector (1536-dim) — powers RAG search |
-| `qa_history` | Q&A logs |
-| `credits` | Credit transactions & balances |
-| `bookmarks` | Saved pages |
-| `ratings` | User star ratings |
-| `achievements` | Unlocked badges |
+| Table                     | Purpose                                                 |
+| ------------------------- | ------------------------------------------------------- |
+| `profiles`                | User metadata (+ `stripe_customer_id`, `plan_tier`)     |
+| `manga_series`            | Series owned by user                                    |
+| `manga_chapters`          | Chapters (`published_at` flag for public library)       |
+| `manga_pages`             | Individual pages, status, translated image URL          |
+| `bubble_data`             | OCR bounding boxes, text, confidence, `review_status`   |
+| `embeddings`              | pgvector (1536-dim) — RAG search                        |
+| `qa_history`              | Q&A logs                                                |
+| `credit_transactions`     | Credit movements                                        |
+| `subscription_plans`      | Plan tier definitions                                   |
+| `user_bookmarks`/`ratings`/`reading_lists`/`reading_goals`/`achievements`/`read_pages`/`read_progress`/`reading_stats` | Wibu tables                                             |
+| `notifications`           | In-app bell feed (v2 migration)                         |
+| `share_links`             | Public share URLs (v2 migration)                        |
+| `app_settings`            | Admin feature flags                                     |
+| `audit_logs`              | Admin audit trail                                       |
 
-Migrations: `backend/supabase_migration*.sql`  
-Supabase Storage buckets: `manga-originals` (private), `manga-thumbnails` (private), `avatars` (public read)
+Migrations (run in order):
+
+```
+backend/supabase_migration.sql           # base schema
+backend/supabase_migration_credits.sql
+backend/supabase_migration_series.sql
+backend/supabase_migration_studio.sql
+backend/supabase_migration_wibu.sql
+backend/supabase_migration_admin.sql
+backend/supabase_migration_v2_features.sql   # notifications, share_links, stripe_customer_id, pg_trgm
+backend/supabase_migration_v3_features.sql   # manga_chapters.published_at
+```
+
+Storage buckets: `manga-originals` (private), `manga-thumbnails` (private),
+`avatars` (public read).
+
+---
+
+## Testing
+
+### Frontend
+
+- **Unit / component** — Vitest + React Testing Library at `frontend/__tests__/`.
+- **E2E** — Playwright at `frontend/e2e/`:
+  - `auth.spec.ts` — login, register, forgot password, password toggle, Google button placeholder
+  - `home.spec.ts` — hero, CTA, language switcher, footer, anime BG mount
+  - `protected-pages.spec.ts` — /profile/security, /notifications, /qa,
+    /search, /plans, /library, /admin
+  - `edge-cases.spec.ts` — backend down, rate-limited, expired session,
+    malformed JSON, share expired (410), 404
+  - `mobile.spec.ts` — mobile viewport: hamburger reveals drawer, language
+    switcher hidden in header, credit-badge plan hidden, username hidden, CTAs reachable
+- API mocking: `frontend/e2e/fixtures.ts` (`withMockedApi`, `clearStorage`,
+  `gotoApp`). Default 200 fallback so unmocked endpoints don't break UI.
+
+### Backend
+
+- Pytest at `backend/tests/`. Uses `respx` to mock Supabase + Gemini HTTP.
+
+### CI
+
+`.github/workflows/ci.yml` runs five jobs in parallel: typecheck, lint,
+production build, Playwright E2E, backend pytest.
 
 ---
 
@@ -208,35 +319,43 @@ Supabase Storage buckets: `manga-originals` (private), `manga-thumbnails` (priva
 
 ### Next.js version warning
 
-This project uses **Next.js 16.2.6 with React 19**. APIs, file conventions, and component behavior may differ from your training data. Before writing page/layout/route code, check `node_modules/next/dist/docs/` or `frontend/AGENTS.md`.
+This project uses **Next.js 16.2.6 with React 19**. Before writing page/layout
+code check `node_modules/next/dist/docs/` or `frontend/AGENTS.md` —
+APIs may differ from training data.
 
 ### API calls
 
-All backend calls go through `src/lib/api.ts` — a centralized fetch wrapper.  
-Do not use `fetch()` directly in components; extend `api.ts` if needed.
+All backend calls go through `src/lib/api.ts` — a centralized fetch wrapper
+with retry on cold-start, idempotency-key headers, and typed return values.
+**Do not use `fetch()` directly in components.**
 
-### Routing
-
-App Router (not Pages Router). All pages are in `src/app/`. Route groups: `(auth)`, `admin/` sub-routes.
-
-### State management
+### State
 
 - Global auth: `AuthContext` (`src/contexts/AuthContext.tsx`)
-- Gamification: `WibuContext` (`src/contexts/WibuContext.tsx`)
-- No Redux/Zustand — use React context + local state.
+- Gamification: `WibuContext`
+- i18n: `I18nContext` (VI/EN, localStorage-backed)
+- No Redux/Zustand — React context + local state.
 
 ### Styling
 
-Tailwind CSS + Framer Motion for animations. Dark-themed manga aesthetic. No CSS modules.
+Tailwind + Framer Motion. Editorial / manga-magazine aesthetic:
 
-### Testing
+- **Sharp corners** (`var(--radius-sm)` = 2px, never soft rounded).
+- **Hard offset shadows** (`panel-shadow` = `4px 4px 0 0 var(--border)`).
+- **2px borders** (`stroke-ink`, `stroke-ink-thick`).
+- `caps-xs` for tiny uppercase labels (letter-spaced 0.18em).
+- Flat colors, no gradient buttons.
+- 3-theme support (`light` / `dark` / `sepia`) via `[data-theme]` on `<html>`.
 
-```typescript
-// Preferred test structure
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-// Vitest globals (describe, it, expect, vi) are available without import
-```
+### Animated wallpapers
+
+`<AnimatedBackground playlist="…" />` mounted in hero / login aside /
+register aside / browse. Playlists declared in
+`src/lib/wallpaper-playlists.ts`. Files in `public/wallpapers/<theme>/`.
+
+### Routing
+
+App Router only. Route groups: `(auth)`, `admin/` sub-routes.
 
 ---
 
@@ -244,27 +363,30 @@ import userEvent from '@testing-library/user-event'
 
 ### Adding a new router
 
-1. Create `backend/app/routers/your_router.py`
-2. Define `router = APIRouter(prefix="/your-prefix", tags=["Your Tag"])`
-3. Register in `app/main.py`: `app.include_router(your_router.router)`
-4. Add Pydantic schemas to `app/models/schemas.py`
+1. Create `backend/app/routers/your_router.py`.
+2. `router = APIRouter(prefix="/your-prefix", tags=["Your Tag"])`.
+3. Register in `app/main.py`.
+4. Add Pydantic schemas to `app/models/schemas.py`.
 
 ### Service layer
 
-Business logic belongs in `app/services/`, not in router functions. Routers handle HTTP; services handle logic.
+Business logic in `app/services/`, **not** in router functions.
 
 ### Rate limiting
 
-Uses `slowapi`. Rate limits defined in `.env` (e.g., `RATE_LIMIT_UPLOAD=30/minute`) and applied via decorator:
+`slowapi` decorators driven by env vars (`RATE_LIMIT_*`). Uses access-token
+hash as key when authenticated, IP otherwise.
 
-```python
-@limiter.limit(settings.RATE_LIMIT_UPLOAD)
-async def upload_handler(request: Request, ...):
-```
+### Security headers
+
+`SecurityHeadersMiddleware` (in `middleware.py`) sets X-Content-Type-Options,
+X-Frame-Options=DENY, Referrer-Policy, Permissions-Policy, HSTS, and a tight
+CSP on every response — including FastAPI /docs.
 
 ### Error handling
 
-Return structured JSON errors — FastAPI `HTTPException` with meaningful status codes. Do not expose internal tracebacks.
+Structured JSON errors via FastAPI `HTTPException`. **Never** expose tracebacks
+in production. Auth errors return localized Vietnamese messages.
 
 ---
 
@@ -272,53 +394,46 @@ Return structured JSON errors — FastAPI `HTTPException` with meaningful status
 
 ### Backend (Render)
 
-- Defined in `render.yaml` — auto-deploys on push to `main`
-- Region: Singapore (`oregon` for free tier override)
-- Plan: free (512MB RAM) — no heavy ML models here
-- Health check endpoint: `GET /health`
+- `render.yaml` — auto-deploys on push to `main`. Region: Singapore.
+- Plan: free (512MB RAM) — no heavy ML models here.
+- Health check: `GET /health`.
 
 ### Frontend (Vercel)
 
-- Connect Vercel project to `storylen` repo, set root to `frontend/`
-- Set `NEXT_PUBLIC_API_URL` to the Render backend URL
+- Connect Vercel project to `storylen` repo, root = `frontend/`.
+- Required env: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SITE_URL`.
 
 ### AI Module (HuggingFace Spaces)
 
-- Docker-based Space (~4GB image)
-- Set `GEMINI_API_KEY` as a repository secret in Space settings
-- Backend `.env`: set `AI_MODULE_URL` to the HF Space URL, leave `AI_MODULE_TOKEN` empty for public Spaces
+- Docker-based Space (~4GB image).
+- Set `GEMINI_API_KEY` secret in Space settings.
+- Backend `.env`: set `AI_MODULE_URL` to the HF Space URL, leave
+  `AI_MODULE_TOKEN` empty for public Spaces.
 
 ### Keep-alive
 
-`.github/workflows/keep-alive.yml` pings the Render free tier to prevent sleep.
-
----
-
-## CI/CD
-
-`.github/workflows/ci.yml` runs on push/PR to `main` when `frontend/**` changes:
-
-1. **typecheck** — `npx tsc --noEmit`
-2. **test** — `npm test` (Vitest)
-3. **lint** — `npm run lint` (ESLint)
-
-All three must pass before merge.
+`.github/workflows/keep-alive.yml` pings Render free tier to prevent sleep.
 
 ---
 
 ## Admin Features
 
-Admin dashboard at `/admin` — restricted to users with `role=admin` in `profiles`.
+Admin dashboard at `/admin` — restricted to users with `role=admin`.
 
-Sub-sections: analytics, users, content moderation, health monitoring, audit logs, app settings (feature toggles, rate limit overrides).
+Sub-sections: analytics, users, content moderation, health monitoring,
+audit logs, app settings (feature toggles, rate limit overrides),
+credit/plan management.
 
 ---
 
 ## What NOT to Do
 
-- Do not add ML model loading to `backend/` — that belongs in `ai_module/` only.
+- Do not add ML model loading to `backend/` — that belongs in `ai_module/`.
 - Do not use `fetch()` directly in frontend components — use `src/lib/api.ts`.
 - Do not commit `.env` files or API keys.
-- Do not bypass the credit deduction logic in `credit_service.py` without a clear reason.
-- Do not use the Pages Router — this project uses the App Router exclusively.
+- Do not bypass credit deduction in `credit_service.py` without a clear reason.
+- Do not use the Pages Router — App Router only.
 - Do not store auth tokens in `localStorage` — they must stay in HTTP-only cookies.
+- Do not introduce rounded corners / blurred shadows / gradient buttons —
+  the design language is sharp / hard / editorial.

@@ -1,0 +1,17 @@
+name: memory_writer_v1
+version: "1.0.0"
+model: gemini-2.0-flash
+description: "Memory writer — extracts glossary/style/story updates from completed page"
+
+system: |
+  Từ trang dịch hoàn chỉnh, trích xuất:
+  - Thuật ngữ mới (tên nhân vật, địa danh, bảo bối).
+  - Quy tắc xưng hô mới phát hiện.
+  - Tóm tắt sự kiện trang.
+
+  Trả về JSON:
+  {
+    "glossary_candidates": [{"source": "...", "target": "...", "type": "character|place|object"}],
+    "style_notes": ["..."],
+    "page_summary": "..."
+  }

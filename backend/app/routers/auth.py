@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 import httpx
@@ -661,3 +661,277 @@ def logout(
                 raise
     _clear_session_cookies(response, settings)
     return AuthResponse(authenticated=False, message="Đã đăng xuất.")
+
+
+# ─── Password reset (forgot password) ─────────────────────────────────────────
+
+class ForgotPasswordRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        email = value.strip().lower()
+        if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+            raise ValueError("Email không hợp lệ")
+        return email
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit(lambda: get_settings().RATE_LIMIT_LOGIN)
+def forgot_password(
+    request: Request,
+    payload: ForgotPasswordRequest,
+    settings: Settings = Depends(get_settings),
+) -> MessageResponse:
+    """Trigger Supabase Auth password reset email. Always returns 200 to avoid email enumeration."""
+    redirect_to = settings.PASSWORD_RESET_REDIRECT_URL or None
+    body: dict[str, Any] = {"email": payload.email}
+    if redirect_to:
+        body["redirect_to"] = redirect_to
+    try:
+        _request_auth("POST", "recover", settings=settings, json=body)
+    except HTTPException as exc:
+        # Don't leak whether the email exists. Log and return generic success.
+        if exc.status_code >= 500:
+            logger.warning("Password reset request failed upstream: %s", exc.detail)
+    return MessageResponse(message="Nếu email tồn tại, chúng tôi đã gửi liên kết đặt lại mật khẩu.")
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
+
+
+@router.post("/change-password", response_model=MessageResponse)
+@limiter.limit(lambda: get_settings().RATE_LIMIT_LOGIN)
+def change_password(
+    request: Request,
+    payload: ChangePasswordRequest,
+    user: AuthUser = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> MessageResponse:
+    """Verify current password by re-login, then update via admin API."""
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu mới phải khác mật khẩu hiện tại.",
+        )
+    # Verify by attempting login with current credentials.
+    try:
+        _request_auth(
+            "POST",
+            "token?grant_type=password",
+            settings=settings,
+            json={"email": user.email, "password": payload.current_password},
+        )
+    except HTTPException as exc:
+        if exc.status_code in {status.HTTP_400_BAD_REQUEST, status.HTTP_401_UNAUTHORIZED}:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Mật khẩu hiện tại không đúng.",
+            ) from exc
+        raise
+
+    # Update via admin endpoint (service role).
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            res = client.put(
+                _supabase_auth_url(settings, f"admin/users/{user.id}"),
+                headers={
+                    "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+                    "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={"password": payload.new_password},
+            )
+            res.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        _raise_auth_error(exc, "Không thể đổi mật khẩu.")
+    except httpx.RequestError as exc:
+        logger.warning("Supabase admin password update failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Dịch vụ tạm thời không khả dụng.",
+        ) from exc
+    return MessageResponse(message="Đã đổi mật khẩu thành công.")
+
+
+class ChangeEmailRequest(BaseModel):
+    new_email: str = Field(min_length=3, max_length=320)
+    current_password: str = Field(min_length=8, max_length=256)
+
+    @field_validator("new_email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        email = value.strip().lower()
+        if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+            raise ValueError("Email không hợp lệ")
+        return email
+
+
+@router.post("/change-email", response_model=MessageResponse)
+@limiter.limit(lambda: get_settings().RATE_LIMIT_LOGIN)
+def change_email(
+    request: Request,
+    payload: ChangeEmailRequest,
+    user: AuthUser = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> MessageResponse:
+    """Verify password, then trigger Supabase to send confirmation email to the new address."""
+    if payload.new_email == user.email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email mới phải khác email hiện tại.",
+        )
+    try:
+        _request_auth(
+            "POST",
+            "token?grant_type=password",
+            settings=settings,
+            json={"email": user.email, "password": payload.current_password},
+        )
+    except HTTPException as exc:
+        if exc.status_code in {status.HTTP_400_BAD_REQUEST, status.HTTP_401_UNAUTHORIZED}:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Mật khẩu hiện tại không đúng.",
+            ) from exc
+        raise
+
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            res = client.put(
+                _supabase_auth_url(settings, f"admin/users/{user.id}"),
+                headers={
+                    "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+                    "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={"email": payload.new_email, "email_confirm": False},
+            )
+            res.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        _raise_auth_error(exc, "Không thể đổi email.")
+    except httpx.RequestError as exc:
+        logger.warning("Supabase admin email update failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Dịch vụ tạm thời không khả dụng.",
+        ) from exc
+    return MessageResponse(
+        message="Đã gửi email xác nhận đến địa chỉ mới. Vui lòng kiểm tra hộp thư để hoàn tất.",
+    )
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=8, max_length=256)
+    confirm: str = Field(..., description='Phải gõ chính xác "XÓA TÀI KHOẢN" để xác nhận')
+
+
+@router.post("/delete-account", response_model=MessageResponse)
+@limiter.limit(lambda: get_settings().RATE_LIMIT_LOGIN)
+def delete_account(
+    request: Request,
+    payload: DeleteAccountRequest,
+    response: Response,
+    user: AuthUser = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+) -> MessageResponse:
+    """Permanently delete user account and all related data (GDPR right-to-erasure)."""
+    if payload.confirm.strip() != "XÓA TÀI KHOẢN":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Vui lòng gõ chính xác "XÓA TÀI KHOẢN" để xác nhận.',
+        )
+    try:
+        _request_auth(
+            "POST",
+            "token?grant_type=password",
+            settings=settings,
+            json={"email": user.email, "password": payload.password},
+        )
+    except HTTPException as exc:
+        if exc.status_code in {status.HTTP_400_BAD_REQUEST, status.HTTP_401_UNAUTHORIZED}:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Mật khẩu không đúng.",
+            ) from exc
+        raise
+
+    sb = get_supabase()
+    user_id = user.id
+    # Clean up user-owned rows. Tables not present in a deploy are ignored.
+    tables_to_clean = (
+        "user_bookmarks", "user_ratings", "user_reading_lists", "user_reading_goals",
+        "user_achievements", "user_read_pages", "user_read_progress", "user_reading_stats",
+        "qa_history", "credit_transactions", "notifications", "manga_pages",
+        "manga_chapters", "manga_series", "profiles",
+    )
+    for table in tables_to_clean:
+        try:
+            sb.table(table).delete().eq("user_id", user_id).execute()
+        except Exception as exc:
+            logger.warning("Cleanup of %s for %s failed: %s", table, user_id, exc)
+
+    # Delete the auth user via admin API.
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            res = client.delete(
+                _supabase_auth_url(settings, f"admin/users/{user_id}"),
+                headers={
+                    "apikey": settings.SUPABASE_SERVICE_ROLE_KEY,
+                    "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+                },
+            )
+            res.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        _raise_auth_error(exc, "Không thể xoá tài khoản.")
+    except httpx.RequestError as exc:
+        logger.warning("Supabase admin delete failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Dịch vụ tạm thời không khả dụng.",
+        ) from exc
+
+    _clear_session_cookies(response, settings)
+    return MessageResponse(message="Tài khoản đã được xoá vĩnh viễn.")
+
+
+@router.get("/export-data")
+def export_user_data(user: AuthUser = Depends(get_current_user)):
+    """GDPR data export — returns a JSON dump of everything we know about the user."""
+    sb = get_supabase()
+    uid = user.id
+    export: dict[str, Any] = {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "user_id": uid,
+        "email": user.email,
+    }
+
+    tables = (
+        "profiles", "user_bookmarks", "user_ratings", "user_reading_lists",
+        "user_reading_goals", "user_achievements", "user_read_pages",
+        "user_read_progress", "user_reading_stats", "qa_history",
+        "credit_transactions", "manga_series", "manga_chapters", "manga_pages",
+        "notifications",
+    )
+    for table in tables:
+        try:
+            res = sb.table(table).select("*").eq("user_id", uid).execute()
+            export[table] = res.data or []
+        except Exception as exc:
+            logger.info("Skip %s in export for %s: %s", table, uid, exc)
+            export[table] = []
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        content=export,
+        headers={
+            "Content-Disposition": f'attachment; filename="storylens-export-{uid}.json"',
+        },
+    )

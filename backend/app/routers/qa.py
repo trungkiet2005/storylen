@@ -71,4 +71,10 @@ def ask_question(request: Request, payload: QARequest, user: AuthUser = Depends(
     except Exception as exc:
         logger.warning("Failed to save Q&A history: %s", exc)
 
+    try:
+        from app.services.achievements import check_and_unlock
+        check_and_unlock(user.id)
+    except Exception as exc:
+        logger.info("Achievement check after Q&A failed: %s", exc)
+
     return qa_result

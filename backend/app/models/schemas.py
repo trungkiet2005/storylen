@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,7 @@ class ProcessingStatus(str, Enum):
     TRANSLATED = "translated"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 # ─── Upload ────────────────────────────────────────────────────────────────────
@@ -71,16 +72,27 @@ class BatchStatusResponse(BaseModel):
 
 # ─── Page / Bubble ─────────────────────────────────────────────────────────────
 
+ReviewStatus = Literal["pending", "approved", "rejected"]
+
+
 class BubbleResult(BaseModel):
     bubble_id: str
     bbox: list[int] = Field(..., min_length=4, max_length=4, description="[x, y, width, height]")
     original_text: str
     translated_text: str
     confidence: float = Field(ge=0.0, le=1.0)
+    review_status: ReviewStatus = "pending"
+    reviewed_by: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
 
 
 class TranslationEditRequest(BaseModel):
     translated_text: str = Field(..., min_length=1, max_length=5000)
+
+
+class BubbleReviewRequest(BaseModel):
+    review_status: ReviewStatus
+    translated_text: Optional[str] = Field(default=None, max_length=5000)
 
 
 class TranslationHistoryItem(BaseModel):

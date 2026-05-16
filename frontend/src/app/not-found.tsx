@@ -121,7 +121,7 @@ export default function NotFound() {
         className="bubble" style={{ maxWidth: 320, marginBottom: 36, background: "#fff" }}
       >
         <span className="serif" style={{ fontSize: 14 }}>
-          "Lost in translation..."
+          &ldquo;Lost in translation...&rdquo;
         </span>
         <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, fontFamily: "var(--font-serif)" }}>
           — Lạc lối giữa những dòng dịch…

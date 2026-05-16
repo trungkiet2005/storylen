@@ -7,7 +7,7 @@ import { Icon } from '@/components/Icons';
 import { useToast } from '@/components/Toast';
 import {
   uploadImages,
-  getBatchStatus,
+  subscribeBatchProgress,
   PageStatus,
   APIError,
   healthCheck,
@@ -26,6 +26,7 @@ import {
   type SeriesDetail,
 } from '@/lib/api';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from '@/components/Animations';
 import { useAuth } from '@/contexts/AuthContext';
@@ -288,6 +289,9 @@ function UploadPageInner() {
   const [scrapePreviewLoading, setScrapePreviewLoading] = useState(false);
   const [scrapePreviewError, setScrapePreviewError] = useState<string | null>(null);
   const [scrapeLoading, setScrapeLoading] = useState(false);
+  // ── Chapter preview reader (lướt đọc trước khi dịch) ──────────────────────
+  const [previewReaderIndex, setPreviewReaderIndex] = useState<number | null>(null);
+  const [previewReaderMode, setPreviewReaderMode] = useState<"scroll" | "page">("scroll");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const consoleEndRef = useRef<HTMLDivElement>(null);
@@ -534,17 +538,14 @@ function UploadPageInner() {
       setSelectedFiles(fakePlaceholders);
       setState("processing");
 
-      let attempts = 0;
-      const maxAttempts = 150;
-      const poll = setInterval(async () => {
-        try {
-          const batchStatus = await getBatchStatus(batchId);
-          let terminalCount = 0;
-
+      // Subscribe to live progress (WebSocket — falls back to polling if WS fails).
+      // Same handle returned for both transports, so cleanup is uniform.
+      const sub = subscribeBatchProgress(
+        batchId,
+        (batchStatus: BatchStatus) => {
           setSelectedFiles(prev => prev.map(f => {
             const remote = batchStatus.pages.find(p => p.page_id === f.pageId);
             if (!remote) return f;
-            if (["completed", "failed", "ocr_failed"].includes(remote.status)) terminalCount++;
             if (f.status !== remote.status) {
               if (remote.status === "completed") addLog(`✓ Xong: ${f.name}`, "success");
               else if (["failed", "ocr_failed"].includes(remote.status)) addLog(`✕ Lỗi: ${f.name}`, "error");
@@ -552,16 +553,14 @@ function UploadPageInner() {
             }
             return { ...f, status: remote.status, progress: remote.progress, error: remote.error };
           }));
-
-          attempts++;
-          if (terminalCount === pageIds.length || attempts >= maxAttempts) {
-            clearInterval(poll);
-            setState("done");
-            addLog("=== HOÀN THÀNH SCRAPE & DỊCH THUẬT ===", "system");
-            toast("Đã scrape và dịch xong toàn bộ chapter!", "success");
-          }
-        } catch { /* ignore polling errors */ }
-      }, 2500);
+        },
+        () => {
+          setState("done");
+          addLog("=== HOÀN THÀNH SCRAPE & DỊCH THUẬT ===", "system");
+          toast("Đã scrape và dịch xong toàn bộ chapter!", "success");
+          sub.close();
+        },
+      );
     } catch (err) {
       const msg = err instanceof APIError ? err.message : "Lỗi khi scrape chapter.";
       setErrorMsg(msg);
@@ -640,60 +639,39 @@ function UploadPageInner() {
 
       setState("processing");
 
-      // Start polling the batch
-      let attempts = 0;
-      const maxAttempts = 150; // ~5 minutes
-      
-      const poll = setInterval(async () => {
-        try {
-          const batchStatus: BatchStatus = await getBatchStatus(batchId);
-          
-          // Update file statuses based on current data
-          let terminalCount = 0;
-          
-          setSelectedFiles(prev => {
-            return prev.map(file => {
-              const remote = batchStatus.pages.find(p => p.page_id === file.pageId);
-              if (!remote) return file;
-              
-              const isTerminal = ["completed", "failed", "ocr_failed"].includes(remote.status);
-              if (isTerminal) terminalCount++;
-
-              // Logging if transition to completed
-              if (file.status !== remote.status) {
-                if (remote.status === "completed") {
-                  addLog(`✓ Xử lý xong: ${file.name}`, 'success');
-                } else if (remote.status === "failed" || remote.status === "ocr_failed") {
-                  addLog(`✕ Lỗi: ${file.name} - ${remote.error || 'Lỗi pipeline'}`, 'error');
-                } else if (remote.status === "ocr_running") {
-                  addLog(`● Phát hiện vùng chữ: ${file.name}`, 'info');
-                } else if (remote.status === "translating") {
-                  addLog(`→ Đang dịch thuật AI: ${file.name}`, 'info');
-                }
+      // Live progress over WebSocket (auto-falls back to polling on handshake failure).
+      const sub = subscribeBatchProgress(
+        batchId,
+        (batchStatus: BatchStatus) => {
+          setSelectedFiles(prev => prev.map(file => {
+            const remote = batchStatus.pages.find(p => p.page_id === file.pageId);
+            if (!remote) return file;
+            if (file.status !== remote.status) {
+              if (remote.status === "completed") {
+                addLog(`✓ Xử lý xong: ${file.name}`, 'success');
+              } else if (remote.status === "failed" || remote.status === "ocr_failed") {
+                addLog(`✕ Lỗi: ${file.name} - ${remote.error || 'Lỗi pipeline'}`, 'error');
+              } else if (remote.status === "ocr_running") {
+                addLog(`● Phát hiện vùng chữ: ${file.name}`, 'info');
+              } else if (remote.status === "translating") {
+                addLog(`→ Đang dịch thuật AI: ${file.name}`, 'info');
               }
-
-              return {
-                ...file,
-                status: remote.status,
-                progress: remote.progress,
-                error: remote.error,
-              };
-            });
-          });
-
-          attempts++;
-          
-          const allDone = terminalCount === selectedFiles.length;
-          if (allDone || attempts >= maxAttempts) {
-            clearInterval(poll);
-            setState("done");
-            addLog("=== HOÀN THÀNH TẤT CẢ TRANG TRUYỆN ===", 'system');
-            toast("Tất cả trang đã được xử lý xong!", "success");
-          }
-        } catch (e) {
-          console.error("Batch status poll error", e);
-        }
-      }, 2500);
+            }
+            return {
+              ...file,
+              status: remote.status,
+              progress: remote.progress,
+              error: remote.error,
+            };
+          }));
+        },
+        () => {
+          setState("done");
+          addLog("=== HOÀN THÀNH TẤT CẢ TRANG TRUYỆN ===", 'system');
+          toast("Tất cả trang đã được xử lý xong!", "success");
+          sub.close();
+        },
+      );
 
     } catch (err) {
       if (err instanceof APIError && err.status === 0) {
@@ -913,29 +891,63 @@ function UploadPageInner() {
                             </div>
                           </div>
 
-                          {/* Image thumbnail strip */}
+                          {/* Image thumbnail strip — click any to open the preview reader */}
                           {scrapePreview.preview_urls.length > 0 && (
-                            <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: "2px 0" }}>
-                              {scrapePreview.preview_urls.map((url, i) => (
-                                /* eslint-disable-next-line @next/next/no-img-element */
-                                <img
-                                  key={i}
-                                  src={url}
-                                  alt={`Trang ${i + 1}`}
-                                  style={{
-                                    height: 90, width: "auto", flexShrink: 0,
-                                    border: "2px solid var(--border)",
-                                    objectFit: "cover",
-                                  }}
-                                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                                />
-                              ))}
-                              {scrapePreview.page_count > scrapePreview.preview_urls.length && (
-                                <div style={{ height: 90, minWidth: 56, flexShrink: 0, border: "2px dashed var(--border-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--muted)" }}>
-                                  +{scrapePreview.page_count - scrapePreview.preview_urls.length}
-                                </div>
-                              )}
-                            </div>
+                            <>
+                              <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: "2px 0" }}>
+                                {scrapePreview.preview_urls.slice(0, 8).map((url, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => { setPreviewReaderMode("page"); setPreviewReaderIndex(i); }}
+                                    title={`Mở trang ${i + 1}`}
+                                    style={{
+                                      padding: 0,
+                                      background: "transparent",
+                                      border: "2px solid var(--border)",
+                                      cursor: "pointer",
+                                      flexShrink: 0,
+                                      position: "relative",
+                                      transition: "transform 0.12s, border-color 0.12s",
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = "var(--accent)"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.borderColor = "var(--border)"; }}
+                                  >
+                                    {/* Remote MangaDex / mangaread URL — Next/Image lets us serve
+                                        AVIF/WebP transcodes from the optimizer for free. We pass an
+                                        explicit width/height and use `unoptimized` only if the
+                                        runtime forbids the optimizer (offline dev). */}
+                                    <Image
+                                      src={url}
+                                      alt={`Trang ${i + 1}`}
+                                      width={70}
+                                      height={90}
+                                      referrerPolicy="no-referrer"
+                                      style={{ height: 90, width: "auto", display: "block", objectFit: "cover" }}
+                                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                                    />
+                                    <div style={{ position: "absolute", bottom: 2, right: 2, background: "rgba(0,0,0,0.7)", color: "#fff", fontSize: 10, fontWeight: 700, padding: "1px 4px" }}>
+                                      {i + 1}
+                                    </div>
+                                  </button>
+                                ))}
+                                {scrapePreview.preview_urls.length > 8 && (
+                                  <button
+                                    onClick={() => { setPreviewReaderMode("scroll"); setPreviewReaderIndex(0); }}
+                                    title="Mở tất cả các trang"
+                                    style={{ height: 90, minWidth: 56, flexShrink: 0, border: "2px dashed var(--border-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--muted)", cursor: "pointer", background: "transparent" }}
+                                  >
+                                    +{scrapePreview.preview_urls.length - 8}
+                                  </button>
+                                )}
+                              </div>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => { setPreviewReaderMode("scroll"); setPreviewReaderIndex(0); }}
+                                style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 6 }}
+                              >
+                                <Icon name="book" size={13}/> Lướt đọc cả chapter ({scrapePreview.page_count} trang)
+                              </button>
+                            </>
                           )}
 
                           {/* Start button */}
@@ -1107,14 +1119,38 @@ function UploadPageInner() {
                           </div>
                         </div>
                         
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           {state === "done" && (
                             <motion.button whileHover={{ scale: 1.03 }} className="btn btn-sm btn-primary" onClick={resetUpload}>
                               <Icon name="upload" size={12}/> Upload thêm
                             </motion.button>
                           )}
                           {state === "processing" && (
-                            <span className="chip chip-accent animate-pulse">DỊCH TỰ ĐỘNG LIVE</span>
+                            <>
+                              <span className="chip chip-accent animate-pulse">DỊCH TỰ ĐỘNG LIVE</span>
+                              {batchId && (
+                                <motion.button
+                                  whileHover={{ scale: 1.02 }}
+                                  whileTap={{ scale: 0.98 }}
+                                  type="button"
+                                  className="btn btn-sm"
+                                  style={{ color: "var(--accent)", borderColor: "var(--accent)" }}
+                                  onClick={async () => {
+                                    if (!batchId) return;
+                                    if (!confirm("Huỷ tất cả trang đang dịch trong batch này?")) return;
+                                    try {
+                                      const { cancelBatch } = await import("@/lib/api");
+                                      const res = await cancelBatch(batchId);
+                                      addLog(`✗ ${res.message}`, "info");
+                                    } catch (err) {
+                                      addLog(`Huỷ thất bại: ${err instanceof Error ? err.message : "lỗi"}`, "error");
+                                    }
+                                  }}
+                                >
+                                  <Icon name="x" size={12}/> Huỷ batch
+                                </motion.button>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -1441,6 +1477,232 @@ function UploadPageInner() {
           </div>
         </div>
       </div>
+
+      {/* ── Preview reader modal ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {previewReaderIndex !== null && scrapePreview && (
+          <ScrapePreviewReader
+            urls={scrapePreview.preview_urls}
+            startIndex={previewReaderIndex}
+            mode={previewReaderMode}
+            chapterTitle={scrapePreview.chapter_title}
+            onModeChange={setPreviewReaderMode}
+            onClose={() => setPreviewReaderIndex(null)}
+          />
+        )}
+      </AnimatePresence>
     </AnimatedPage>
+  );
+}
+
+// ── Preview reader (lướt đọc chapter trước khi dịch) ─────────────────────────
+
+function ScrapePreviewReader({
+  urls,
+  startIndex,
+  mode,
+  chapterTitle,
+  onModeChange,
+  onClose,
+}: {
+  urls: string[];
+  startIndex: number;
+  mode: "scroll" | "page";
+  chapterTitle: string;
+  onModeChange: (m: "scroll" | "page") => void;
+  onClose: () => void;
+}) {
+  const [current, setCurrent] = useState(startIndex);
+
+  // Sync to startIndex when the modal is re-opened at a new thumbnail
+  useEffect(() => { setCurrent(startIndex); }, [startIndex]);
+
+  // Lock body scroll while modal is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  // Keyboard: ←/→ paginate, Esc close
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { onClose(); return; }
+      if (mode !== "page") return;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setCurrent(c => Math.min(urls.length - 1, c + 1));
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setCurrent(c => Math.max(0, c - 1));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, urls.length, onClose]);
+
+  const total = urls.length;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(10,10,14,0.96)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+      onClick={(e) => {
+        // Click outside image area = close
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      {/* Topbar */}
+      <div
+        style={{
+          flex: "0 0 auto",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "10px 16px",
+          background: "rgba(15,15,20,0.95)",
+          backdropFilter: "blur(8px)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Xem trước (chưa dịch)
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {chapterTitle}
+          </div>
+        </div>
+
+        <span style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontVariantNumeric: "tabular-nums" }}>
+          {mode === "page" ? `${current + 1} / ${total}` : `${total} trang`}
+        </span>
+
+        <div style={{ display: "flex", gap: 6 }}>
+          <button
+            className={`btn btn-sm ${mode === "scroll" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => onModeChange("scroll")}
+            title="Cuộn dọc"
+          >
+            <Icon name="layers" size={13}/> Cuộn
+          </button>
+          <button
+            className={`btn btn-sm ${mode === "page" ? "btn-primary" : "btn-ghost"}`}
+            onClick={() => onModeChange("page")}
+            title="Lật trang"
+          >
+            <Icon name="book" size={13}/> Trang
+          </button>
+        </div>
+
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={onClose}
+          style={{ color: "#fff" }}
+          title="Đóng (Esc)"
+        >
+          <Icon name="x" size={14}/> Đóng
+        </button>
+      </div>
+
+      {/* Body */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: mode === "scroll" ? "auto" : "hidden",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: mode === "scroll" ? "12px 16px" : 0,
+        }}
+      >
+        {mode === "scroll" ? (
+          <div style={{ width: "100%", maxWidth: 900, display: "flex", flexDirection: "column", gap: 2 }}>
+            {urls.map((u, i) => (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                key={i}
+                src={u}
+                alt={`Trang ${i + 1}`}
+                referrerPolicy="no-referrer"
+                loading={i < 2 ? "eager" : "lazy"}
+                decoding="async"
+                style={{ width: "100%", display: "block", background: "#1a1a22" }}
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.style.cssText = "width:100%;min-height:120px;display:flex;align-items:center;justify-content:center;background:#2a1010;color:#aaa";
+                  img.alt = `Lỗi tải trang ${i + 1}`;
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div style={{ position: "relative", width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <button
+              onClick={() => setCurrent(c => Math.max(0, c - 1))}
+              disabled={current === 0}
+              aria-label="Trang trước"
+              style={{
+                position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)",
+                width: 44, height: 44, borderRadius: "50%",
+                background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+                color: "#fff", cursor: current === 0 ? "not-allowed" : "pointer",
+                opacity: current === 0 ? 0.3 : 1, zIndex: 2,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <Icon name="arrow-left" size={20}/>
+            </button>
+
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={current}
+                src={urls[current]}
+                alt={`Trang ${current + 1}`}
+                referrerPolicy="no-referrer"
+                decoding="async"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.15 }}
+                style={{ maxWidth: "92%", maxHeight: "100%", objectFit: "contain", display: "block", background: "#1a1a22" }}
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.style.background = "#2a1010";
+                  img.alt = `Lỗi tải trang ${current + 1}`;
+                }}
+              />
+            </AnimatePresence>
+
+            <button
+              onClick={() => setCurrent(c => Math.min(urls.length - 1, c + 1))}
+              disabled={current === urls.length - 1}
+              aria-label="Trang sau"
+              style={{
+                position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)",
+                width: 44, height: 44, borderRadius: "50%",
+                background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)",
+                color: "#fff", cursor: current === urls.length - 1 ? "not-allowed" : "pointer",
+                opacity: current === urls.length - 1 ? 0.3 : 1, zIndex: 2,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <Icon name="arrow-right" size={20}/>
+            </button>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }

@@ -132,6 +132,13 @@ class Settings(BaseSettings):
             return v.strip()
         return v
 
+    # ─── Observability ────────────────────────────────────────────────────────
+    SENTRY_DSN: str = ""                # Empty → Sentry disabled.
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
+    SENTRY_ENVIRONMENT: str = "development"
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = ""  # Empty → OTel exporter disabled.
+    OTEL_SERVICE_NAME: str = "storylens-backend"
+
     # ─── Gemini (Google AI) ───────────────────────────────────────────────────
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-2.5-flash"
@@ -179,6 +186,19 @@ class Settings(BaseSettings):
 
     # ─── RAG ──────────────────────────────────────────────────────────────────
     RAG_TOP_K: int = 5
+
+    # ─── Account & email flows ────────────────────────────────────────────────
+    # URL Supabase Auth redirects to after the user clicks the password-reset
+    # email link. Leave empty to use Supabase's project default.
+    PASSWORD_RESET_REDIRECT_URL: str = ""
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
+
+    # ─── Stripe (optional — payment integration) ──────────────────────────────
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_BASIC: str = ""
+    STRIPE_PRICE_PRO: str = ""
+    STRIPE_PRICE_PREMIUM: str = ""
 
     # ─── Production sanity check ──────────────────────────────────────────────
     @model_validator(mode="after")

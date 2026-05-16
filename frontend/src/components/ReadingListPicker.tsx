@@ -1,132 +1,155 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Icon } from "./Icons";
-import { READING_LIST_META, type ReadingListStatus } from "@/contexts/WibuContext";
+import { Icon } from "@/components/Icons";
+import { READING_LIST_META } from "@/lib/localStore";
+import type { ReadingListStatus } from "@/lib/localStore";
 
-const STATUSES: ReadingListStatus[] = ["reading", "want", "done", "dropped"];
-
-export function ReadingListPicker({
-  value,
-  onChange,
-  size = "sm",
-}: {
-  value: ReadingListStatus | null;
+interface ReadingListPickerProps {
+  /** Pass-through identifier for callers that want to wire onChange without
+   *  a closure. Currently not used by the component itself. */
+  seriesId?: string;
+  /** Current status, or null when not in any list. */
+  value?: ReadingListStatus | null;
+  /** Backwards-compatible alias for `value`. */
+  current?: ReadingListStatus | null;
   onChange: (status: ReadingListStatus | null) => void;
-  size?: "sm" | "md";
-}) {
+  /** Accepted for forward-compat; visual size lives in CSS for now. */
+  size?: "sm" | "md" | "lg" | number;
+}
+
+const PLACEHOLDER = "Thêm vào danh sách";
+
+export function ReadingListPicker({ value, current, onChange }: ReadingListPickerProps) {
+  const status = value ?? current ?? null;
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const onClick = (e: MouseEvent) => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, []);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
 
-  const meta = value ? READING_LIST_META[value] : null;
-  const triggerPad = size === "md" ? "5px 10px" : "3px 8px";
-  const triggerFont = size === "md" ? 12 : 11;
+  const meta = status ? READING_LIST_META[status] : null;
 
   return (
-    <div ref={ref} style={{ position: "relative", display: "inline-block" }} onClick={e => e.stopPropagation()}>
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.97 }}
+    <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+      <button
         type="button"
-        onClick={e => { e.preventDefault(); setOpen(v => !v); }}
+        className="btn btn-sm btn-ghost"
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          setOpen(v => !v);
+        }}
         style={{
-          border: meta ? `1.5px solid ${meta.color}` : "1.5px dashed var(--border-soft)",
-          background: meta ? "var(--panel)" : "transparent",
-          color: meta ? meta.color : "var(--muted)",
-          padding: triggerPad,
-          fontSize: triggerFont,
-          fontWeight: 700,
-          letterSpacing: "0.02em",
-          display: "inline-flex",
+          display: "flex",
           alignItems: "center",
           gap: 6,
-          cursor: "pointer",
+          color: meta?.color ?? "var(--muted)",
+          borderColor: meta ? meta.color : undefined,
         }}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label="Danh sách đọc"
       >
-        <Icon name={meta?.icon ?? "plus"} size={triggerFont - 1} />
-        {meta?.label ?? "Thêm vào danh sách"}
-        <Icon name="chevron-down" size={triggerFont - 2} />
-      </motion.button>
+        <Icon name={meta?.icon ?? "bookmark"} size={13} />
+        <span style={{ fontSize: 12 }}>{meta?.label ?? PLACEHOLDER}</span>
+        <Icon name="chevron-down" size={11} />
+      </button>
 
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.12 }}
             role="listbox"
+            initial={{ opacity: 0, y: -8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+            transition={{ duration: 0.12 }}
             style={{
               position: "absolute",
               top: "calc(100% + 6px)",
               left: 0,
-              minWidth: 160,
+              zIndex: 200,
               background: "var(--panel)",
               border: "2px solid var(--border)",
-              boxShadow: "3px 3px 0 0 var(--border)",
-              zIndex: 50,
+              boxShadow: "4px 4px 0 0 var(--border)",
+              minWidth: 160,
             }}
           >
-            {STATUSES.map(s => {
-              const m = READING_LIST_META[s];
-              const selected = value === s;
-              return (
+            {(Object.entries(READING_LIST_META) as [ReadingListStatus, typeof READING_LIST_META[ReadingListStatus]][]).map(
+              ([s, m]) => (
                 <button
                   key={s}
+                  type="button"
                   role="option"
-                  aria-selected={selected}
-                  onClick={e => { e.preventDefault(); onChange(selected ? null : s); setOpen(false); }}
+                  aria-selected={status === s}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onChange(status === s ? null : s);
+                    setOpen(false);
+                  }}
                   style={{
-                    width: "100%",
                     display: "flex",
                     alignItems: "center",
                     gap: 8,
-                    padding: "8px 12px",
-                    fontSize: 12,
-                    fontWeight: selected ? 700 : 500,
-                    color: selected ? m.color : "var(--fg)",
-                    background: selected ? "var(--bg-2)" : "transparent",
+                    width: "100%",
+                    padding: "9px 14px",
+                    background: status === s ? "var(--bg-2)" : "transparent",
                     border: "none",
-                    borderBottom: "1px dashed var(--border-soft)",
-                    textAlign: "left",
                     cursor: "pointer",
+                    fontSize: 13,
+                    color: m.color,
+                    fontFamily: "var(--font-sans)",
+                    fontWeight: 600,
+                    textAlign: "left",
                   }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--bg-2)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = status === s ? "var(--bg-2)" : "transparent"; }}
                 >
-                  <Icon name={m.icon} size={12} />
+                  <Icon name={m.icon} size={13} />
                   {m.label}
-                  {selected && <Icon name="check" size={11} />}
+                  {status === s && (
+                    <span style={{ marginLeft: "auto", fontSize: 10, opacity: 0.6 }}>✓</span>
+                  )}
                 </button>
-              );
-            })}
-            {value && (
-              <button
-                onClick={e => { e.preventDefault(); onChange(null); setOpen(false); }}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "8px 12px",
-                  fontSize: 11,
-                  color: "var(--muted)",
-                  background: "transparent",
-                  border: "none",
-                  textAlign: "left",
-                  cursor: "pointer",
-                }}
-              >
-                <Icon name="x" size={11} /> Bỏ khỏi danh sách
-              </button>
+              ),
+            )}
+            {status && (
+              <>
+                <div role="separator" style={{ height: 1, background: "var(--border-soft)", margin: "2px 0" }} />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onChange(null);
+                    setOpen(false);
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    width: "100%",
+                    padding: "9px 14px",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    color: "var(--muted)",
+                    fontFamily: "var(--font-sans)",
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "var(--bg-2)"; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                >
+                  <Icon name="x" size={12} /> Bỏ khỏi danh sách
+                </button>
+              </>
             )}
           </motion.div>
         )}
