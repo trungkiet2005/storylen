@@ -18,8 +18,10 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_supabase
 from app.models.schemas import (
+    BubbleDictionaryResponse,
     BubbleResult,
     BubbleReviewRequest,
+    DictionaryToken,
     PageDataResponse,
     PageMetadata,
     ProcessingStatus,
@@ -27,6 +29,7 @@ from app.models.schemas import (
     TranslationHistoryItem,
     TranslationHistoryResponse,
 )
+from app.services.dictionary import lookup_bubble_dictionary
 from app.routers.auth import AuthUser, get_current_user
 from app.storage.supabase_storage import (
     signed_original_image_url,
@@ -437,4 +440,75 @@ def update_bubble_review(
         review_status=row.get("review_status") or payload.review_status,  # type: ignore[arg-type]
         reviewed_by=row.get("reviewed_by") or user.id,
         reviewed_at=row.get("reviewed_at"),
+    )
+
+
+@router.get(
+    "/{page_id}/bubbles/{bubble_id}/dictionary",
+    response_model=BubbleDictionaryResponse,
+)
+def get_bubble_dictionary(
+    page_id: str,
+    bubble_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> BubbleDictionaryResponse:
+    """
+    Return language analysis for a bubble: tokens with readings/meanings,
+    romanization, alternative VN translations. Cached in-process on Gemini hits.
+
+    Used by the reader's dictionary popup. Does NOT consume a credit — this is
+    a learning/inspection feature, not a generation feature.
+    """
+    supabase = get_supabase()
+    _get_owned_page(supabase, page_id, user)
+
+    bubble_res = (
+        supabase.table("bubble_data")
+        .select(
+            "bubble_id, original_text_jp, "
+            "translation_history(translated_text_vi, translated_at)"
+        )
+        .eq("page_id", page_id)
+        .eq("bubble_id", bubble_id)
+        .maybe_single()
+        .execute()
+    )
+    if not bubble_res.data:
+        raise HTTPException(status_code=404, detail="Bubble not found.")
+
+    original_text = bubble_res.data.get("original_text_jp") or ""
+    translations = bubble_res.data.get("translation_history") or []
+    if translations:
+        try:
+            translations_sorted = sorted(
+                translations,
+                key=lambda t: t.get("translated_at") or "",
+                reverse=True,
+            )
+            current_translation = translations_sorted[0].get("translated_text_vi") or ""
+        except Exception:
+            current_translation = translations[-1].get("translated_text_vi") or ""
+    else:
+        current_translation = ""
+
+    payload, cached = lookup_bubble_dictionary(bubble_id, original_text, current_translation)
+
+    return BubbleDictionaryResponse(
+        bubble_id=bubble_id,
+        original_text=original_text,
+        language=payload.get("language", "unknown"),
+        romaji=payload.get("romaji"),
+        tokens=[
+            DictionaryToken(
+                surface=str(tok.get("surface") or ""),
+                reading=tok.get("reading") or None,
+                meaning=tok.get("meaning") or None,
+                pos=tok.get("pos") or None,
+            )
+            for tok in (payload.get("tokens") or [])
+            if isinstance(tok, dict) and tok.get("surface")
+        ],
+        alternatives=payload.get("alternatives") or [],
+        note=payload.get("note"),
+        cached=cached,
     )

@@ -757,6 +757,33 @@ export async function updateBubbleTranslation(
   });
 }
 
+// ─── Bubble dictionary popup (S2) ─────────────────────────────────────────────
+
+export interface DictionaryToken {
+  surface: string;
+  reading?: string | null;
+  meaning?: string | null;
+  pos?: string | null;
+}
+
+export interface BubbleDictionaryResponse {
+  bubble_id: string;
+  original_text: string;
+  language: "ja" | "zh" | "unknown" | string;
+  romaji?: string | null;
+  tokens: DictionaryToken[];
+  alternatives: string[];
+  note?: string | null;
+  cached: boolean;
+}
+
+export async function getBubbleDictionary(
+  pageId: string,
+  bubbleId: string,
+): Promise<BubbleDictionaryResponse> {
+  return request<BubbleDictionaryResponse>(`/page/${pageId}/bubbles/${bubbleId}/dictionary`);
+}
+
 /**
  * Studio review action — set a bubble's QC status (approved / rejected / pending).
  * Optionally pipes through an edited translation in the same call (recorded as a

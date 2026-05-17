@@ -111,6 +111,27 @@ class TranslationHistoryResponse(BaseModel):
     items: list[TranslationHistoryItem]
 
 
+# ─── Bubble dictionary popup (S2) ──────────────────────────────────────────────
+
+class DictionaryToken(BaseModel):
+    """One word / morpheme in the bubble's original text."""
+    surface: str = Field(..., description="As-written form, e.g. '行きたい'")
+    reading: Optional[str] = Field(default=None, description="Hiragana / pinyin")
+    meaning: Optional[str] = Field(default=None, description="Vietnamese gloss")
+    pos: Optional[str] = Field(default=None, description="Part of speech, e.g. 'verb'")
+
+
+class BubbleDictionaryResponse(BaseModel):
+    bubble_id: str
+    original_text: str
+    language: str = Field(..., description="Detected source language: 'ja', 'zh', or 'unknown'")
+    romaji: Optional[str] = Field(default=None, description="Romanization (rōmaji / pinyin)")
+    tokens: list[DictionaryToken] = Field(default_factory=list)
+    alternatives: list[str] = Field(default_factory=list, description="Alternative VN translations")
+    note: Optional[str] = Field(default=None, description="Translator note / cultural hint")
+    cached: bool = False
+
+
 class PageMetadata(BaseModel):
     batch_id: Optional[str] = None
     series_id: Optional[str] = None
