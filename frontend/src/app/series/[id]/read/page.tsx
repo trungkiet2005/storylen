@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { TopBar } from "@/components/TopBar";
 import { Icon } from "@/components/Icons";
-import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedPage } from "@/components/Animations";
 import {
@@ -57,7 +56,6 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
 
   const [series, setSeries] = useState<SeriesDetail | null>(null);
   const [loading, setLoading] = useState(true);
