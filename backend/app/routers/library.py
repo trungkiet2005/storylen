@@ -223,6 +223,115 @@ def public_series_chapters(series_id: str):
     }
 
 
+@router.get("/u/{username}")
+def public_profile(username: str):
+    """Public read-only profile page (Tier C). Anonymous.
+
+    Returns: username, joined_at, published series counts, recent published
+    chapters. Hidden if the user has no published chapters.
+    """
+    sb = get_supabase()
+    needle = username.strip()
+    if not needle:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+
+    try:
+        profile_res = (
+            sb.table("profiles")
+            .select("user_id, username, avatar_url, created_at, bio")
+            .eq("username", needle)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        logger.warning("public_profile lookup failed: %s", exc)
+        raise HTTPException(status_code=503, detail="Không truy cập được hồ sơ.") from exc
+
+    if not profile_res or not profile_res.data:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+
+    profile = profile_res.data
+    user_id = profile["user_id"]
+
+    # Pull owned series
+    try:
+        series_rows = (
+            sb.table("manga_series")
+            .select("series_id, title, cover_image_url, tags, created_at")
+            .eq("user_id", user_id)
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        series_rows = []
+
+    series_ids = [s["series_id"] for s in series_rows]
+    published_count: dict[str, int] = {}
+    latest_publish: dict[str, str] = {}
+    recent_chapters: list[dict[str, Any]] = []
+
+    if series_ids:
+        try:
+            chap_rows = (
+                sb.table("manga_chapters")
+                .select("chapter_id, series_id, chapter_number, title, published_at")
+                .in_("series_id", series_ids)
+                .not_.is_("published_at", "null")
+                .order("published_at", desc=True)
+                .limit(30)
+                .execute()
+                .data
+                or []
+            )
+        except Exception:
+            chap_rows = []
+
+        for c in chap_rows:
+            sid = c["series_id"]
+            published_count[sid] = published_count.get(sid, 0) + 1
+            if sid not in latest_publish:
+                latest_publish[sid] = c.get("published_at") or ""
+            if len(recent_chapters) < 10:
+                series = next((s for s in series_rows if s["series_id"] == sid), None)
+                recent_chapters.append({
+                    "chapter_id": c["chapter_id"],
+                    "series_id": sid,
+                    "series_title": series.get("title") if series else None,
+                    "chapter_number": c.get("chapter_number"),
+                    "title": c.get("title"),
+                    "published_at": c.get("published_at"),
+                })
+
+    public_series = [
+        {
+            "series_id": s["series_id"],
+            "title": s.get("title") or "Untitled",
+            "cover_image_url": s.get("cover_image_url"),
+            "tags": s.get("tags") or [],
+            "published_chapter_count": published_count.get(s["series_id"], 0),
+            "latest_published_at": latest_publish.get(s["series_id"]),
+        }
+        for s in series_rows
+        if published_count.get(s["series_id"], 0) > 0
+    ]
+    public_series.sort(key=lambda x: x.get("latest_published_at") or "", reverse=True)
+
+    if not public_series:
+        # Don't reveal user existence if they have nothing published
+        raise HTTPException(status_code=404, detail="Người dùng chưa publish chương nào.")
+
+    return {
+        "username": profile.get("username"),
+        "avatar_url": profile.get("avatar_url"),
+        "bio": profile.get("bio"),
+        "joined_at": profile.get("created_at"),
+        "published_series": public_series,
+        "total_published_chapters": sum(published_count.values()),
+        "recent_chapters": recent_chapters,
+    }
+
+
 @router.get("/library/chapters/{chapter_id}")
 def public_chapter_pages(chapter_id: str):
     """List pages of a published chapter — anonymous read-only."""
