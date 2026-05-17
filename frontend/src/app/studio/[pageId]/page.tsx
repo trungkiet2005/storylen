@@ -33,6 +33,127 @@ function statusOf(b: BubbleData): ReviewStatus {
   return (b.review_status ?? "pending") as ReviewStatus;
 }
 
+// ─── Find & Replace (Tier C) ──────────────────────────────────────────────────
+// Bulk-edit drafts only — no autosave. The translator still reviews each card
+// before approving, so approvals act as the explicit commit.
+
+function FindReplacePanel({
+  bubbles,
+  drafts,
+  setDrafts,
+  toast,
+}: {
+  bubbles: BubbleData[];
+  drafts: Record<string, string>;
+  setDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  toast: (msg: string, type?: "info" | "success" | "error") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [find, setFind] = useState("");
+  const [replace, setReplace] = useState("");
+  const [caseSensitive, setCaseSensitive] = useState(false);
+
+  const previewCount = useMemo(() => {
+    if (!find) return 0;
+    const needle = caseSensitive ? find : find.toLowerCase();
+    let count = 0;
+    for (const b of bubbles) {
+      const haystack = drafts[b.bubble_id] ?? b.translated_text ?? "";
+      const target = caseSensitive ? haystack : haystack.toLowerCase();
+      if (target.includes(needle)) count++;
+    }
+    return count;
+  }, [bubbles, drafts, find, caseSensitive]);
+
+  const applyAll = () => {
+    if (!find) {
+      toast("Nhập chuỗi cần tìm.", "info");
+      return;
+    }
+    const flags = caseSensitive ? "g" : "gi";
+    const escaped = find.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(escaped, flags);
+
+    let updated = 0;
+    setDrafts(prev => {
+      const next = { ...prev };
+      for (const b of bubbles) {
+        const cur = next[b.bubble_id] ?? b.translated_text ?? "";
+        const after = cur.replace(re, replace);
+        if (after !== cur) {
+          next[b.bubble_id] = after;
+          updated++;
+        }
+      }
+      return next;
+    });
+    toast(
+      updated > 0
+        ? `Đã thay ${updated} bubble. Hãy duyệt để lưu xuống DB.`
+        : "Không tìm thấy chuỗi nào khớp.",
+      updated > 0 ? "success" : "info",
+    );
+  };
+
+  return (
+    <div style={{ marginTop: 10, borderTop: "1px dashed var(--border-soft)", paddingTop: 10 }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="btn btn-sm btn-ghost"
+        style={{ fontSize: 11, padding: "3px 8px" }}
+      >
+        <Icon name="search" size={11} /> Tìm & thay {open ? "▲" : "▼"}
+      </button>
+
+      {open && (
+        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+          <input
+            value={find}
+            onChange={e => setFind(e.target.value)}
+            placeholder='Tìm (vd: "bạn")'
+            style={{
+              padding: "5px 8px", fontSize: 12,
+              border: "1.5px solid var(--border)", background: "var(--bg)",
+              color: "var(--fg)",
+            }}
+          />
+          <input
+            value={replace}
+            onChange={e => setReplace(e.target.value)}
+            placeholder='Thay bằng (vd: "cậu") · để trống = xoá'
+            style={{
+              padding: "5px 8px", fontSize: 12,
+              border: "1.5px solid var(--border)", background: "var(--bg)",
+              color: "var(--fg)",
+            }}
+          />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--muted)" }}>
+            <input
+              type="checkbox"
+              checked={caseSensitive}
+              onChange={e => setCaseSensitive(e.target.checked)}
+            />
+            Phân biệt hoa thường
+          </label>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button
+              onClick={applyAll}
+              disabled={!find || previewCount === 0}
+              className="btn btn-sm btn-primary"
+              style={{ fontSize: 11, padding: "4px 10px" }}
+            >
+              Áp dụng tất cả ({previewCount})
+            </button>
+            <span style={{ fontSize: 10, color: "var(--muted)" }}>
+              Chỉ thay ở draft — bạn vẫn cần duyệt từng bubble.
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Bubble overlay on image ──────────────────────────────────────────────────
 
 function BubbleOverlay({
@@ -532,6 +653,14 @@ function StudioContent({ pageId }: { pageId: string }) {
                     );
                   })}
                 </div>
+
+                {/* Find & Replace (Tier C) */}
+                <FindReplacePanel
+                  bubbles={bubbles}
+                  drafts={drafts}
+                  setDrafts={setDrafts}
+                  toast={toast}
+                />
               </div>
 
               {/* Cards */}
