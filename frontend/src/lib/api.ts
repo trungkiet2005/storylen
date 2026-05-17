@@ -1170,6 +1170,31 @@ export async function upgradePlan(planId: string): Promise<UpgradeResponse> {
   });
 }
 
+// ─── Daily check-in (Tier B #12) ──────────────────────────────────────────────
+
+export interface CheckinStatus {
+  eligible: boolean;
+  next_eligible_at?: string | null;
+  streak: number;
+  last_checkin_at?: string | null;
+}
+
+export interface CheckinResult {
+  credits_balance: number;
+  credits_awarded: number;
+  streak: number;
+  next_eligible_at: string;
+  message: string;
+}
+
+export async function getCheckinStatus(): Promise<CheckinStatus> {
+  return request<CheckinStatus>("/credits/checkin");
+}
+
+export async function dailyCheckin(): Promise<CheckinResult> {
+  return request<CheckinResult>("/credits/checkin", { method: "POST" });
+}
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 export type UserRole = "user" | "admin";
