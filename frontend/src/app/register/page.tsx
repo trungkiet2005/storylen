@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedPage, FadeIn } from "@/components/Animations";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
+import { TurnstileWidget, isTurnstileEnabled } from "@/components/TurnstileWidget";
 
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,32}$/;
 
@@ -37,6 +38,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRequired = isTurnstileEnabled();
 
   const strength = useMemo(() => getPasswordScore(password), [password]);
   const strengthLabels = ["", "Yếu", "Trung bình", "Khá", "Mạnh"];
@@ -61,10 +64,14 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
     if (!validate()) return;
+    if (captchaRequired && !captchaToken) {
+      setError("Vui lòng hoàn thành captcha bên dưới.");
+      return;
+    }
 
     setLoading(true);
     try {
-      const result = await register(username.trim(), email.trim().toLowerCase(), password);
+      const result = await register(username.trim(), email.trim().toLowerCase(), password, captchaToken ?? undefined);
       if (result.requires_email_confirmation) {
         toast(result.message || "Tài khoản đã được tạo. Vui lòng xác thực email.", "info", 6000);
         router.replace("/login");
@@ -473,13 +480,19 @@ export default function RegisterPage() {
                 </div>
               </FadeIn>
 
+              {captchaRequired && (
+                <FadeIn direction="up" distance={10} delay={0.42}>
+                  <TurnstileWidget onSuccess={setCaptchaToken} onExpired={() => setCaptchaToken(null)} />
+                </FadeIn>
+              )}
+
               <FadeIn direction="up" distance={10} delay={0.45}>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   className="btn btn-primary"
-                  disabled={loading}
+                  disabled={loading || (captchaRequired && !captchaToken)}
                   style={{ width: "100%", justifyContent: "center", padding: "14px", fontSize: 15, marginTop: 4, display: "flex", gap: 8, alignItems: "center" }}
                 >
                   {loading ? (

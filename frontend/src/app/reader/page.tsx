@@ -21,6 +21,8 @@ import {
   SeriesListItem,
 } from '@/lib/api';
 import { AddToSeriesModal } from '@/components/AddToSeriesModal';
+import { BubbleDictionaryModal } from '@/components/BubbleDictionaryModal';
+import { TranslationFeedback } from '@/components/TranslationFeedback';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedPage } from '@/components/Animations';
@@ -37,6 +39,11 @@ interface BubbleStyle {
 
 const BUBBLE_STYLE_DEFAULTS: BubbleStyle = { textColor: "#111111", bgColor: "#ffffff", fontSize: 0 };
 const STYLE_STORAGE_KEY = "storylens_bubble_styles";
+const SKIPPED_BUBBLES_KEY = "storylens_skipped_bubbles";
+// Confidence below this threshold renders a yellow warning border (S/N #8).
+const LOW_CONFIDENCE_THRESHOLD = 0.7;
+// Katakana-only short original text is almost always SFX (sound effects).
+const KATAKANA_SFX_RE = /^[ァ-ヺーッ・！？!?\s]{1,8}$/;
 
 function loadBubbleStyles(): Record<string, BubbleStyle> {
   try {
@@ -47,6 +54,21 @@ function loadBubbleStyles(): Record<string, BubbleStyle> {
 
 function saveBubbleStyles(styles: Record<string, BubbleStyle>) {
   try { localStorage.setItem(STYLE_STORAGE_KEY, JSON.stringify(styles)); } catch { /* quota */ }
+}
+
+function loadSkippedBubbles(): Record<string, true> {
+  try {
+    const raw = localStorage.getItem(SKIPPED_BUBBLES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveSkippedBubbles(skipped: Record<string, true>) {
+  try { localStorage.setItem(SKIPPED_BUBBLES_KEY, JSON.stringify(skipped)); } catch { /* quota */ }
+}
+
+function isLikelySfx(originalText: string): boolean {
+  return !!originalText && KATAKANA_SFX_RE.test(originalText.trim());
 }
 
 interface ChatMessage {
@@ -471,6 +493,9 @@ function BubbleOverlays({
   onSelect,
   mode,
   getStyle,
+  onLookup,
+  skippedBubbles,
+  onToggleSkip,
 }: {
   bubbles: BubbleData[];
   containerW: number;
@@ -481,6 +506,9 @@ function BubbleOverlays({
   onSelect: (i: number | null) => void;
   mode: ViewMode;
   getStyle?: (bubbleId: string) => BubbleStyle;
+  onLookup?: (i: number) => void;
+  skippedBubbles?: Record<string, true>;
+  onToggleSkip?: (bubbleId: string) => void;
 }) {
   const scaleX = containerW / imageW;
   const scaleY = containerH / imageH;
@@ -492,6 +520,8 @@ function BubbleOverlays({
     >
       <AnimatePresence mode="popLayout">
         {bubbles.map((b, i) => {
+          if (skippedBubbles?.[b.bubble_id]) return null;
+
           const [x, y, w, h] = b.bbox;
           const rx = x * scaleX;
           const ry = y * scaleY;
@@ -499,6 +529,7 @@ function BubbleOverlays({
           const rhScaled = h * scaleY;
 
           const isGiant = (w * h) >= (imageW * imageH * 0.8);
+          const isLowConfidence = (b.confidence ?? 1) < LOW_CONFIDENCE_THRESHOLD;
 
           if (mode === "overlay") {
             const style = getStyle?.(b.bubble_id) ?? BUBBLE_STYLE_DEFAULTS;
@@ -508,14 +539,25 @@ function BubbleOverlays({
             return (
               <motion.g
                 key={`${i}-overlay`}
-                style={{ pointerEvents: "auto", transformOrigin: `${rx + rwScaled/2}px ${ry + rhScaled/2}px` }}
+                style={{ pointerEvents: "auto", transformOrigin: `${rx + rwScaled/2}px ${ry + rhScaled/2}px`, cursor: onLookup ? "zoom-in" : "default" }}
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20, delay: i * 0.05 }}
+                onDoubleClick={() => onLookup?.(i)}
               >
                 {!isGiant ? (
-                  <rect x={rx} y={ry} width={rwScaled} height={rhScaled} fill={style.bgColor} stroke="#111" strokeWidth="1.5" rx="4" />
+                  <rect
+                    x={rx}
+                    y={ry}
+                    width={rwScaled}
+                    height={rhScaled}
+                    fill={style.bgColor}
+                    stroke={isLowConfidence ? "#e8a800" : "#111"}
+                    strokeWidth={isLowConfidence ? "2" : "1.5"}
+                    strokeDasharray={isLowConfidence ? "3 2" : undefined}
+                    rx="4"
+                  />
                 ) : (
                   <rect x={rx} y={ry} width={rwScaled} height={rhScaled} fill="rgba(255,255,255,0.2)" stroke="rgba(255,0,0,0.5)" strokeWidth="2" strokeDasharray="5 5" rx="4" />
                 )}
@@ -551,6 +593,9 @@ function BubbleOverlays({
           }
 
           if (mode === "tap") {
+            const tapStroke = isLowConfidence
+              ? "#e8a800"
+              : selected === i ? "var(--beni)" : "rgba(200,16,46,0.4)";
             return (
               <motion.rect
                 key={`${i}-tap`}
@@ -558,11 +603,12 @@ function BubbleOverlays({
                 animate={{ opacity: 1 }}
                 x={rx} y={ry} width={rwScaled} height={rhScaled}
                 fill={selected === i ? "rgba(200,16,46,0.12)" : "transparent"}
-                stroke={selected === i ? "var(--beni)" : "rgba(200,16,46,0.4)"}
+                stroke={tapStroke}
                 strokeWidth="2"
                 strokeDasharray="4 3"
                 style={{ cursor: "pointer", pointerEvents: "auto" }}
                 onClick={() => onSelect(selected === i ? null : i)}
+                onDoubleClick={() => onLookup?.(i)}
                 whileHover={{ fill: "rgba(200,16,46,0.05)" }}
               />
             );
@@ -576,6 +622,8 @@ function BubbleOverlays({
           const [x, y, , h] = b.bbox;
           const rx = x * scaleX;
           const ry = (y + h) * scaleY + 4;
+          const lowConf = (b.confidence ?? 1) < LOW_CONFIDENCE_THRESHOLD;
+          const sfx = isLikelySfx(b.original_text || "");
           return (
             <motion.foreignObject
               key="tooltip"
@@ -583,7 +631,7 @@ function BubbleOverlays({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 5 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              x={rx} y={ry} width={240} height={80}
+              x={rx} y={ry} width={280} height={150}
             >
               <div style={{
                 background: "#fffde8",
@@ -593,8 +641,42 @@ function BubbleOverlays({
                 fontSize: 12,
                 boxShadow: "3px 3px 0 #111",
               }}>
-                <div style={{ fontSize: 10, color: "#888", marginBottom: 3 }}>GỐC → VIỆT</div>
+                <div style={{ fontSize: 10, color: "#888", marginBottom: 3, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>GỐC → VIỆT</span>
+                  {lowConf && (
+                    <span style={{ background: "#e8a800", color: "#fff", padding: "1px 5px", fontSize: 9 }}>
+                      ⚠ độ tin {(b.confidence * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontFamily: "var(--font-serif)", lineHeight: 1.4 }}>{b.translated_text}</div>
+                <div style={{ marginTop: 6, display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {onLookup && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onLookup(selected); }}
+                      style={{
+                        padding: "3px 7px", fontSize: 10,
+                        background: "#111", color: "#fff", border: "none", cursor: "pointer",
+                      }}
+                    >
+                      📖 Từ điển
+                    </button>
+                  )}
+                  {onToggleSkip && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onToggleSkip(b.bubble_id); }}
+                      title={sfx ? "Có vẻ là SFX — bỏ qua sẽ ẩn khỏi reader" : "Ẩn bubble này khỏi reader"}
+                      style={{
+                        padding: "3px 7px", fontSize: 10,
+                        background: sfx ? "#7e3a14" : "transparent",
+                        color: sfx ? "#fff" : "#111",
+                        border: "1.5px solid #111", cursor: "pointer",
+                      }}
+                    >
+                      {sfx ? "🔊 Bỏ SFX" : "Bỏ qua"}
+                    </button>
+                  )}
+                </div>
               </div>
             </motion.foreignObject>
           );
@@ -633,6 +715,21 @@ function ReaderContent() {
 
   // Add-to-series modal
   const [showAddToSeries, setShowAddToSeries] = useState(false);
+
+  // Bubble dictionary popup (S2 — Tier S)
+  const [dictBubbleIdx, setDictBubbleIdx] = useState<number | null>(null);
+
+  // Skipped (SFX / unwanted) bubbles — persisted to localStorage (Tier B #8)
+  const [skippedBubbles, setSkippedBubbles] = useState<Record<string, true>>(() => loadSkippedBubbles());
+  const toggleSkipBubble = useCallback((bubbleId: string) => {
+    setSkippedBubbles(prev => {
+      const next = { ...prev };
+      if (next[bubbleId]) delete next[bubbleId];
+      else next[bubbleId] = true;
+      saveSkippedBubbles(next);
+      return next;
+    });
+  }, []);
 
   // Keyboard shortcut overlay
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -1291,6 +1388,9 @@ function ReaderContent() {
                               imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
                               selected={selected} onSelect={setSelected} mode="overlay"
                               getStyle={getBubbleStyle}
+                              onLookup={setDictBubbleIdx}
+                              skippedBubbles={skippedBubbles}
+                              onToggleSkip={toggleSkipBubble}
                             />
                           )}
                         </div>
@@ -1322,6 +1422,9 @@ function ReaderContent() {
                             imageW={imgNaturalSize.w} imageH={imgNaturalSize.h}
                             selected={selected} onSelect={setSelected} mode={mode}
                             getStyle={getBubbleStyle}
+                            onLookup={setDictBubbleIdx}
+                            skippedBubbles={skippedBubbles}
+                            onToggleSkip={toggleSkipBubble}
                           />
                         )}
                       </div>
@@ -1331,6 +1434,13 @@ function ReaderContent() {
               </motion.div>
             ) : null}
           </AnimatePresence>
+
+          {/* ── Translation feedback (Tier B #10) ── */}
+          {pageData && (
+            <div style={{ width: "100%", maxWidth: 840, marginTop: 12 }}>
+              <TranslationFeedback pageId={pageData.page_id} />
+            </div>
+          )}
 
           {/* ── Bottom Navigation (conditional) ── */}
           {hasMultiplePages && currentPageIdx !== -1 && (
@@ -1828,6 +1938,44 @@ function ReaderContent() {
           // Re-fetch page metadata so the breadcrumb appears
           if (pageIdParam) {
             getPage(pageIdParam).then(setPageData).catch(() => {});
+          }
+        }}
+      />
+    )}
+
+    {/* Bubble dictionary popup (S2 — Tier S) */}
+    {pageData && dictBubbleIdx !== null && pageData.processed_data[dictBubbleIdx] && (
+      <BubbleDictionaryModal
+        open={dictBubbleIdx !== null}
+        pageId={pageData.page_id}
+        bubbleId={pageData.processed_data[dictBubbleIdx].bubble_id}
+        originalText={pageData.processed_data[dictBubbleIdx].original_text}
+        translatedText={pageData.processed_data[dictBubbleIdx].translated_text}
+        onClose={() => setDictBubbleIdx(null)}
+        onApplyAlternative={async (text) => {
+          const bubble = pageData.processed_data[dictBubbleIdx];
+          if (!bubble || !pageIdParam) return;
+          setEditTexts(prev => ({ ...prev, [bubble.bubble_id]: text }));
+          setSavingBubbleId(bubble.bubble_id);
+          try {
+            const saved = await updateBubbleTranslation(pageIdParam, bubble.bubble_id, text);
+            setPageData((current) => current
+              ? {
+                  ...current,
+                  processed_data: current.processed_data.map((item) =>
+                    item.bubble_id === bubble.bubble_id
+                      ? { ...item, translated_text: saved.translated_text }
+                      : item,
+                  ),
+                }
+              : current);
+            toast("Đã áp dụng bản dịch khác.", "success");
+          } catch (err) {
+            const msg = err instanceof APIError ? err.message : "Không thể lưu bản dịch.";
+            toast(msg, "error");
+          } finally {
+            setSavingBubbleId(null);
+            setDictBubbleIdx(null);
           }
         }}
       />

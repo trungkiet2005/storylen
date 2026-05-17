@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "analyze": "cross-env ANALYZE=true next build"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.53.1",
@@ -23,6 +24,7 @@
     "react-easy-crop": "^5.5.7"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.2.6",
     "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -31,6 +33,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.2",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",

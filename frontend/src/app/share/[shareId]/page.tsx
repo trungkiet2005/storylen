@@ -6,6 +6,7 @@ import Image from "next/image";
 import { TopBar } from "@/components/TopBar";
 import { Footer } from "@/components/Footer";
 import { getSharedPage, type PageData } from "@/lib/api";
+import { ChapterComments } from "@/components/ChapterComments";
 
 export default function SharedPage({ params }: { params: Promise<{ shareId: string }> }) {
   const { shareId } = use(params);
@@ -77,6 +78,10 @@ export default function SharedPage({ params }: { params: Promise<{ shareId: stri
           <Link href="/register" style={{ color: "var(--accent)", fontWeight: 700 }}>Tạo tài khoản StoryLens</Link>{" "}
           để dịch truyện của bạn.
         </div>
+
+        {page?.metadata?.chapter_id && (
+          <ChapterComments chapterId={page.metadata.chapter_id} />
+        )}
       </main>
       <Footer />
     </>

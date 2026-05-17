@@ -62,7 +62,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   isAdmin: boolean;
   login: (email: string, password: string) => Promise<AuthResult>;
-  register: (username: string, email: string, password: string) => Promise<AuthResult>;
+  register: (username: string, email: string, password: string, captchaToken?: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<User | null>;
   refreshCredits: () => Promise<void>;
@@ -160,9 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data;
   }, []);
 
-  const register = useCallback(async (username: string, email: string, password: string) => {
+  const register = useCallback(async (username: string, email: string, password: string, captchaToken?: string) => {
     const res = await authFetch("/auth/register", {
       method: "POST",
+      headers: captchaToken ? { "cf-turnstile-token": captchaToken } : undefined,
       body: JSON.stringify({ username, email, password }),
     });
     const data = await parseAuthResponse(res, "Đăng ký thất bại");

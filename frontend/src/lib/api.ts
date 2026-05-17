@@ -757,6 +757,58 @@ export async function updateBubbleTranslation(
   });
 }
 
+// ─── Bubble dictionary popup (S2) ─────────────────────────────────────────────
+
+export interface DictionaryToken {
+  surface: string;
+  reading?: string | null;
+  meaning?: string | null;
+  pos?: string | null;
+}
+
+export interface BubbleDictionaryResponse {
+  bubble_id: string;
+  original_text: string;
+  language: "ja" | "zh" | "unknown" | string;
+  romaji?: string | null;
+  tokens: DictionaryToken[];
+  alternatives: string[];
+  note?: string | null;
+  cached: boolean;
+}
+
+export async function getBubbleDictionary(
+  pageId: string,
+  bubbleId: string,
+): Promise<BubbleDictionaryResponse> {
+  return request<BubbleDictionaryResponse>(`/page/${pageId}/bubbles/${bubbleId}/dictionary`);
+}
+
+// ─── Translation feedback (Tier B #10) ────────────────────────────────────────
+
+export type FeedbackVote = "up" | "down";
+
+export interface TranslationFeedback {
+  page_id: string;
+  vote: FeedbackVote | string;
+  persisted: boolean;
+}
+
+export async function submitTranslationFeedback(
+  pageId: string,
+  payload: { vote: FeedbackVote; comment?: string },
+): Promise<TranslationFeedback> {
+  return request<TranslationFeedback>(`/page/${pageId}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getTranslationFeedback(pageId: string): Promise<TranslationFeedback | null> {
+  return request<TranslationFeedback | null>(`/page/${pageId}/feedback`);
+}
+
 /**
  * Studio review action — set a bubble's QC status (approved / rejected / pending).
  * Optionally pipes through an edited translation in the same call (recorded as a
@@ -926,6 +978,40 @@ export async function getSeriesFull(seriesId: string): Promise<SeriesDetail> {
   return request<SeriesDetail>(`/series/${seriesId}/full`);
 }
 
+// ─── Glossary auto-suggest (Tier A #4) ────────────────────────────────────────
+
+export interface GlossarySuggestion {
+  candidate: string;
+  count: number;
+  kind: "katakana" | "kanji";
+  sample: string;
+}
+
+export interface GlossarySuggestionsResponse {
+  candidates: GlossarySuggestion[];
+  scanned_bubbles: number;
+}
+
+export async function getGlossarySuggestions(
+  seriesId: string,
+  opts: { minCount?: number; limit?: number } = {},
+): Promise<GlossarySuggestionsResponse> {
+  const qs = new URLSearchParams();
+  if (opts.minCount) qs.set("min_count", String(opts.minCount));
+  if (opts.limit) qs.set("limit", String(opts.limit));
+  const q = qs.toString();
+  return request<GlossarySuggestionsResponse>(`/series/${seriesId}/glossary/suggestions${q ? `?${q}` : ""}`);
+}
+
+// ─── Chapter export (Tier B #9) ───────────────────────────────────────────────
+
+/** Returns the absolute URL of the chapter-export endpoint. The caller can
+ * navigate to it (browser will download) or fetch it manually for blob handling. */
+export function chapterExportUrl(chapterId: string, prefer: "translated" | "original" = "translated"): string {
+  const qs = new URLSearchParams({ prefer }).toString();
+  return `${BASE_URL}/chapters/${chapterId}/export?${qs}`;
+}
+
 export async function createSeries(payload: SeriesCreatePayload): Promise<SeriesDetail> {
   return request<SeriesDetail>("/series", {
     method: "POST",
@@ -1082,6 +1168,31 @@ export async function upgradePlan(planId: string): Promise<UpgradeResponse> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ plan_id: planId }),
   });
+}
+
+// ─── Daily check-in (Tier B #12) ──────────────────────────────────────────────
+
+export interface CheckinStatus {
+  eligible: boolean;
+  next_eligible_at?: string | null;
+  streak: number;
+  last_checkin_at?: string | null;
+}
+
+export interface CheckinResult {
+  credits_balance: number;
+  credits_awarded: number;
+  streak: number;
+  next_eligible_at: string;
+  message: string;
+}
+
+export async function getCheckinStatus(): Promise<CheckinStatus> {
+  return request<CheckinStatus>("/credits/checkin");
+}
+
+export async function dailyCheckin(): Promise<CheckinResult> {
+  return request<CheckinResult>("/credits/checkin", { method: "POST" });
 }
 
 // ─── Admin ────────────────────────────────────────────────────────────────────
@@ -1625,10 +1736,21 @@ export async function saveWibuProgress(
 
 // ─── Account self-service ────────────────────────────────────────────────────
 
-export async function forgotPassword(email: string): Promise<{ message: string }> {
-  return request<{ message: string }>("/auth/forgot-password", {
+export async function resendVerification(email: string): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/resend-verification", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function forgotPassword(email: string, captchaToken?: string): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(captchaToken ? { "cf-turnstile-token": captchaToken } : {}),
+    },
     body: JSON.stringify({ email }),
   });
 }
@@ -1740,17 +1862,29 @@ export interface SearchHit {
   chapter_number: number | null;
   snippet: string;
   thumbnail_url: string | null;
+  similarity?: number | null;
 }
 
 export interface SearchResponse {
   query: string;
   total: number;
   hits: SearchHit[];
+  mode?: "keyword" | "semantic";
 }
 
 export async function searchBubbles(query: string, limit = 30): Promise<SearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit) });
   return request<SearchResponse>(`/search?${params}`);
+}
+
+export async function searchSemantic(
+  query: string,
+  opts: { limit?: number; seriesId?: string } = {},
+): Promise<SearchResponse> {
+  const params = new URLSearchParams({ q: query });
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.seriesId) params.set("series_id", opts.seriesId);
+  return request<SearchResponse>(`/search/semantic?${params}`);
 }
 
 // ─── Pipeline cancellation ───────────────────────────────────────────────────
@@ -1792,16 +1926,30 @@ export interface LibrarySeriesItem {
   author: string | null;
   tags: string[];
   published_chapter_count: number;
+  trending_score?: number;
   latest_published_at: string | null;
 }
 
 export interface LibraryResponse {
   total: number;
   items: LibrarySeriesItem[];
+  all_tags?: string[];
 }
 
-export async function getPublicLibrary(limit = 50, offset = 0): Promise<LibraryResponse> {
-  return request<LibraryResponse>(`/library?limit=${limit}&offset=${offset}`);
+export type LibrarySort = "recent" | "trending";
+
+export async function getPublicLibrary(opts: {
+  limit?: number;
+  offset?: number;
+  tag?: string | null;
+  sort?: LibrarySort;
+} = {}): Promise<LibraryResponse> {
+  const params = new URLSearchParams();
+  params.set("limit", String(opts.limit ?? 50));
+  params.set("offset", String(opts.offset ?? 0));
+  if (opts.tag) params.set("tag", opts.tag);
+  if (opts.sort) params.set("sort", opts.sort);
+  return request<LibraryResponse>(`/library?${params.toString()}`);
 }
 
 export interface LibraryChapter {
@@ -1810,6 +1958,55 @@ export interface LibraryChapter {
   title: string | null;
   published_at: string | null;
   cover_image_url: string | null;
+}
+
+// ─── Chapter comments (Tier C) ────────────────────────────────────────────────
+
+export interface ChapterComment {
+  comment_id: string;
+  chapter_id: string;
+  user_id: string;
+  username: string | null;
+  body: string;
+  created_at: string;
+  can_delete: boolean;
+}
+
+export interface ChapterCommentsResponse {
+  chapter_id: string;
+  total: number;
+  items: ChapterComment[];
+}
+
+export async function listChapterComments(
+  chapterId: string,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<ChapterCommentsResponse> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.offset) params.set("offset", String(opts.offset));
+  const q = params.toString();
+  return request<ChapterCommentsResponse>(`/chapters/${chapterId}/comments${q ? `?${q}` : ""}`);
+}
+
+export async function postChapterComment(
+  chapterId: string,
+  body: string,
+): Promise<ChapterComment> {
+  return request<ChapterComment>(`/chapters/${chapterId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function deleteChapterComment(
+  chapterId: string,
+  commentId: string,
+): Promise<void> {
+  return request<void>(`/chapters/${chapterId}/comments/${commentId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function getPublicSeriesChapters(seriesId: string): Promise<{

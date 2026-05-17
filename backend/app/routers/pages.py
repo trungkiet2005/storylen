@@ -18,8 +18,10 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_supabase
 from app.models.schemas import (
+    BubbleDictionaryResponse,
     BubbleResult,
     BubbleReviewRequest,
+    DictionaryToken,
     PageDataResponse,
     PageMetadata,
     ProcessingStatus,
@@ -27,6 +29,7 @@ from app.models.schemas import (
     TranslationHistoryItem,
     TranslationHistoryResponse,
 )
+from app.services.dictionary import lookup_bubble_dictionary
 from app.routers.auth import AuthUser, get_current_user
 from app.storage.supabase_storage import (
     signed_original_image_url,
@@ -438,3 +441,165 @@ def update_bubble_review(
         reviewed_by=row.get("reviewed_by") or user.id,
         reviewed_at=row.get("reviewed_at"),
     )
+
+
+@router.get(
+    "/{page_id}/bubbles/{bubble_id}/dictionary",
+    response_model=BubbleDictionaryResponse,
+)
+def get_bubble_dictionary(
+    page_id: str,
+    bubble_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> BubbleDictionaryResponse:
+    """
+    Return language analysis for a bubble: tokens with readings/meanings,
+    romanization, alternative VN translations. Cached in-process on Gemini hits.
+
+    Used by the reader's dictionary popup. Does NOT consume a credit — this is
+    a learning/inspection feature, not a generation feature.
+    """
+    supabase = get_supabase()
+    _get_owned_page(supabase, page_id, user)
+
+    bubble_res = (
+        supabase.table("bubble_data")
+        .select(
+            "bubble_id, original_text_jp, "
+            "translation_history(translated_text_vi, translated_at)"
+        )
+        .eq("page_id", page_id)
+        .eq("bubble_id", bubble_id)
+        .maybe_single()
+        .execute()
+    )
+    if not bubble_res.data:
+        raise HTTPException(status_code=404, detail="Bubble not found.")
+
+    original_text = bubble_res.data.get("original_text_jp") or ""
+    translations = bubble_res.data.get("translation_history") or []
+    if translations:
+        try:
+            translations_sorted = sorted(
+                translations,
+                key=lambda t: t.get("translated_at") or "",
+                reverse=True,
+            )
+            current_translation = translations_sorted[0].get("translated_text_vi") or ""
+        except Exception:
+            current_translation = translations[-1].get("translated_text_vi") or ""
+    else:
+        current_translation = ""
+
+    payload, cached = lookup_bubble_dictionary(bubble_id, original_text, current_translation)
+
+    return BubbleDictionaryResponse(
+        bubble_id=bubble_id,
+        original_text=original_text,
+        language=payload.get("language", "unknown"),
+        romaji=payload.get("romaji"),
+        tokens=[
+            DictionaryToken(
+                surface=str(tok.get("surface") or ""),
+                reading=tok.get("reading") or None,
+                meaning=tok.get("meaning") or None,
+                pos=tok.get("pos") or None,
+            )
+            for tok in (payload.get("tokens") or [])
+            if isinstance(tok, dict) and tok.get("surface")
+        ],
+        alternatives=payload.get("alternatives") or [],
+        note=payload.get("note"),
+        cached=cached,
+    )
+
+
+# ─── Translation feedback (Tier B #10) ────────────────────────────────────────
+
+from pydantic import BaseModel as _BaseModel
+from typing import Literal as _Literal
+
+
+class TranslationFeedbackRequest(_BaseModel):
+    vote: _Literal["up", "down"]
+    comment: str | None = None
+
+
+class TranslationFeedbackResponse(_BaseModel):
+    page_id: str
+    vote: str
+    persisted: bool
+
+
+def _missing_table_marker(exc: Exception, table: str) -> bool:
+    text = str(exc).lower()
+    return table.lower() in text and ("does not exist" in text or "could not find" in text or "42p01" in text)
+
+
+@router.post(
+    "/{page_id}/feedback",
+    response_model=TranslationFeedbackResponse,
+)
+def submit_translation_feedback(
+    page_id: str,
+    payload: TranslationFeedbackRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> TranslationFeedbackResponse:
+    """Record a 👍 / 👎 vote on this page's translation. Re-voting upserts.
+
+    If the `translation_feedback` table is missing (v4 migration not run yet),
+    we still return 200 with persisted=false and log structured feedback so
+    admins can grep logs while the migration is pending.
+    """
+    supabase = get_supabase()
+    _get_owned_page(supabase, page_id, user)
+
+    row = {
+        "user_id": user.id,
+        "page_id": page_id,
+        "vote": payload.vote,
+        "comment": (payload.comment or "").strip()[:2000] or None,
+    }
+
+    try:
+        supabase.table("translation_feedback").upsert(row, on_conflict="user_id,page_id").execute()
+        return TranslationFeedbackResponse(page_id=page_id, vote=payload.vote, persisted=True)
+    except Exception as exc:
+        if _missing_table_marker(exc, "translation_feedback"):
+            logger.warning(
+                "translation_feedback table missing — falling back to log. "
+                "user=%s page=%s vote=%s comment=%r",
+                user.id, page_id, payload.vote, row["comment"],
+            )
+            return TranslationFeedbackResponse(page_id=page_id, vote=payload.vote, persisted=False)
+        logger.error("Failed to record translation feedback for page %s: %s", page_id, exc)
+        raise HTTPException(status_code=500, detail="Không lưu được phản hồi.") from exc
+
+
+@router.get("/{page_id}/feedback", response_model=TranslationFeedbackResponse | None)
+def get_translation_feedback(
+    page_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> TranslationFeedbackResponse | None:
+    """Return the caller's current vote on this page, if any."""
+    supabase = get_supabase()
+    _get_owned_page(supabase, page_id, user)
+
+    try:
+        res = (
+            supabase.table("translation_feedback")
+            .select("vote")
+            .eq("user_id", user.id)
+            .eq("page_id", page_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        if _missing_table_marker(exc, "translation_feedback"):
+            return None
+        logger.warning("Feedback lookup failed: %s", exc)
+        return None
+
+    if not res or not res.data:
+        return None
+    return TranslationFeedbackResponse(page_id=page_id, vote=str(res.data.get("vote")), persisted=True)

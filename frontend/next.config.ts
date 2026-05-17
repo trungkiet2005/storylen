@@ -79,4 +79,12 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Bundle analyzer wraps the config when `ANALYZE=true`. Reports land in
+// `.next/analyze/*.html` for inspection in the browser.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const withBundleAnalyzer = require("@next/bundle-analyzer")({
+  enabled: process.env.ANALYZE === "true",
+  openAnalyzer: false,
+});
+
+export default withBundleAnalyzer(nextConfig);

@@ -15,6 +15,7 @@ import { ReadingListPicker } from "@/components/ReadingListPicker";
 import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from "@/components/Animations";
 import {
   APIError,
+  chapterExportUrl,
   createChapter,
   deleteChapter,
   deleteSeries,
@@ -537,6 +538,21 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                               <span style={{ fontSize: 11, color: "var(--muted)" }}>
                                 {chapter.page_count} trang
                               </span>
+                              {isExpanded && chapter.pages.length > 0 && (
+                                <a
+                                  href={chapterExportUrl(chapter.chapter_id, "translated")}
+                                  onClick={e => e.stopPropagation()}
+                                  className="btn btn-sm btn-ghost"
+                                  style={{
+                                    padding: "4px 8px",
+                                    color: "var(--muted)",
+                                    textDecoration: "none",
+                                  }}
+                                  title="Tải ZIP các trang đã dịch (offline / lưu trữ)"
+                                >
+                                  <Icon name="download" size={11} />
+                                </a>
+                              )}
                               {isExpanded && chapter.pages.length > 1 && (
                                 <button
                                   onClick={e => {

@@ -7,18 +7,25 @@ import { Footer } from "@/components/Footer";
 import { useToast } from "@/components/Toast";
 import { Icon } from "@/components/Icons";
 import { forgotPassword } from "@/lib/api";
+import { TurnstileWidget, isTurnstileEnabled } from "@/components/TurnstileWidget";
 
 export default function ForgotPasswordPage() {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRequired = isTurnstileEnabled();
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (captchaRequired && !captchaToken) {
+      toast("Vui lòng hoàn thành captcha.", "error");
+      return;
+    }
     setLoading(true);
     try {
-      const res = await forgotPassword(email.trim().toLowerCase());
+      const res = await forgotPassword(email.trim().toLowerCase(), captchaToken ?? undefined);
       setSent(true);
       toast(res.message, "success");
     } catch (err) {
@@ -65,7 +72,10 @@ export default function ForgotPasswordPage() {
                   style={{ width: "100%", padding: "11px 14px", border: "2px solid var(--border)", background: "var(--panel)", color: "var(--fg)", fontSize: 14, borderRadius: "var(--radius-sm)", outline: "none", boxSizing: "border-box" }}
                 />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={loading || !email} style={{ width: "100%", justifyContent: "center", padding: 14 }}>
+              {captchaRequired && (
+                <TurnstileWidget onSuccess={setCaptchaToken} onExpired={() => setCaptchaToken(null)} />
+              )}
+              <button type="submit" className="btn btn-primary" disabled={loading || !email || (captchaRequired && !captchaToken)} style={{ width: "100%", justifyContent: "center", padding: 14 }}>
                 {loading ? "Đang gửi..." : "Gửi liên kết đặt lại"}
               </button>
               <div style={{ textAlign: "center", fontSize: 13 }}>

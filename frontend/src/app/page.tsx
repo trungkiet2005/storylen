@@ -11,6 +11,7 @@ import { Footer } from '@/components/Footer';
 import { useToast } from '@/components/Toast';
 import { FadeIn, StaggerContainer, StaggerItem, ScaleIn } from '@/components/Animations';
 import { ResumeReading } from '@/components/ResumeReading';
+import { DailyCheckin } from '@/components/DailyCheckin';
 import { AnimatedBackground } from '@/components/AnimatedBackground';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Suspense } from 'react';
@@ -409,6 +410,10 @@ export default function Home() {
       <TopBar active="home" />
 
       <ResumeReading />
+
+      <div style={{ padding: "0 clamp(16px, 4vw, 40px)", marginTop: 8 }}>
+        <DailyCheckin />
+      </div>
 
       {/* ── Hero Section ── */}
       <div style={{ padding: "clamp(16px, 4vw, 40px)" }}>
