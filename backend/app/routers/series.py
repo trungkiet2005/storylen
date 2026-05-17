@@ -1070,3 +1070,128 @@ def get_glossary_suggestions(
         "candidates": candidates[:limit],
         "scanned_bubbles": len(rows),
     }
+
+
+# ─── Chapter export to ZIP (Tier B #9) ────────────────────────────────────────
+
+import io as _io_export
+import zipfile as _zipfile_export
+import httpx as _httpx_export
+from fastapi.responses import StreamingResponse
+
+from app.storage.supabase_storage import (
+    signed_original_image_url,
+    signed_translated_image_url,
+    translated_image_public_url,
+)
+
+
+def _safe_filename(name: str | None, fallback: str) -> str:
+    """Sanitize a string for use as a file/folder name across OSes."""
+    base = (name or fallback).strip() or fallback
+    return _re_glossary.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", base)[:80]
+
+
+@router.get("/chapters/{chapter_id}/export")
+def export_chapter_zip(
+    chapter_id: str,
+    prefer: str = Query("translated", regex="^(translated|original)$"),
+    user: AuthUser = Depends(get_current_user),
+):
+    """
+    Download every page of a chapter as a single ZIP. By default returns
+    translated images; pass ?prefer=original to get raw originals.
+
+    Note: this hits Supabase Storage for each page in sequence — fine for
+    typical 20-page chapters but not optimized for hundreds of pages.
+    """
+    chapter, series = _require_chapter(chapter_id, user.id)
+    supabase = get_supabase()
+
+    try:
+        pages_res = (
+            supabase.table("manga_pages")
+            .select("page_id, page_number, translated_image_url, original_image_url, status")
+            .eq("chapter_id", chapter_id)
+            .order("page_number", desc=False)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("Chapter export: failed to list pages for %s: %s", chapter_id, exc)
+        raise HTTPException(status_code=503, detail="Không liệt kê được trang.") from exc
+
+    pages = pages_res.data or []
+    if not pages:
+        raise HTTPException(status_code=404, detail="Chương này chưa có trang nào.")
+
+    series_title = _safe_filename(series.get("title"), f"series-{series['series_id'][:8]}")
+    chapter_label = _safe_filename(
+        chapter.get("title") or f"Chuong-{chapter.get('chapter_number', '?')}",
+        f"chapter-{chapter_id[:8]}",
+    )
+
+    buffer = _io_export.BytesIO()
+    fetched = 0
+    skipped = 0
+
+    with _zipfile_export.ZipFile(buffer, mode="w", compression=_zipfile_export.ZIP_STORED) as zf:
+        with _httpx_export.Client(timeout=_httpx_export.Timeout(connect=10.0, read=30.0, write=10.0, pool=5.0)) as client:
+            for idx, page in enumerate(pages, start=1):
+                page_id = page["page_id"]
+                page_num = page.get("page_number") or idx
+
+                url: str | None = None
+                if prefer == "translated":
+                    url = signed_translated_image_url(
+                        page_id,
+                        page.get("translated_image_url") or translated_image_public_url(page_id),
+                    )
+                    if not url:
+                        url = signed_original_image_url(page.get("original_image_url"))
+                else:
+                    url = signed_original_image_url(page.get("original_image_url"))
+
+                if not url:
+                    skipped += 1
+                    continue
+
+                try:
+                    resp = client.get(url)
+                    resp.raise_for_status()
+                except Exception as exc:
+                    logger.warning("Chapter export: fetch page %s failed: %s", page_id, exc)
+                    skipped += 1
+                    continue
+
+                # Pick extension from URL or content-type
+                content_type = resp.headers.get("content-type", "image/jpeg").split(";", 1)[0].strip()
+                ext = ".png" if "png" in content_type else ".webp" if "webp" in content_type else ".jpg"
+                arcname = f"{chapter_label}/page-{str(page_num).zfill(3)}{ext}"
+                zf.writestr(arcname, resp.content)
+                fetched += 1
+
+        # Manifest so the reader knows what's inside
+        manifest = (
+            f"StoryLens chapter export\n"
+            f"Series: {series.get('title')}\n"
+            f"Chapter: {chapter.get('chapter_number')} - {chapter.get('title') or ''}\n"
+            f"Source: {prefer}\n"
+            f"Pages included: {fetched}\n"
+            f"Pages skipped: {skipped}\n"
+        )
+        zf.writestr(f"{chapter_label}/README.txt", manifest)
+
+    if fetched == 0:
+        raise HTTPException(status_code=503, detail="Không tải được ảnh nào cho chương này.")
+
+    buffer.seek(0)
+    filename = f"{series_title}-{chapter_label}.zip"
+    return StreamingResponse(
+        buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Pages-Fetched": str(fetched),
+            "X-Pages-Skipped": str(skipped),
+        },
+    )

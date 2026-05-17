@@ -978,6 +978,15 @@ export async function getGlossarySuggestions(
   return request<GlossarySuggestionsResponse>(`/series/${seriesId}/glossary/suggestions${q ? `?${q}` : ""}`);
 }
 
+// ─── Chapter export (Tier B #9) ───────────────────────────────────────────────
+
+/** Returns the absolute URL of the chapter-export endpoint. The caller can
+ * navigate to it (browser will download) or fetch it manually for blob handling. */
+export function chapterExportUrl(chapterId: string, prefer: "translated" | "original" = "translated"): string {
+  const qs = new URLSearchParams({ prefer }).toString();
+  return `${BASE_URL}/chapters/${chapterId}/export?${qs}`;
+}
+
 export async function createSeries(payload: SeriesCreatePayload): Promise<SeriesDetail> {
   return request<SeriesDetail>("/series", {
     method: "POST",
