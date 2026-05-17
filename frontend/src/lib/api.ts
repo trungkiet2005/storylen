@@ -1960,6 +1960,55 @@ export interface LibraryChapter {
   cover_image_url: string | null;
 }
 
+// ─── Chapter comments (Tier C) ────────────────────────────────────────────────
+
+export interface ChapterComment {
+  comment_id: string;
+  chapter_id: string;
+  user_id: string;
+  username: string | null;
+  body: string;
+  created_at: string;
+  can_delete: boolean;
+}
+
+export interface ChapterCommentsResponse {
+  chapter_id: string;
+  total: number;
+  items: ChapterComment[];
+}
+
+export async function listChapterComments(
+  chapterId: string,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<ChapterCommentsResponse> {
+  const params = new URLSearchParams();
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.offset) params.set("offset", String(opts.offset));
+  const q = params.toString();
+  return request<ChapterCommentsResponse>(`/chapters/${chapterId}/comments${q ? `?${q}` : ""}`);
+}
+
+export async function postChapterComment(
+  chapterId: string,
+  body: string,
+): Promise<ChapterComment> {
+  return request<ChapterComment>(`/chapters/${chapterId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+}
+
+export async function deleteChapterComment(
+  chapterId: string,
+  commentId: string,
+): Promise<void> {
+  return request<void>(`/chapters/${chapterId}/comments/${commentId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function getPublicSeriesChapters(seriesId: string): Promise<{
   series: { series_id: string; title: string; description: string | null; cover_image_url: string | null; author: string | null; tags: string[] };
   chapters: LibraryChapter[];

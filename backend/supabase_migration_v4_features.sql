@@ -39,3 +39,41 @@ ALTER TABLE public.profiles
 
 ALTER TABLE public.profiles
     ADD COLUMN IF NOT EXISTS checkin_streak INT NOT NULL DEFAULT 0;
+
+-- ─── 3. Chapter comments (Tier C) ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.chapter_comments (
+    comment_id    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    chapter_id    UUID NOT NULL REFERENCES public.manga_chapters(chapter_id) ON DELETE CASCADE,
+    user_id       UUID NOT NULL REFERENCES public.profiles(user_id) ON DELETE CASCADE,
+    body          TEXT NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at    TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_chapter_comments_chapter
+    ON public.chapter_comments(chapter_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chapter_comments_user
+    ON public.chapter_comments(user_id);
+
+ALTER TABLE public.chapter_comments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow service role full access on chapter_comments"
+    ON public.chapter_comments;
+CREATE POLICY "Allow service role full access on chapter_comments"
+    ON public.chapter_comments FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "chapter_comments_read_public" ON public.chapter_comments;
+CREATE POLICY "chapter_comments_read_public"
+    ON public.chapter_comments FOR SELECT
+    USING (deleted_at IS NULL);
+
+DROP POLICY IF EXISTS "chapter_comments_owner_write" ON public.chapter_comments;
+CREATE POLICY "chapter_comments_owner_write"
+    ON public.chapter_comments FOR INSERT
+    WITH CHECK (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "chapter_comments_owner_delete" ON public.chapter_comments;
+CREATE POLICY "chapter_comments_owner_delete"
+    ON public.chapter_comments FOR UPDATE
+    USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());

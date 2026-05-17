@@ -489,6 +489,22 @@ def get_current_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     return user
 
 
+def get_optional_current_user(
+    request: Request,
+    response: Response,
+    settings: Settings = Depends(get_settings),
+) -> AuthUser | None:
+    """Like get_current_user but returns None instead of 401 when no session.
+    Used by endpoints that are anonymous-readable but want to personalize the
+    response for logged-in viewers (e.g. show "delete my own comment" buttons)."""
+    try:
+        return get_current_user(request, response, settings)
+    except HTTPException as exc:
+        if exc.status_code in {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN}:
+            return None
+        raise
+
+
 @router.post("/register", response_model=AuthResponse)
 @limiter.limit(lambda: get_settings().RATE_LIMIT_REGISTER)
 async def register(request: Request, payload: RegisterRequest, response: Response, settings: Settings = Depends(get_settings)) -> AuthResponse:
