@@ -22,6 +22,7 @@ import {
 } from '@/lib/api';
 import { AddToSeriesModal } from '@/components/AddToSeriesModal';
 import { BubbleDictionaryModal } from '@/components/BubbleDictionaryModal';
+import { TranslationFeedback } from '@/components/TranslationFeedback';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedPage } from '@/components/Animations';
@@ -1433,6 +1434,13 @@ function ReaderContent() {
               </motion.div>
             ) : null}
           </AnimatePresence>
+
+          {/* ── Translation feedback (Tier B #10) ── */}
+          {pageData && (
+            <div style={{ width: "100%", maxWidth: 840, marginTop: 12 }}>
+              <TranslationFeedback pageId={pageData.page_id} />
+            </div>
+          )}
 
           {/* ── Bottom Navigation (conditional) ── */}
           {hasMultiplePages && currentPageIdx !== -1 && (

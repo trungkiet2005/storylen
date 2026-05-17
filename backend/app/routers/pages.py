@@ -512,3 +512,94 @@ def get_bubble_dictionary(
         note=payload.get("note"),
         cached=cached,
     )
+
+
+# ─── Translation feedback (Tier B #10) ────────────────────────────────────────
+
+from pydantic import BaseModel as _BaseModel
+from typing import Literal as _Literal
+
+
+class TranslationFeedbackRequest(_BaseModel):
+    vote: _Literal["up", "down"]
+    comment: str | None = None
+
+
+class TranslationFeedbackResponse(_BaseModel):
+    page_id: str
+    vote: str
+    persisted: bool
+
+
+def _missing_table_marker(exc: Exception, table: str) -> bool:
+    text = str(exc).lower()
+    return table.lower() in text and ("does not exist" in text or "could not find" in text or "42p01" in text)
+
+
+@router.post(
+    "/{page_id}/feedback",
+    response_model=TranslationFeedbackResponse,
+)
+def submit_translation_feedback(
+    page_id: str,
+    payload: TranslationFeedbackRequest,
+    user: AuthUser = Depends(get_current_user),
+) -> TranslationFeedbackResponse:
+    """Record a 👍 / 👎 vote on this page's translation. Re-voting upserts.
+
+    If the `translation_feedback` table is missing (v4 migration not run yet),
+    we still return 200 with persisted=false and log structured feedback so
+    admins can grep logs while the migration is pending.
+    """
+    supabase = get_supabase()
+    _get_owned_page(supabase, page_id, user)
+
+    row = {
+        "user_id": user.id,
+        "page_id": page_id,
+        "vote": payload.vote,
+        "comment": (payload.comment or "").strip()[:2000] or None,
+    }
+
+    try:
+        supabase.table("translation_feedback").upsert(row, on_conflict="user_id,page_id").execute()
+        return TranslationFeedbackResponse(page_id=page_id, vote=payload.vote, persisted=True)
+    except Exception as exc:
+        if _missing_table_marker(exc, "translation_feedback"):
+            logger.warning(
+                "translation_feedback table missing — falling back to log. "
+                "user=%s page=%s vote=%s comment=%r",
+                user.id, page_id, payload.vote, row["comment"],
+            )
+            return TranslationFeedbackResponse(page_id=page_id, vote=payload.vote, persisted=False)
+        logger.error("Failed to record translation feedback for page %s: %s", page_id, exc)
+        raise HTTPException(status_code=500, detail="Không lưu được phản hồi.") from exc
+
+
+@router.get("/{page_id}/feedback", response_model=TranslationFeedbackResponse | None)
+def get_translation_feedback(
+    page_id: str,
+    user: AuthUser = Depends(get_current_user),
+) -> TranslationFeedbackResponse | None:
+    """Return the caller's current vote on this page, if any."""
+    supabase = get_supabase()
+    _get_owned_page(supabase, page_id, user)
+
+    try:
+        res = (
+            supabase.table("translation_feedback")
+            .select("vote")
+            .eq("user_id", user.id)
+            .eq("page_id", page_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        if _missing_table_marker(exc, "translation_feedback"):
+            return None
+        logger.warning("Feedback lookup failed: %s", exc)
+        return None
+
+    if not res or not res.data:
+        return None
+    return TranslationFeedbackResponse(page_id=page_id, vote=str(res.data.get("vote")), persisted=True)

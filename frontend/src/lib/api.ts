@@ -784,6 +784,31 @@ export async function getBubbleDictionary(
   return request<BubbleDictionaryResponse>(`/page/${pageId}/bubbles/${bubbleId}/dictionary`);
 }
 
+// ─── Translation feedback (Tier B #10) ────────────────────────────────────────
+
+export type FeedbackVote = "up" | "down";
+
+export interface TranslationFeedback {
+  page_id: string;
+  vote: FeedbackVote | string;
+  persisted: boolean;
+}
+
+export async function submitTranslationFeedback(
+  pageId: string,
+  payload: { vote: FeedbackVote; comment?: string },
+): Promise<TranslationFeedback> {
+  return request<TranslationFeedback>(`/page/${pageId}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getTranslationFeedback(pageId: string): Promise<TranslationFeedback | null> {
+  return request<TranslationFeedback | null>(`/page/${pageId}/feedback`);
+}
+
 /**
  * Studio review action — set a bubble's QC status (approved / rejected / pending).
  * Optionally pipes through an edited translation in the same call (recorded as a
