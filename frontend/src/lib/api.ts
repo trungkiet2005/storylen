@@ -1625,10 +1625,21 @@ export async function saveWibuProgress(
 
 // ─── Account self-service ────────────────────────────────────────────────────
 
-export async function forgotPassword(email: string): Promise<{ message: string }> {
-  return request<{ message: string }>("/auth/forgot-password", {
+export async function resendVerification(email: string): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/resend-verification", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function forgotPassword(email: string, captchaToken?: string): Promise<{ message: string }> {
+  return request<{ message: string }>("/auth/forgot-password", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(captchaToken ? { "cf-turnstile-token": captchaToken } : {}),
+    },
     body: JSON.stringify({ email }),
   });
 }

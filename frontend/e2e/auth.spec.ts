@@ -68,11 +68,11 @@ test.describe("Auth flow", () => {
     await expect(page.getByRole("button", { name: /tài khoản người dùng/i })).toBeVisible();
   });
 
-  test("Google login button is present but disabled (Coming Soon)", async ({ page }) => {
+  test("Google OAuth button is present and enabled", async ({ page }) => {
     await withMockedApi(page);
     await gotoApp(page, "/login");
     const googleBtn = page.getByRole("button", { name: /tiếp tục với google/i });
     await expect(googleBtn).toBeVisible();
-    await expect(googleBtn).toBeDisabled();
+    await expect(googleBtn).toBeEnabled();
   });
 });

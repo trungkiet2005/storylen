@@ -296,8 +296,22 @@ export default function LoginPage() {
                   whileHover={{ scale: 1.01 }}
                   whileTap={{ scale: 0.99 }}
                   type="button"
-                  disabled
-                  title="Đăng nhập Google sắp ra mắt"
+                  disabled={loading}
+                  onClick={() => {
+                    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+                    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+                    if (!supabaseUrl) {
+                      toast("OAuth chưa được cấu hình trên frontend (.env).", "error");
+                      return;
+                    }
+                    // Remember where the user was so /auth/callback can return them.
+                    try { window.localStorage.setItem("sl.oauth-next", "/"); } catch { /* ignore */ }
+                    const redirect = encodeURIComponent(`${siteUrl}/auth/callback`);
+                    // Supabase Auth — provider=google, scope default. Returns
+                    // tokens in the URL hash after OAuth dance completes.
+                    window.location.href =
+                      `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${redirect}`;
+                  }}
                   className="stroke-ink"
                   style={{
                     width: "100%",
@@ -308,12 +322,11 @@ export default function LoginPage() {
                     alignItems: "center",
                     justifyContent: "center",
                     background: "var(--panel)",
-                    color: "var(--fg-soft)",
+                    color: "var(--fg)",
                     borderRadius: "var(--radius-sm)",
                     fontFamily: "var(--font-sans)",
                     fontWeight: 700,
-                    cursor: "not-allowed",
-                    opacity: 0.7,
+                    cursor: loading ? "wait" : "pointer",
                     letterSpacing: "0.02em",
                   }}
                 >
@@ -324,7 +337,6 @@ export default function LoginPage() {
                     <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                   </svg>
                   Tiếp tục với Google
-                  <span className="mono" style={{ fontSize: 9, padding: "2px 6px", background: "var(--bg-2)", border: "1px solid var(--border-soft)", marginLeft: 4, letterSpacing: "0.1em" }}>SOON</span>
                 </motion.button>
               </FadeIn>
 
