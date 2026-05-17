@@ -6,8 +6,10 @@ import Image from "next/image";
 import { TopBar } from "@/components/TopBar";
 import { Footer } from "@/components/Footer";
 import { Icon } from "@/components/Icons";
-import { searchBubbles, type SearchHit } from "@/lib/api";
+import { searchBubbles, searchSemantic, type SearchHit } from "@/lib/api";
 import { useToast } from "@/components/Toast";
+
+type SearchMode = "keyword" | "semantic";
 
 function Highlight({ text, q }: { text: string; q: string }) {
   if (!q.trim()) return <>{text}</>;
@@ -28,6 +30,7 @@ export default function SearchPage() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [mode, setMode] = useState<SearchMode>("keyword");
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -38,14 +41,31 @@ export default function SearchPage() {
     setLoading(true);
     setSearched(true);
     try {
-      const res = await searchBubbles(q.trim(), 50);
+      const res = mode === "semantic"
+        ? await searchSemantic(q.trim(), { limit: 30 })
+        : await searchBubbles(q.trim(), 50);
       setHits(res.hits);
+      if (mode === "semantic" && res.hits.length === 0) {
+        toast(
+          "Không có kết quả semantic. Có thể trang chưa được index (chưa có embedding) — thử từ khoá thường.",
+          "info",
+        );
+      }
     } catch (err) {
       toast(err instanceof Error ? err.message : "Có lỗi xảy ra.", "error");
     } finally {
       setLoading(false);
     }
   }
+
+  const examplesByMode: Record<SearchMode, string[]> = {
+    keyword: ["định mệnh", "tiến lên", "chạy trốn"],
+    semantic: [
+      "cảnh nhân vật khóc trong mưa",
+      "trận đánh giữa hai phe",
+      "lúc thú nhận tình yêu",
+    ],
+  };
 
   return (
     <>
@@ -56,12 +76,50 @@ export default function SearchPage() {
           <h1 className="display" style={{ fontSize: 28, marginTop: 4 }}>Tìm trong nội dung truyện đã dịch</h1>
         </header>
 
-        <form onSubmit={onSubmit} style={{ display: "flex", gap: 10, marginBottom: 24 }}>
+        {/* Mode toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+          <span className="caps-xs" style={{ color: "var(--muted)" }}>Chế độ</span>
+          <div style={{ display: "flex", border: "1.5px solid var(--border)", background: "var(--panel)" }}>
+            <button
+              onClick={() => setMode("keyword")}
+              aria-pressed={mode === "keyword"}
+              style={{
+                padding: "6px 12px", fontSize: 12, fontWeight: 600,
+                background: mode === "keyword" ? "var(--accent)" : "transparent",
+                color: mode === "keyword" ? "#fff" : "var(--fg)",
+                border: "none", borderRight: "1.5px solid var(--border)", cursor: "pointer",
+                display: "inline-flex", gap: 5, alignItems: "center",
+              }}
+            >
+              <Icon name="search" size={11} /> Từ khoá
+            </button>
+            <button
+              onClick={() => setMode("semantic")}
+              aria-pressed={mode === "semantic"}
+              style={{
+                padding: "6px 12px", fontSize: 12, fontWeight: 600,
+                background: mode === "semantic" ? "var(--accent)" : "transparent",
+                color: mode === "semantic" ? "#fff" : "var(--fg)",
+                border: "none", cursor: "pointer",
+                display: "inline-flex", gap: 5, alignItems: "center",
+              }}
+            >
+              <Icon name="sparkle" size={11} /> Theo nghĩa (semantic)
+            </button>
+          </div>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>
+            {mode === "semantic"
+              ? "Tìm cảnh theo ý nghĩa — không cần khớp chữ"
+              : "Tìm theo từ khoá xuất hiện trong lời thoại"}
+          </span>
+        </div>
+
+        <form onSubmit={onSubmit} style={{ display: "flex", gap: 10, marginBottom: 18 }}>
           <input
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Tìm theo lời thoại tiếng Việt..."
+            placeholder={mode === "semantic" ? "vd: cảnh nhân vật khóc trong mưa" : "Tìm theo lời thoại tiếng Việt..."}
             style={{
               flex: 1,
               padding: "12px 14px",
@@ -74,13 +132,33 @@ export default function SearchPage() {
             }}
           />
           <button type="submit" className="btn btn-primary" disabled={loading || q.trim().length < 2} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <Icon name="search" size={14} /> {loading ? "..." : "Tìm"}
+            <Icon name={mode === "semantic" ? "sparkle" : "search"} size={14} /> {loading ? "..." : "Tìm"}
           </button>
         </form>
 
+        {/* Example chips */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18 }}>
+          <span style={{ fontSize: 11, color: "var(--muted)" }}>Ví dụ:</span>
+          {examplesByMode[mode].map(example => (
+            <button
+              key={example}
+              onClick={() => setQ(example)}
+              style={{
+                fontSize: 11, padding: "3px 8px",
+                background: "var(--bg-2)", color: "var(--fg-soft)",
+                border: "1.5px solid var(--border-soft)", cursor: "pointer",
+              }}
+            >
+              {example}
+            </button>
+          ))}
+        </div>
+
         {!searched && (
           <div style={{ color: "var(--muted)", fontSize: 14 }}>
-            Nhập từ khoá để tìm trong tất cả lời thoại đã dịch.
+            {mode === "semantic"
+              ? "Nhập câu mô tả cảnh / chủ đề. Chỉ áp dụng cho các trang đã được index embedding."
+              : "Nhập từ khoá để tìm trong tất cả lời thoại đã dịch."}
           </div>
         )}
 
@@ -98,11 +176,26 @@ export default function SearchPage() {
                   <Image src={h.thumbnail_url} alt="" width={80} height={120} unoptimized style={{ flexShrink: 0, objectFit: "cover", borderRadius: 4 }} />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <Link href={`/reader/${h.page_id}`} style={{ fontWeight: 700, color: "var(--accent)" }}>
-                    {h.series_title || "Truyện"}{h.chapter_number ? ` · Chương ${h.chapter_number}` : ""}{h.page_number ? ` · Trang ${h.page_number}` : ""}
-                  </Link>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <Link href={`/reader?page=${h.page_id}`} style={{ fontWeight: 700, color: "var(--accent)" }}>
+                      {h.series_title || "Truyện"}{h.chapter_number ? ` · Chương ${h.chapter_number}` : ""}{h.page_number ? ` · Trang ${h.page_number}` : ""}
+                    </Link>
+                    {h.similarity != null && (
+                      <span
+                        className="mono"
+                        style={{
+                          fontSize: 10, padding: "1px 6px",
+                          background: "var(--bg-3)", color: "var(--muted)",
+                          border: "1px solid var(--border-soft)",
+                        }}
+                        title="Độ tương tự ngữ nghĩa"
+                      >
+                        {(h.similarity * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 13, color: "var(--fg-soft)", marginTop: 6, lineHeight: 1.6 }}>
-                    <Highlight text={h.snippet} q={q} />
+                    {mode === "keyword" ? <Highlight text={h.snippet} q={q} /> : h.snippet}
                   </div>
                 </div>
               </li>

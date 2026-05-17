@@ -1803,17 +1803,29 @@ export interface SearchHit {
   chapter_number: number | null;
   snippet: string;
   thumbnail_url: string | null;
+  similarity?: number | null;
 }
 
 export interface SearchResponse {
   query: string;
   total: number;
   hits: SearchHit[];
+  mode?: "keyword" | "semantic";
 }
 
 export async function searchBubbles(query: string, limit = 30): Promise<SearchResponse> {
   const params = new URLSearchParams({ q: query, limit: String(limit) });
   return request<SearchResponse>(`/search?${params}`);
+}
+
+export async function searchSemantic(
+  query: string,
+  opts: { limit?: number; seriesId?: string } = {},
+): Promise<SearchResponse> {
+  const params = new URLSearchParams({ q: query });
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.seriesId) params.set("series_id", opts.seriesId);
+  return request<SearchResponse>(`/search/semantic?${params}`);
 }
 
 // ─── Pipeline cancellation ───────────────────────────────────────────────────
