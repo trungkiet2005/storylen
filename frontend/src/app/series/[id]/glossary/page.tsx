@@ -9,6 +9,7 @@ import { AnimatedPage, FadeIn, StaggerContainer, StaggerItem } from "@/component
 import { useWibu } from "@/contexts/WibuContext";
 import { type GlossaryEntry } from "@/lib/localStore";
 import { useToast } from "@/components/Toast";
+import { APIError, getGlossarySuggestions, type GlossarySuggestion } from "@/lib/api";
 
 function GlossaryRow({
   entry,
@@ -79,9 +80,50 @@ export default function GlossaryPage({ params }: { params: Promise<{ id: string 
   const [formNote, setFormNote] = useState("");
   const [editingKey, setEditingKey] = useState<string | null>(null);
 
+  // Auto-suggest (Tier A #4)
+  const [suggestions, setSuggestions] = useState<GlossarySuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [scannedBubbles, setScannedBubbles] = useState<number | null>(null);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
   const refresh = () => setEntries(getGlossary(id));
 
   useEffect(() => { refresh(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadSuggestions = React.useCallback(async () => {
+    setLoadingSuggestions(true);
+    try {
+      const res = await getGlossarySuggestions(id, { minCount: 3, limit: 40 });
+      setSuggestions(res.candidates);
+      setScannedBubbles(res.scanned_bubbles);
+    } catch (err) {
+      const msg = err instanceof APIError ? err.message : "Không tải được đề xuất.";
+      toast(msg, "error");
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [id, toast]);
+
+  useEffect(() => {
+    loadSuggestions();
+  }, [loadSuggestions]);
+
+  const existingKeys = React.useMemo(() => new Set(entries.map(e => e.key)), [entries]);
+  const visibleSuggestions = suggestions.filter(
+    s => !existingKeys.has(s.candidate) && !dismissed.has(s.candidate),
+  );
+
+  const handleAddSuggestion = (s: GlossarySuggestion) => {
+    setFormKey(s.candidate);
+    setFormValue("");
+    setFormNote(`Xuất hiện ${s.count} lần · ${s.kind === "katakana" ? "katakana (thường là tên)" : "kanji compound"}`);
+    setEditingKey(null);
+    document.getElementById("glossary-form")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const handleDismissSuggestion = (candidate: string) => {
+    setDismissed(prev => new Set(prev).add(candidate));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,6 +181,100 @@ export default function GlossaryPage({ params }: { params: Promise<{ id: string 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 28, alignItems: "flex-start" }}>
             {/* Left — table */}
             <div>
+              {/* Auto-suggest panel (Tier A #4) */}
+              {(loadingSuggestions || visibleSuggestions.length > 0) && (
+                <FadeIn direction="up" distance={10} delay={0.12}>
+                  <div
+                    className="stroke-ink panel-shadow"
+                    style={{
+                      background: "var(--panel)",
+                      padding: "14px 16px",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <Icon name="sparkle" size={13} />
+                      <span className="caps-xs" style={{ color: "var(--accent)" }}>
+                        Đề xuất tự động
+                      </span>
+                      {scannedBubbles !== null && (
+                        <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                          · đã quét {scannedBubbles} bong bóng
+                        </span>
+                      )}
+                      <div style={{ flex: 1 }} />
+                      <button
+                        onClick={loadSuggestions}
+                        disabled={loadingSuggestions}
+                        className="btn btn-sm btn-ghost"
+                        title="Quét lại"
+                        style={{ fontSize: 10, padding: "2px 6px" }}
+                      >
+                        <Icon name="refresh" size={10} /> Quét lại
+                      </button>
+                    </div>
+
+                    {loadingSuggestions ? (
+                      <div style={{ padding: "10px 0", color: "var(--muted)", fontSize: 12 }}>
+                        Đang quét bong bóng để tìm danh từ riêng…
+                      </div>
+                    ) : visibleSuggestions.length === 0 ? (
+                      <div style={{ padding: "6px 0", color: "var(--muted)", fontSize: 12 }}>
+                        Không tìm thấy ứng viên mới. Hệ thống chỉ đề xuất từ lặp ≥ 3 lần.
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {visibleSuggestions.slice(0, 16).map(s => (
+                          <div
+                            key={s.candidate}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 4,
+                              padding: "4px 6px 4px 10px",
+                              background: "var(--bg-2)",
+                              border: "1.5px solid var(--border-soft)",
+                              fontSize: 12,
+                            }}
+                            title={s.sample}
+                          >
+                            <span className="serif" style={{ fontWeight: 600 }}>{s.candidate}</span>
+                            <span style={{ color: "var(--muted)", fontSize: 10 }}>×{s.count}</span>
+                            <button
+                              onClick={() => handleAddSuggestion(s)}
+                              title="Thêm vào từ điển"
+                              style={{
+                                marginLeft: 4, padding: "2px 5px", fontSize: 10,
+                                background: "var(--accent)", color: "#fff",
+                                border: "none", cursor: "pointer",
+                              }}
+                            >
+                              + Thêm
+                            </button>
+                            <button
+                              onClick={() => handleDismissSuggestion(s.candidate)}
+                              title="Bỏ qua"
+                              style={{
+                                padding: "2px 4px", fontSize: 10,
+                                background: "transparent", color: "var(--muted)",
+                                border: "1px solid var(--border-soft)", cursor: "pointer",
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        {visibleSuggestions.length > 16 && (
+                          <span style={{ alignSelf: "center", fontSize: 11, color: "var(--muted)" }}>
+                            … còn {visibleSuggestions.length - 16}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </FadeIn>
+              )}
+
               {/* Search */}
               <FadeIn direction="up" distance={10} delay={0.15}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", border: "2px solid var(--border)", background: "var(--panel)", marginBottom: 16 }}>

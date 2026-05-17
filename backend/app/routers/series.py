@@ -950,3 +950,123 @@ def remove_page_from_chapter(
         raise HTTPException(status_code=503, detail="Gỡ trang thất bại.") from exc
 
     return Response(status_code=204)
+
+
+# ─── Glossary auto-suggest (Tier A #4) ────────────────────────────────────────
+
+import re as _re_glossary
+from collections import Counter as _Counter
+
+# Katakana sequences ≥ 2 chars usually = proper nouns (names, places, skills) in JP.
+_KATAKANA_RE = _re_glossary.compile(r"[ァ-ヺー]{2,12}")
+# Repeated kanji compounds (2-4 chars) — often character names or unique terms.
+_KANJI_COMPOUND_RE = _re_glossary.compile(r"[一-鿿]{2,4}")
+# CJK words for Chinese text (mostly handled by kanji regex above; same Unicode block).
+
+# Block-list of very common particles / function words that show up as kanji compounds
+# but aren't worth suggesting. Keep small — over-filtering hides useful candidates.
+_COMMON_KANJI = {
+    "今日", "明日", "昨日", "時間", "場所", "人間", "自分", "本当",
+    "大丈夫", "気持", "気持ち", "頑張", "可愛", "可愛い", "綺麗",
+    "今回", "前回", "今度", "今夜", "今朝", "毎日", "全部", "全然",
+    "問題", "理由", "本当", "本気", "本物", "本日",
+}
+
+
+@router.get("/series/{series_id}/glossary/suggestions")
+def get_glossary_suggestions(
+    series_id: str,
+    min_count: int = Query(3, ge=2, le=20),
+    limit: int = Query(40, ge=5, le=200),
+    user: AuthUser = Depends(get_current_user),
+) -> dict:
+    """
+    Scan all bubble OCR text across a series and suggest proper-noun candidates
+    for the glossary: Katakana sequences (very likely names/skills) and repeated
+    kanji compounds. Frontend renders these as one-click "Add to glossary".
+    """
+    _require_series(series_id, user.id)
+    supabase = get_supabase()
+
+    # Pull all bubble texts for pages owned by this series via chapters.
+    try:
+        chapters_res = (
+            supabase.table("manga_chapters")
+            .select("chapter_id")
+            .eq("series_id", series_id)
+            .execute()
+        )
+        chapter_ids = [c["chapter_id"] for c in (chapters_res.data or [])]
+        if not chapter_ids:
+            return {"candidates": [], "scanned_bubbles": 0}
+
+        pages_res = (
+            supabase.table("manga_pages")
+            .select("page_id")
+            .in_("chapter_id", chapter_ids)
+            .execute()
+        )
+        page_ids = [p["page_id"] for p in (pages_res.data or [])]
+        if not page_ids:
+            return {"candidates": [], "scanned_bubbles": 0}
+
+        bubbles_res = (
+            supabase.table("bubble_data")
+            .select("original_text_jp")
+            .in_("page_id", page_ids)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("Glossary suggestions lookup failed for series %s: %s", series_id, exc)
+        raise HTTPException(status_code=503, detail="Không quét được dữ liệu bóng thoại.") from exc
+
+    rows = bubbles_res.data or []
+    katakana_counter: _Counter = _Counter()
+    kanji_counter: _Counter = _Counter()
+    samples: dict[str, str] = {}
+
+    for row in rows:
+        text = (row.get("original_text_jp") or "").strip()
+        if not text:
+            continue
+        seen_in_bubble: set[str] = set()
+        for tok in _KATAKANA_RE.findall(text):
+            if tok in seen_in_bubble:
+                continue
+            seen_in_bubble.add(tok)
+            katakana_counter[tok] += 1
+            if tok not in samples:
+                samples[tok] = text[:80]
+        for tok in _KANJI_COMPOUND_RE.findall(text):
+            if tok in seen_in_bubble or tok in _COMMON_KANJI:
+                continue
+            seen_in_bubble.add(tok)
+            kanji_counter[tok] += 1
+            if tok not in samples:
+                samples[tok] = text[:80]
+
+    candidates: list[dict] = []
+    # Katakana entries get bonus weight — they are almost always proper nouns.
+    for tok, count in katakana_counter.most_common():
+        if count < min_count:
+            continue
+        candidates.append({
+            "candidate": tok,
+            "count": count,
+            "kind": "katakana",
+            "sample": samples.get(tok, ""),
+        })
+    for tok, count in kanji_counter.most_common():
+        if count < min_count:
+            continue
+        candidates.append({
+            "candidate": tok,
+            "count": count,
+            "kind": "kanji",
+            "sample": samples.get(tok, ""),
+        })
+
+    return {
+        "candidates": candidates[:limit],
+        "scanned_bubbles": len(rows),
+    }

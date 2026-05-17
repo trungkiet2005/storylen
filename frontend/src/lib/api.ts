@@ -953,6 +953,31 @@ export async function getSeriesFull(seriesId: string): Promise<SeriesDetail> {
   return request<SeriesDetail>(`/series/${seriesId}/full`);
 }
 
+// ─── Glossary auto-suggest (Tier A #4) ────────────────────────────────────────
+
+export interface GlossarySuggestion {
+  candidate: string;
+  count: number;
+  kind: "katakana" | "kanji";
+  sample: string;
+}
+
+export interface GlossarySuggestionsResponse {
+  candidates: GlossarySuggestion[];
+  scanned_bubbles: number;
+}
+
+export async function getGlossarySuggestions(
+  seriesId: string,
+  opts: { minCount?: number; limit?: number } = {},
+): Promise<GlossarySuggestionsResponse> {
+  const qs = new URLSearchParams();
+  if (opts.minCount) qs.set("min_count", String(opts.minCount));
+  if (opts.limit) qs.set("limit", String(opts.limit));
+  const q = qs.toString();
+  return request<GlossarySuggestionsResponse>(`/series/${seriesId}/glossary/suggestions${q ? `?${q}` : ""}`);
+}
+
 export async function createSeries(payload: SeriesCreatePayload): Promise<SeriesDetail> {
   return request<SeriesDetail>("/series", {
     method: "POST",
