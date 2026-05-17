@@ -1926,16 +1926,30 @@ export interface LibrarySeriesItem {
   author: string | null;
   tags: string[];
   published_chapter_count: number;
+  trending_score?: number;
   latest_published_at: string | null;
 }
 
 export interface LibraryResponse {
   total: number;
   items: LibrarySeriesItem[];
+  all_tags?: string[];
 }
 
-export async function getPublicLibrary(limit = 50, offset = 0): Promise<LibraryResponse> {
-  return request<LibraryResponse>(`/library?limit=${limit}&offset=${offset}`);
+export type LibrarySort = "recent" | "trending";
+
+export async function getPublicLibrary(opts: {
+  limit?: number;
+  offset?: number;
+  tag?: string | null;
+  sort?: LibrarySort;
+} = {}): Promise<LibraryResponse> {
+  const params = new URLSearchParams();
+  params.set("limit", String(opts.limit ?? 50));
+  params.set("offset", String(opts.offset ?? 0));
+  if (opts.tag) params.set("tag", opts.tag);
+  if (opts.sort) params.set("sort", opts.sort);
+  return request<LibraryResponse>(`/library?${params.toString()}`);
 }
 
 export interface LibraryChapter {
