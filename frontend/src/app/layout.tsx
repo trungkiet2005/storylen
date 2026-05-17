@@ -7,6 +7,7 @@ import { I18nProvider } from "@/contexts/I18nContext";
 import { AchievementToaster } from "@/components/AchievementToaster";
 import { OnboardingOverlay } from "@/components/OnboardingOverlay";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { CookieConsent } from "@/components/CookieConsent";
 import { AnalyticsProvider } from "@/components/AnalyticsProvider";
 
@@ -47,6 +48,7 @@ export default function RootLayout({
                 <AchievementToaster />
                 <OnboardingOverlay />
                 <ServiceWorkerRegistrar />
+                <PWAInstallPrompt />
                 <CookieConsent />
                 <AnalyticsProvider />
                 {children}

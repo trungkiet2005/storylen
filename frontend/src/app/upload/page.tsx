@@ -294,6 +294,7 @@ function UploadPageInner() {
   const [previewReaderMode, setPreviewReaderMode] = useState<"scroll" | "page">("scroll");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll console
@@ -818,6 +819,16 @@ function UploadPageInner() {
                   onChange={e => void handleFiles(e.target.files)}
                 />
 
+                {/* Hidden Camera Input — opens the rear camera on mobile (Tier A #6) */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  style={{ display: "none" }}
+                  onChange={e => void handleFiles(e.target.files)}
+                />
+
                 <AnimatePresence mode="wait">
                   {/* ── SCRAPE URL PANEL ── */}
                   {(state === "idle" || state === "dragging") && leftTab === "scrape" && (
@@ -1013,16 +1024,29 @@ function UploadPageInner() {
                           </motion.div>
                           <div className="display" style={{ fontSize: 26 }}>Kéo thả ảnh hoặc PDF vào đây</div>
                           <div style={{ color: "var(--fg-soft)", marginTop: 8, marginBottom: 24 }}>Chọn nhiều ảnh, hoặc chọn PDF để tự cắt từng trang</div>
-                          <motion.button
-                            whileHover={{ scale: 1.03 }}
-                            whileTap={{ scale: 0.97 }}
-                            className="btn btn-primary"
-                            disabled={isPreparingFiles}
-                            onClick={() => fileInputRef.current?.click()}
-                            style={{ padding: "14px 28px" }}
-                          >
-                            <Icon name="folder" size={14}/> {isPreparingFiles ? "Đang cắt PDF..." : "Chọn tệp tin"}
-                          </motion.button>
+                          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                            <motion.button
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.97 }}
+                              className="btn btn-primary"
+                              disabled={isPreparingFiles}
+                              onClick={() => fileInputRef.current?.click()}
+                              style={{ padding: "14px 28px" }}
+                            >
+                              <Icon name="folder" size={14}/> {isPreparingFiles ? "Đang cắt PDF..." : "Chọn tệp tin"}
+                            </motion.button>
+                            <motion.button
+                              whileHover={{ scale: 1.03 }}
+                              whileTap={{ scale: 0.97 }}
+                              className="btn"
+                              disabled={isPreparingFiles}
+                              onClick={() => cameraInputRef.current?.click()}
+                              title="Chụp trực tiếp trang sách giấy (chỉ mobile)"
+                              style={{ padding: "14px 22px" }}
+                            >
+                              <Icon name="image" size={14}/> Chụp ảnh
+                            </motion.button>
+                          </div>
                         </div>
                       ) : (
                         // Queue Table & Start Action
