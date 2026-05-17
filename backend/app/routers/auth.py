@@ -491,7 +491,11 @@ def get_current_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
 
 @router.post("/register", response_model=AuthResponse)
 @limiter.limit(lambda: get_settings().RATE_LIMIT_REGISTER)
-def register(request: Request, payload: RegisterRequest, response: Response, settings: Settings = Depends(get_settings)) -> AuthResponse:
+async def register(request: Request, payload: RegisterRequest, response: Response, settings: Settings = Depends(get_settings)) -> AuthResponse:
+    # Bot wall — no-op when TURNSTILE_SECRET_KEY is unset (free-tier / dev).
+    from app.services.captcha import verify_turnstile
+    await verify_turnstile(request)
+
     if not _username_available(payload.username):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Tên đăng nhập đã được sử dụng.")
 
@@ -681,14 +685,128 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class ResendVerificationRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        email = value.strip().lower()
+        if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
+            raise ValueError("Email không hợp lệ")
+        return email
+
+
+@router.post("/resend-verification", response_model=MessageResponse)
+@limiter.limit("3/minute")
+def resend_verification(
+    request: Request,
+    payload: ResendVerificationRequest,
+    settings: Settings = Depends(get_settings),
+) -> MessageResponse:
+    """Resend the Supabase signup-confirmation email.
+
+    Always returns 200 — we don't leak whether the email is registered.
+    Supabase enforces email verification when Authentication → Providers →
+    Email → Confirm email is enabled in the project dashboard.
+    """
+    try:
+        _request_auth(
+            "POST",
+            "resend",
+            settings=settings,
+            json={"type": "signup", "email": payload.email},
+        )
+    except HTTPException as exc:
+        # Don't leak which emails exist. Log + return generic success.
+        if exc.status_code >= 500:
+            logger.warning("Resend verification upstream error: %s", exc.detail)
+    return MessageResponse(
+        message="Nếu email tồn tại, chúng tôi đã gửi lại liên kết xác thực.",
+    )
+
+
+class OAuthCallbackRequest(BaseModel):
+    access_token: str = Field(min_length=10, max_length=4096)
+    refresh_token: str = Field(min_length=10, max_length=4096)
+
+
+@router.post("/oauth-callback", response_model=AuthResponse)
+@limiter.limit("20/minute")
+def oauth_callback(
+    request: Request,
+    payload: OAuthCallbackRequest,
+    response: Response,
+    settings: Settings = Depends(get_settings),
+) -> AuthResponse:
+    """Finalise OAuth (Google etc.) — receive raw Supabase tokens from the
+    frontend callback page and convert them into HTTP-only cookies so the
+    rest of the app uses the same session shape as email/password login.
+
+    Flow:
+      Browser → Supabase OAuth provider → /auth/callback page (Next.js) →
+      POST /v1/auth/oauth-callback (this endpoint) → cookies set, redirect home.
+
+    We verify the token with Supabase by calling ``GET /auth/v1/user`` so a
+    forged token doesn't get session cookies.
+    """
+    try:
+        user_payload = _request_auth("GET", "user", settings=settings, token=payload.access_token)
+    except HTTPException as exc:
+        if exc.status_code in {status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN}:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token OAuth không hợp lệ.") from exc
+        raise
+
+    user = _user_from_payload(user_payload) or user_payload
+    user_id = str(user["id"])
+
+    # First-time OAuth users may not have a profile row yet.
+    profile = _get_profile(user_id)
+    if not profile:
+        user_metadata = user.get("user_metadata") or {}
+        username_hint = (
+            user_metadata.get("preferred_username")
+            or user_metadata.get("user_name")
+            or user_metadata.get("name")
+            or (user.get("email") or "").split("@", 1)[0]
+            or f"user_{user_id[:8]}"
+        )
+        # Sanitize to match USERNAME_RE (3-32 chars, alnum + underscore).
+        sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", username_hint)[:32].strip("_")
+        if len(sanitized) < 3:
+            sanitized = f"user_{user_id[:6]}"
+        # Make unique if already taken.
+        candidate = sanitized
+        suffix = 0
+        while not _username_available(candidate):
+            suffix += 1
+            tail = f"_{suffix}"
+            candidate = f"{sanitized[: 32 - len(tail)]}{tail}"
+            if suffix > 50:
+                candidate = f"user_{user_id[:8]}_{suffix}"
+                break
+        _ensure_profile(user_id, candidate)
+
+    session = {
+        "access_token": payload.access_token,
+        "refresh_token": payload.refresh_token,
+        "expires_in": 3600,
+    }
+    _set_session_cookies(response, session, settings)
+    return AuthResponse(authenticated=True, user=_to_auth_user(user))
+
+
 @router.post("/forgot-password", response_model=MessageResponse)
 @limiter.limit(lambda: get_settings().RATE_LIMIT_LOGIN)
-def forgot_password(
+async def forgot_password(
     request: Request,
     payload: ForgotPasswordRequest,
     settings: Settings = Depends(get_settings),
 ) -> MessageResponse:
     """Trigger Supabase Auth password reset email. Always returns 200 to avoid email enumeration."""
+    from app.services.captcha import verify_turnstile
+    await verify_turnstile(request)
+
     redirect_to = settings.PASSWORD_RESET_REDIRECT_URL or None
     body: dict[str, Any] = {"email": payload.email}
     if redirect_to:
