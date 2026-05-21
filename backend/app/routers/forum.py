@@ -13,9 +13,9 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field, field_validator
 
 from app.config import get_settings
@@ -27,7 +27,13 @@ from app.routers.auth import (
     get_current_user,
     get_optional_current_user,
 )
-from app.services.forum_service import notify_mentions, notify_reply_to_owner
+from app.services.forum_service import (
+    detect_mime_from_filename,
+    normalize_attachments,
+    notify_mentions,
+    notify_reply_to_owner,
+    upload_forum_attachment,
+)
 
 router = APIRouter(prefix="/forum", tags=["forum"])
 logger = logging.getLogger(__name__)
@@ -38,10 +44,23 @@ EDIT_WINDOW = timedelta(minutes=15)
 
 # ─── Schemas ─────────────────────────────────────────────────────────────────
 
+class AttachmentIn(BaseModel):
+    """Attachment metadata referenced by a thread or reply. URL must point to an
+    already-uploaded file in the forum-attachments bucket (use POST /forum/upload)."""
+    type: Literal["image", "video"]
+    url: str = Field(..., min_length=1, max_length=2048)
+    mime: str = Field(..., min_length=3, max_length=64)
+    size: int = Field(..., ge=0)
+    width: Optional[int] = None
+    height: Optional[int] = None
+    thumbnail_url: Optional[str] = None
+
+
 class ThreadCreateRequest(BaseModel):
     category: str = Field(..., min_length=1, max_length=32)
     title: str = Field(..., min_length=5, max_length=200)
     body: str = Field(..., min_length=1, max_length=10000)
+    attachments: list[AttachmentIn] = Field(default_factory=list, max_length=10)
 
     @field_validator("category")
     @classmethod
@@ -54,11 +73,23 @@ class ThreadCreateRequest(BaseModel):
 class ThreadEditRequest(BaseModel):
     title: Optional[str] = Field(None, min_length=5, max_length=200)
     body: Optional[str] = Field(None, min_length=1, max_length=10000)
+    attachments: Optional[list[AttachmentIn]] = Field(default=None, max_length=10)
 
 
 class ReplyCreateRequest(BaseModel):
     body: str = Field(..., min_length=1, max_length=5000)
     parent_reply_id: Optional[str] = None
+    attachments: list[AttachmentIn] = Field(default_factory=list, max_length=10)
+
+
+class AttachmentOut(BaseModel):
+    type: Literal["image", "video"]
+    url: str
+    mime: str
+    size: int
+    width: Optional[int] = None
+    height: Optional[int] = None
+    thumbnail_url: Optional[str] = None
 
 
 class VoteRequest(BaseModel):
@@ -83,6 +114,7 @@ class ThreadOut(BaseModel):
     created_at: datetime
     can_edit: bool = False
     can_delete: bool = False
+    attachments: list[AttachmentOut] = Field(default_factory=list)
 
 
 class ThreadListResponse(BaseModel):
@@ -103,6 +135,7 @@ class ReplyOut(BaseModel):
     my_vote: int = 0
     created_at: datetime
     can_delete: bool = False
+    attachments: list[AttachmentOut] = Field(default_factory=list)
 
 
 class ThreadDetailResponse(BaseModel):
@@ -225,6 +258,7 @@ def _thread_to_out(
         created_at=row["created_at"],
         can_edit=can_edit,
         can_delete=is_owner or is_admin,
+        attachments=_safe_attachments(row.get("attachments")),
     )
 
 
@@ -250,7 +284,31 @@ def _reply_to_out(
         my_vote=votes.get(("reply", rid), 0),
         created_at=row["created_at"],
         can_delete=is_owner or is_admin,
+        attachments=_safe_attachments(row.get("attachments")),
     )
+
+
+def _safe_attachments(raw: Any) -> list[AttachmentOut]:
+    """Coerce a JSONB attachments field (could be None / list / str) into AttachmentOut[]."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        try:
+            import json as _json
+            raw = _json.loads(raw)
+        except Exception:
+            return []
+    if not isinstance(raw, list):
+        return []
+    out: list[AttachmentOut] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            out.append(AttachmentOut(**item))
+        except Exception:
+            continue
+    return out
 
 
 def _load_thread_row(thread_id: str, *, include_deleted: bool = False) -> dict:
@@ -379,6 +437,14 @@ def create_thread(
 
     sb = get_supabase()
     now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        attachments = normalize_attachments(
+            [a.model_dump() for a in payload.attachments],
+            get_settings().FORUM_MAX_ATTACHMENTS,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     row = {
         "thread_id": str(uuid.uuid4()),
         "user_id": user.id,
@@ -390,6 +456,7 @@ def create_thread(
         "score": 0,
         "reply_count": 0,
         "hot_score": 0,
+        "attachments": attachments,
         "created_at": now_iso,
         "updated_at": now_iso,
     }
@@ -425,7 +492,7 @@ def edit_thread(
     payload: ThreadEditRequest,
     user: AuthUser = Depends(get_current_user),
 ):
-    if payload.title is None and payload.body is None:
+    if payload.title is None and payload.body is None and payload.attachments is None:
         raise HTTPException(status_code=400, detail="Không có gì để cập nhật.")
 
     sb = get_supabase()
@@ -451,6 +518,14 @@ def edit_thread(
         updates["title"] = payload.title.strip()
     if payload.body is not None:
         updates["body"] = payload.body.strip()
+    if payload.attachments is not None:
+        try:
+            updates["attachments"] = normalize_attachments(
+                [a.model_dump() for a in payload.attachments],
+                get_settings().FORUM_MAX_ATTACHMENTS,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
         sb.table("forum_threads").update(updates).eq("thread_id", thread_id).execute()
@@ -521,6 +596,14 @@ def create_reply(
         parent_owner_id = parent["user_id"]
         parent_kind = "reply"
 
+    try:
+        attachments = normalize_attachments(
+            [a.model_dump() for a in payload.attachments],
+            get_settings().FORUM_MAX_ATTACHMENTS,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     row = {
         "reply_id": str(uuid.uuid4()),
         "thread_id": thread_id,
@@ -528,6 +611,7 @@ def create_reply(
         "parent_reply_id": payload.parent_reply_id,
         "body": body,
         "score": 0,
+        "attachments": attachments,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -715,3 +799,49 @@ def toggle_lock(thread_id: str, admin: AuthUser = Depends(get_current_admin)):
     row["is_locked"] = new_val
     usernames = _resolve_usernames([row["user_id"]])
     return _thread_to_out(row, usernames=usernames, votes={}, current_user=admin)
+
+
+# ─── Attachment upload ───────────────────────────────────────────────────────
+
+class AttachmentUploadResponse(BaseModel):
+    type: Literal["image", "video"]
+    url: str
+    mime: str
+    size: int
+    width: Optional[int] = None
+    height: Optional[int] = None
+    thumbnail_url: Optional[str] = None
+
+
+@router.post("/upload", response_model=AttachmentUploadResponse)
+@limiter.limit(lambda: get_settings().RATE_LIMIT_FORUM_UPLOAD)
+async def upload_attachment(
+    request: Request,
+    file: UploadFile = File(...),
+    user: AuthUser = Depends(get_current_user),
+):
+    """Upload a single image/video to the forum-attachments bucket and return
+    the metadata the client should attach to a thread/reply create request."""
+    # Trust the client-declared content-type only if it's in the allowlist; otherwise
+    # fall back to filename sniffing. The service layer re-validates against allowed mimes.
+    mime = (file.content_type or "").lower().strip()
+    settings = get_settings()
+    allowed = set(settings.FORUM_ALLOWED_IMAGE_MIMES) | set(settings.FORUM_ALLOWED_VIDEO_MIMES)
+    if mime not in allowed:
+        sniffed = detect_mime_from_filename(file.filename)
+        if sniffed and sniffed in allowed:
+            mime = sniffed
+        else:
+            raise HTTPException(status_code=400, detail=f"Loại file không hỗ trợ: {mime or 'unknown'}.")
+
+    # Read fully into memory — limits are small (10MB image / 50MB video).
+    content = await file.read()
+
+    try:
+        meta = upload_forum_attachment(content=content, mime=mime, owner_id=user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return AttachmentUploadResponse(**meta)

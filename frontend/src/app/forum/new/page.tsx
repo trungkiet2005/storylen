@@ -8,7 +8,13 @@ import { Footer } from "@/components/Footer";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
-import { APIError, createForumThread, type ForumCategory } from "@/lib/api";
+import { AttachmentPicker } from "@/components/forum/AttachmentPicker";
+import {
+  APIError,
+  createForumThread,
+  type ForumAttachment,
+  type ForumCategory,
+} from "@/lib/api";
 
 const CATEGORIES: ForumCategory[] = ["discussion", "qna", "recommend", "feedback", "announcement"];
 const MAX_TITLE = 200;
@@ -23,6 +29,7 @@ export default function NewForumThreadPage() {
   const [category, setCategory] = useState<ForumCategory>("discussion");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [attachments, setAttachments] = useState<ForumAttachment[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -48,7 +55,7 @@ export default function NewForumThreadPage() {
     }
     setSubmitting(true);
     try {
-      const created = await createForumThread({ category, title: cleanTitle, body: cleanBody });
+      const created = await createForumThread({ category, title: cleanTitle, body: cleanBody, attachments });
       router.replace(`/forum/${encodeURIComponent(created.thread_id)}`);
     } catch (err) {
       const msg = err instanceof APIError ? err.message : "Không tạo được thread.";
@@ -150,6 +157,8 @@ export default function NewForumThreadPage() {
             />
             <span style={{ fontSize: 11, color: "var(--muted)" }}>{t("forum.mention_hint")}</span>
           </label>
+
+          <AttachmentPicker value={attachments} onChange={setAttachments} disabled={submitting} />
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
             <Link href="/forum" className="btn">{t("common.cancel")}</Link>

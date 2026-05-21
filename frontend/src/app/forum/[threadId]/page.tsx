@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
+import { AttachmentGallery } from "@/components/forum/AttachmentGallery";
 import { CategoryBadge } from "@/components/forum/CategoryBadge";
 import { MentionText } from "@/components/forum/MentionText";
 import { ReplyComposer } from "@/components/forum/ReplyComposer";
@@ -230,6 +231,8 @@ export default function ForumThreadDetailPage({ params }: PageProps) {
                 >
                   <MentionText text={thread.body} />
                 </div>
+
+                <AttachmentGallery attachments={thread.attachments} />
 
                 {/* Action row */}
                 <div style={{ display: "flex", gap: 6, marginTop: 14, flexWrap: "wrap" }}>

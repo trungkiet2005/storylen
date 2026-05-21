@@ -103,6 +103,9 @@ export function ThreadCard({ thread }: { thread: ForumThread }) {
           </span>
           <span>· {timeAgo(thread.created_at)}</span>
           <span>· {thread.reply_count} {t("forum.replies")}</span>
+          {thread.attachments && thread.attachments.length > 0 && (
+            <span>· 📎 {thread.attachments.length}</span>
+          )}
         </div>
       </div>
     </article>

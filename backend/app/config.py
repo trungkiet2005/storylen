@@ -169,6 +169,34 @@ class Settings(BaseSettings):
     RATE_LIMIT_FORUM_THREAD: str = "5/minute"
     RATE_LIMIT_FORUM_REPLY: str = "20/minute"
     RATE_LIMIT_FORUM_VOTE: str = "60/minute"
+    RATE_LIMIT_FORUM_UPLOAD: str = "30/minute"
+
+    # ─── Forum attachments ────────────────────────────────────────────────────
+    FORUM_BUCKET: str = "forum-attachments"
+    FORUM_MAX_ATTACHMENTS: int = 10
+    FORUM_MAX_IMAGE_MB: int = 10
+    FORUM_MAX_VIDEO_MB: int = 50
+    FORUM_ALLOWED_IMAGE_MIMES: list[str] | str = [
+        "image/jpeg", "image/png", "image/webp", "image/gif",
+    ]
+    FORUM_ALLOWED_VIDEO_MIMES: list[str] | str = [
+        "video/mp4", "video/webm",
+    ]
+
+    @field_validator("FORUM_ALLOWED_IMAGE_MIMES", "FORUM_ALLOWED_VIDEO_MIMES", mode="before")
+    @classmethod
+    def parse_mime_list(cls, v: Any) -> list[str]:
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            s = v.strip()
+            if s.startswith("["):
+                try:
+                    return list(json.loads(s))
+                except Exception:
+                    pass
+            return [item.strip() for item in s.split(",") if item.strip()]
+        return list(v) if v else []
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod

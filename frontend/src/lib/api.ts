@@ -2106,6 +2106,17 @@ export type ForumCategory = "discussion" | "qna" | "recommend" | "feedback" | "a
 export type ForumSort = "hot" | "top" | "new";
 export type ForumVoteValue = -1 | 0 | 1;
 export type ForumTargetType = "thread" | "reply";
+export type ForumAttachmentType = "image" | "video";
+
+export interface ForumAttachment {
+  type: ForumAttachmentType;
+  url: string;
+  mime: string;
+  size: number;
+  width: number | null;
+  height: number | null;
+  thumbnail_url: string | null;
+}
 
 export interface ForumThread {
   thread_id: string;
@@ -2123,6 +2134,7 @@ export interface ForumThread {
   created_at: string;
   can_edit: boolean;
   can_delete: boolean;
+  attachments: ForumAttachment[];
 }
 
 export interface ForumThreadListResponse {
@@ -2143,6 +2155,7 @@ export interface ForumReply {
   my_vote: ForumVoteValue;
   created_at: string;
   can_delete: boolean;
+  attachments: ForumAttachment[];
 }
 
 export interface ForumThreadDetail {
@@ -2182,17 +2195,21 @@ export async function createForumThread(input: {
   category: ForumCategory;
   title: string;
   body: string;
+  attachments?: ForumAttachment[];
 }): Promise<ForumThread> {
   return request<ForumThread>("/forum/threads", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      ...input,
+      attachments: input.attachments ?? [],
+    }),
   });
 }
 
 export async function editForumThread(
   threadId: string,
-  input: { title?: string; body?: string },
+  input: { title?: string; body?: string; attachments?: ForumAttachment[] },
 ): Promise<ForumThread> {
   return request<ForumThread>(`/forum/threads/${encodeURIComponent(threadId)}`, {
     method: "PATCH",
@@ -2209,7 +2226,7 @@ export async function deleteForumThread(threadId: string): Promise<void> {
 
 export async function createForumReply(
   threadId: string,
-  input: { body: string; parent_reply_id?: string | null },
+  input: { body: string; parent_reply_id?: string | null; attachments?: ForumAttachment[] },
 ): Promise<ForumReply> {
   return request<ForumReply>(`/forum/threads/${encodeURIComponent(threadId)}/replies`, {
     method: "POST",
@@ -2217,8 +2234,33 @@ export async function createForumReply(
     body: JSON.stringify({
       body: input.body,
       parent_reply_id: input.parent_reply_id ?? null,
+      attachments: input.attachments ?? [],
     }),
   });
+}
+
+/** Upload one file to the forum attachments bucket. Returns metadata to
+ *  attach to a thread/reply create payload. Validation (mime, size) happens
+ *  server-side; surface the resulting message to the user on rejection. */
+export async function uploadForumAttachment(file: File): Promise<ForumAttachment> {
+  const form = new FormData();
+  form.append("file", file);
+  // Bypass the JSON-default `request<>` wrapper because we need multipart.
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/v1";
+  const res = await fetch(`${base}/forum/upload`, {
+    method: "POST",
+    body: form,
+    credentials: "include",
+  });
+  if (!res.ok) {
+    let detail = "Không upload được file.";
+    try {
+      const j = await res.json();
+      if (typeof j?.detail === "string") detail = j.detail;
+    } catch { /* keep generic */ }
+    throw new APIError(res.status, detail);
+  }
+  return (await res.json()) as ForumAttachment;
 }
 
 export async function deleteForumReply(replyId: string): Promise<void> {

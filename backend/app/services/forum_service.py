@@ -10,9 +10,11 @@ from __future__ import annotations
 
 import logging
 import re
+import uuid
 from datetime import datetime, timezone
 from math import log10
-from typing import Iterable
+from pathlib import Path
+from typing import Any, Iterable
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +125,137 @@ def notify_reply_to_owner(
         body=f"Trong thread: {short_title}",
         url=url,
     )
+
+
+# ─── Attachments ────────────────────────────────────────────────────────────
+
+_MIME_TO_EXT: dict[str, str] = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "video/mp4": ".mp4",
+    "video/webm": ".webm",
+}
+
+_ATTACHMENT_KEYS = {"type", "url", "mime", "size", "width", "height", "thumbnail_url"}
+
+
+def upload_forum_attachment(*, content: bytes, mime: str, owner_id: str) -> dict:
+    """Upload bytes to the forum bucket and return a normalized attachment dict.
+
+    Validates mime against the allowlist + per-type size cap. Raises ValueError
+    on policy violations; the router converts these to HTTP 400.
+    """
+    from app.config import get_settings
+    from app.database import get_supabase
+
+    settings = get_settings()
+    size = len(content)
+
+    image_mimes = set(settings.FORUM_ALLOWED_IMAGE_MIMES)
+    video_mimes = set(settings.FORUM_ALLOWED_VIDEO_MIMES)
+    if mime in image_mimes:
+        kind = "image"
+        max_bytes = settings.FORUM_MAX_IMAGE_MB * 1024 * 1024
+    elif mime in video_mimes:
+        kind = "video"
+        max_bytes = settings.FORUM_MAX_VIDEO_MB * 1024 * 1024
+    else:
+        raise ValueError(f"Loại file không hỗ trợ: {mime}")
+
+    if size <= 0:
+        raise ValueError("File rỗng.")
+    if size > max_bytes:
+        limit_mb = max_bytes // (1024 * 1024)
+        raise ValueError(f"File vượt quá {limit_mb}MB.")
+
+    ext = _MIME_TO_EXT.get(mime, "")
+    storage_path = f"{owner_id}/{uuid.uuid4().hex}{ext}"
+
+    sb = get_supabase()
+    try:
+        sb.storage.from_(settings.FORUM_BUCKET).upload(
+            path=storage_path,
+            file=content,
+            file_options={"content-type": mime, "upsert": "false"},
+        )
+    except Exception as exc:
+        logger.error("forum upload to %s/%s failed: %s", settings.FORUM_BUCKET, storage_path, exc)
+        raise RuntimeError("Không upload được file.") from exc
+
+    public_url: str
+    try:
+        resp = sb.storage.from_(settings.FORUM_BUCKET).get_public_url(storage_path)
+        if isinstance(resp, str) and resp.startswith("http"):
+            public_url = resp
+        else:
+            public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.FORUM_BUCKET}/{storage_path}"
+    except Exception:
+        public_url = f"{settings.SUPABASE_URL}/storage/v1/object/public/{settings.FORUM_BUCKET}/{storage_path}"
+
+    return {
+        "type": kind,
+        "url": public_url,
+        "mime": mime,
+        "size": size,
+        "width": None,
+        "height": None,
+        "thumbnail_url": None,
+    }
+
+
+def normalize_attachments(raw: Any, max_count: int) -> list[dict]:
+    """Sanitize a client-supplied attachments array.
+
+    Drops unknown keys, validates structure, enforces max_count. Returns a
+    list of dicts safe to persist to the JSONB column. Raises ValueError on
+    structural problems.
+    """
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("attachments phải là danh sách.")
+    if len(raw) > max_count:
+        raise ValueError(f"Tối đa {max_count} file/post.")
+
+    out: list[dict] = []
+    for i, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise ValueError(f"attachments[{i}] phải là object.")
+        kind = item.get("type")
+        url = item.get("url")
+        mime = item.get("mime")
+        size = item.get("size")
+        if kind not in ("image", "video"):
+            raise ValueError(f"attachments[{i}].type không hợp lệ.")
+        if not isinstance(url, str) or not url.startswith("http"):
+            raise ValueError(f"attachments[{i}].url không hợp lệ.")
+        if not isinstance(mime, str) or "/" not in mime:
+            raise ValueError(f"attachments[{i}].mime không hợp lệ.")
+        if not isinstance(size, int) or size < 0:
+            raise ValueError(f"attachments[{i}].size không hợp lệ.")
+        clean = {
+            "type": kind,
+            "url": url,
+            "mime": mime,
+            "size": size,
+            "width": item.get("width") if isinstance(item.get("width"), int) else None,
+            "height": item.get("height") if isinstance(item.get("height"), int) else None,
+            "thumbnail_url": item.get("thumbnail_url") if isinstance(item.get("thumbnail_url"), str) else None,
+        }
+        out.append(clean)
+    return out
+
+
+def detect_mime_from_filename(filename: str | None) -> str | None:
+    if not filename:
+        return None
+    ext = Path(filename).suffix.lower()
+    for mime, e in _MIME_TO_EXT.items():
+        if e == ext:
+            return mime
+    return None
 
 
 def compute_hot_score(score: int, created_at: datetime) -> float:

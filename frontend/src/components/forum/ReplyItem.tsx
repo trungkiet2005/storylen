@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useI18n } from "@/contexts/I18nContext";
 import { APIError, deleteForumReply, type ForumReply } from "@/lib/api";
+import { AttachmentGallery } from "./AttachmentGallery";
 import { MentionText } from "./MentionText";
 import { VoteButtons } from "./VoteButtons";
 import { ReplyComposer } from "./ReplyComposer";
@@ -119,6 +120,8 @@ export function ReplyItem({
         <div style={{ fontSize: 13, lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
           <MentionText text={reply.body} />
         </div>
+
+        <AttachmentGallery attachments={reply.attachments} compact />
 
         {allowReplyButton && !threadLocked && (
           <div style={{ marginTop: 6 }}>

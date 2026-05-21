@@ -60,6 +60,13 @@ const VI: Dict = {
   "forum.admin_lock": "Khoá",
   "forum.admin_unlock": "Mở khoá",
   "forum.back_to_list": "Quay lại danh sách",
+  "forum.attach.label": "Đính kèm ảnh / video",
+  "forum.attach.add": "Chọn file",
+  "forum.attach.hint": "Kéo thả hoặc chọn file. Ảnh tối đa 10MB, video tối đa 50MB. Tối đa 10 file.",
+  "forum.attach.too_large_image": "Ảnh vượt quá 10MB.",
+  "forum.attach.too_large_video": "Video vượt quá 50MB.",
+  "forum.attach.unsupported": "Loại file không hỗ trợ. Dùng JPG/PNG/WebP/GIF hoặc MP4/WebM.",
+  "forum.attach.over_limit": "Tối đa 10 file/post.",
 
   // ── Common buttons / actions ────────────────────────────────────────
   "common.search": "Tìm kiếm",
@@ -161,6 +168,13 @@ const EN: Dict = {
   "forum.admin_lock": "Lock",
   "forum.admin_unlock": "Unlock",
   "forum.back_to_list": "Back to list",
+  "forum.attach.label": "Attach images / videos",
+  "forum.attach.add": "Choose files",
+  "forum.attach.hint": "Drag & drop or click. Images up to 10MB, videos up to 50MB. Max 10 files.",
+  "forum.attach.too_large_image": "Image exceeds 10MB.",
+  "forum.attach.too_large_video": "Video exceeds 50MB.",
+  "forum.attach.unsupported": "Unsupported file type. Use JPG/PNG/WebP/GIF or MP4/WebM.",
+  "forum.attach.over_limit": "Max 10 files per post.",
 
   // Common
   "common.search": "Search",

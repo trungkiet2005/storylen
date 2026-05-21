@@ -6,7 +6,13 @@ import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
-import { APIError, createForumReply, type ForumReply } from "@/lib/api";
+import {
+  APIError,
+  createForumReply,
+  type ForumAttachment,
+  type ForumReply,
+} from "@/lib/api";
+import { AttachmentPicker } from "./AttachmentPicker";
 
 interface Props {
   threadId: string;
@@ -33,6 +39,7 @@ export function ReplyComposer({
   const { toast } = useToast();
   const { t } = useI18n();
   const [draft, setDraft] = useState(parentUsername ? `@${parentUsername} ` : "");
+  const [attachments, setAttachments] = useState<ForumAttachment[]>([]);
   const [posting, setPosting] = useState(false);
 
   if (!isAuthenticated) {
@@ -75,12 +82,17 @@ export function ReplyComposer({
 
   const submit = async () => {
     const body = draft.trim();
-    if (!body || posting) return;
+    if ((!body && attachments.length === 0) || posting) return;
     setPosting(true);
     try {
-      const created = await createForumReply(threadId, { body, parent_reply_id: parentReplyId });
+      const created = await createForumReply(threadId, {
+        body: body || " ",  // backend requires non-empty body; placeholder when only attachments
+        parent_reply_id: parentReplyId,
+        attachments,
+      });
       onPosted(created);
       setDraft("");
+      setAttachments([]);
       if (onCancel) onCancel();
     } catch (err) {
       const msg = err instanceof APIError ? err.message : "Không gửi được trả lời.";
@@ -123,6 +135,7 @@ export function ReplyComposer({
           fontFamily: "inherit",
         }}
       />
+      <AttachmentPicker value={attachments} onChange={setAttachments} disabled={posting} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 10, color: "var(--muted)" }}>
           {draft.length} / {MAX} · {t("forum.mention_hint")}
@@ -136,7 +149,7 @@ export function ReplyComposer({
           <button
             type="button"
             onClick={submit}
-            disabled={!draft.trim() || posting}
+            disabled={(!draft.trim() && attachments.length === 0) || posting}
             className="btn btn-sm btn-primary"
             style={{ fontSize: 12 }}
           >
