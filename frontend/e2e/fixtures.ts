@@ -42,28 +42,45 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
     const method = route.request().method();
     const path = new URL(url).pathname.replace(/^.*\/v1/, "");
 
+    // The frontend talks to NEXT_PUBLIC_API_URL (a different origin in CI:
+    // http://127.0.0.1:8000) from the page origin (http://localhost:3100).
+    // With credentials: "include" + Content-Type: application/json, every POST
+    // triggers a CORS preflight. Without proper headers the browser silently
+    // rejects the response → fetch throws → request lib retries 8s+15s →
+    // assertion times out. We attach matching CORS headers to every fulfill.
+    const reqOrigin = route.request().headers()["origin"] ?? "*";
+    const cors = {
+      "Access-Control-Allow-Origin": reqOrigin,
+      "Access-Control-Allow-Credentials": "true",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, Idempotency-Key, cf-turnstile-token, X-Requested-With",
+    };
+    if (method === "OPTIONS") {
+      return route.fulfill({ status: 204, headers: cors });
+    }
+
     // ── Auth ─────────────────────────────────────────────────────────────
     if (path === "/auth/me" && method === "GET") {
       if (authenticated) {
         return route.fulfill({
           status: 200,
-          contentType: "application/json",
+          contentType: "application/json", headers: cors,
           body: JSON.stringify({ authenticated: true, user: TEST_USER }),
         });
       }
-      return route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ detail: "Chưa đăng nhập." }) });
+      return route.fulfill({ status: 401, contentType: "application/json", headers: cors, body: JSON.stringify({ detail: "Chưa đăng nhập." }) });
     }
     if (path === "/auth/login" && method === "POST") {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify({ authenticated: true, user: TEST_USER }),
       });
     }
     if (path === "/auth/register" && method === "POST") {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify({
           authenticated: false,
           user: TEST_USER,
@@ -73,12 +90,12 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
       });
     }
     if (path === "/auth/logout" && method === "POST") {
-      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ authenticated: false }) });
+      return route.fulfill({ status: 200, contentType: "application/json", headers: cors, body: JSON.stringify({ authenticated: false }) });
     }
     if (path === "/auth/forgot-password" && method === "POST") {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify({ message: "Nếu email tồn tại, chúng tôi đã gửi liên kết." }),
       });
     }
@@ -87,7 +104,7 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
     if (path === "/credits" && method === "GET") {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify({
           plan_tier: "free",
           credits_balance: 5,
@@ -100,7 +117,7 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
     if (path === "/credits/plans" && method === "GET") {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify([
           { id: "free", name: "Free", price_vnd: 0, monthly_credits: 0, daily_credits: 5, max_batch_size: 5, priority_weight: 1, bonus_credits: 0, sort_order: 0 },
           { id: "basic", name: "Basic", price_vnd: 49000, monthly_credits: 200, daily_credits: 0, max_batch_size: 20, priority_weight: 2, bonus_credits: 50, sort_order: 1 },
@@ -112,7 +129,7 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
     if (path === "/library" && method === "GET") {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify({ total: 0, items: [] }),
       });
     }
@@ -121,7 +138,7 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
     if (path.startsWith("/notifications") && method === "GET") {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify({ total: 0, unread: 0, items: [] }),
       });
     }
@@ -130,7 +147,7 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
     if (path === "/wibu/me" && method === "GET") {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify({
           bookmarks: [],
           ratings: {},
@@ -154,7 +171,7 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
     if (path.startsWith("/history") && method === "GET") {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify({ total: 0, items: [] }),
       });
     }
@@ -163,7 +180,7 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
     if (path.startsWith("/mdx/manga/popular")) {
       return route.fulfill({
         status: 200,
-        contentType: "application/json",
+        contentType: "application/json", headers: cors,
         body: JSON.stringify({ data: [], total: 0, limit: 24, offset: 0 }),
       });
     }
@@ -176,7 +193,7 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
     }
     return route.fulfill({
       status: 200,
-      contentType: "application/json",
+      contentType: "application/json", headers: cors,
       body: JSON.stringify({}),
     });
   });
