@@ -71,6 +71,11 @@ $$;
 
 -- ─── 5. Full-text-ish index on bubble_data.translated_text (optional) ────────
 -- ILIKE '%foo%' cannot use a btree index. Use a trigram index so it can.
+-- Denormalised column populated by the AI pipeline so the search router can
+-- ILIKE without joining translation_history on every query.
+ALTER TABLE bubble_data
+    ADD COLUMN IF NOT EXISTS translated_text TEXT;
+
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 CREATE INDEX IF NOT EXISTS idx_bubble_translated_trgm

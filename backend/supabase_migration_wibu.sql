@@ -107,6 +107,15 @@ alter table user_achievements  enable row level security;
 alter table user_read_pages    enable row level security;
 alter table user_read_progress enable row level security;
 
+drop policy if exists "own bookmarks"    on user_bookmarks;
+drop policy if exists "own ratings"      on user_ratings;
+drop policy if exists "own lists"        on user_reading_lists;
+drop policy if exists "own goals"        on user_reading_goals;
+drop policy if exists "own stats"        on user_reading_stats;
+drop policy if exists "own achievements" on user_achievements;
+drop policy if exists "own read pages"   on user_read_pages;
+drop policy if exists "own progress"     on user_read_progress;
+
 create policy "own bookmarks"    on user_bookmarks    for all using (auth.uid() = user_id);
 create policy "own ratings"      on user_ratings      for all using (auth.uid() = user_id);
 create policy "own lists"        on user_reading_lists for all using (auth.uid() = user_id);
