@@ -60,6 +60,7 @@ export function DailyCheckin() {
 
   if (!isAuthenticated || loading || error === "disabled") return null;
   if (!status) return null;
+  if (!status.eligible) return null;
 
   const handleCheckin = async () => {
     if (redeeming || !status.eligible) return;

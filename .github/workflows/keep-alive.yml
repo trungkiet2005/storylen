@@ -10,23 +10,50 @@ jobs:
   ping:
     name: Ping Services
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    # A health-ping should never break the build. Treat timeouts and non-200s
+    # as warnings; the schedule will retry in 10 minutes anyway.
+    continue-on-error: true
 
     steps:
       - name: Ping Render Backend
+        shell: bash
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
-            https://storylens-api.onrender.com/health)
-          echo "Render backend status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "Warning: Render backend returned $STATUS"
+          set +e
+          URL="https://storylens-api.onrender.com/health"
+          # Render free tier can take 60-90s to wake from sleep. Allow up to 120s
+          # connect + transfer, and retry twice with backoff so a slow cold-start
+          # doesn't fail the step.
+          STATUS=$(curl -sS -o /tmp/render_body -w "%{http_code}" \
+            --connect-timeout 30 --max-time 120 \
+            --retry 2 --retry-delay 10 --retry-connrefused \
+            "$URL")
+          RC=$?
+          echo "Render backend status: ${STATUS:-<no-response>} (curl exit=$RC)"
+          if [ -s /tmp/render_body ]; then
+            echo "Body: $(head -c 300 /tmp/render_body)"
           fi
+          if [ "$RC" -ne 0 ] || [ "$STATUS" != "200" ]; then
+            echo "::warning title=Render ping::Render backend did not return 200 (status=${STATUS:-none}, curl exit=$RC)"
+          fi
+          exit 0
 
       - name: Ping HuggingFace AI Module
+        shell: bash
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 60 \
-            https://huynhtrungkiet09032005-ai-storylen.hf.space/health)
-          echo "HuggingFace AI module status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "Warning: HuggingFace returned $STATUS"
+          set +e
+          URL="https://huynhtrungkiet09032005-ai-storylen.hf.space/health"
+          # HF Spaces cold-start can be slow on free tier; give it plenty of time.
+          STATUS=$(curl -sS -o /tmp/hf_body -w "%{http_code}" \
+            --connect-timeout 30 --max-time 180 \
+            --retry 2 --retry-delay 15 --retry-connrefused \
+            "$URL")
+          RC=$?
+          echo "HuggingFace AI module status: ${STATUS:-<no-response>} (curl exit=$RC)"
+          if [ -s /tmp/hf_body ]; then
+            echo "Body: $(head -c 300 /tmp/hf_body)"
           fi
+          if [ "$RC" -ne 0 ] || [ "$STATUS" != "200" ]; then
+            echo "::warning title=HuggingFace ping::AI module did not return 200 (status=${STATUS:-none}, curl exit=$RC)"
+          fi
+          exit 0

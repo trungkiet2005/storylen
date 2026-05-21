@@ -103,8 +103,11 @@ test.describe("Forum", () => {
   test("anonymous user sees login link instead of new-thread button", async ({ page }) => {
     await mockForum(page, { authenticated: false });
     await gotoApp(page, "/forum");
-    // The header CTA should be a login link, not "+ Tạo thread mới".
-    await expect(page.getByRole("link", { name: /^đăng nhập$/i })).toBeVisible();
+    // The header CTA should be a login link, not "+ Tạo thread mới". Scope to
+    // the forum's <main> region so we don't collide with TopBar's own login link.
+    const main = page.getByRole("main");
+    await expect(main.getByRole("link", { name: /^đăng nhập$/i })).toBeVisible();
+    await expect(main.getByRole("link", { name: /tạo thread mới/i })).toHaveCount(0);
   });
 
   test("authenticated user sees new-thread CTA", async ({ page }) => {

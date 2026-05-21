@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { TopBar } from "@/components/TopBar";
@@ -27,7 +27,7 @@ function isSort(v: string | null): v is ForumSort {
   return !!v && (SORTS as readonly string[]).includes(v);
 }
 
-export default function ForumIndexPage() {
+function ForumIndexContent() {
   const { user } = useAuth();
   const { t } = useI18n();
   const router = useRouter();
@@ -279,4 +279,23 @@ function tabStyle(active: boolean): React.CSSProperties {
     color: active ? "var(--paper)" : "var(--fg)",
     border: "1.5px solid var(--border)",
   };
+}
+
+// Wrap with Suspense for useSearchParams (Next.js requires it at the page boundary).
+export default function ForumIndexPage() {
+  return (
+    <Suspense
+      fallback={
+        <>
+          <TopBar />
+          <main style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 20px 80px" }}>
+            <div style={{ color: "var(--muted)", padding: 20 }}>…</div>
+          </main>
+          <Footer />
+        </>
+      }
+    >
+      <ForumIndexContent />
+    </Suspense>
+  );
 }

@@ -5,7 +5,8 @@ import { Icon } from "@/components/Icons";
 import type { ForumAttachment } from "@/lib/api";
 
 interface Props {
-  attachments: ForumAttachment[];
+  // Optional + nullable — backend may omit the field on legacy rows; coerce to [] in the body.
+  attachments?: ForumAttachment[] | null;
   /** Compact mode: single-row strip, no autoplay. Used in ThreadCard previews. */
   compact?: boolean;
 }
@@ -17,7 +18,11 @@ interface Props {
  *   3+ files → grid, last cell shows "+N" overlay if more than 4
  * Click any cell opens a fullscreen lightbox (keyboard nav with ← / → / Esc).
  */
-export function AttachmentGallery({ attachments, compact = false }: Props) {
+export function AttachmentGallery({ attachments: attachmentsProp, compact = false }: Props) {
+  // Normalise once so every downstream access is safe — including the
+  // useCallback dep arrays below, which would crash if attachmentsProp is
+  // undefined (the prop comes from API responses that may omit the field).
+  const attachments: ForumAttachment[] = attachmentsProp ?? [];
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const close = useCallback(() => setOpenIndex(null), []);
