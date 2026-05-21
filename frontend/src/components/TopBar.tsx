@@ -8,6 +8,7 @@ import { useToast } from './Toast';
 import { CreditBadge } from './CreditBadge';
 import { NotificationBell } from './NotificationBell';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { useI18n, type Locale } from '@/contexts/I18nContext';
 
 export const Logo = ({ size = 22 }: { size?: number }) => (
   <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -24,25 +25,111 @@ export const Logo = ({ size = 22 }: { size?: number }) => (
   </Link>
 );
 
-// ─── User Avatar Dropdown ─────────────────────────────────────────────────────
+// ─── Shared dropdown panel styles ─────────────────────────────────────────────
 
-function UserMenu() {
-  const { user, logout } = useAuth();
-  const { toast } = useToast();
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+const dropdownPanelStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "calc(100% + 8px)",
+  right: 0,
+  minWidth: 220,
+  background: "var(--panel)",
+  border: "2px solid var(--border)",
+  boxShadow: "4px 4px 0 0 var(--border)",
+  zIndex: 200,
+  animation: "fadeIn 0.12s ease",
+};
 
-  // Close dropdown on outside click
+const dropdownItemStyle: React.CSSProperties = {
+  display: "flex", alignItems: "center", gap: 10,
+  padding: "10px 16px",
+  fontSize: 13,
+  color: "var(--fg-soft)",
+  cursor: "pointer",
+  transition: "background 0.1s",
+};
+
+function useOutsideClick<T extends HTMLElement>(ref: React.RefObject<T | null>, onOutside: () => void) {
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) onOutside();
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+  }, [ref, onOutside]);
+}
+
+// ─── Grouped "Của tôi" dropdown ───────────────────────────────────────────────
+
+type NavItem = { id: string; label: string; icon: string; href: string };
+
+function GroupedNavMenu({ items, active }: { items: NavItem[]; active: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useOutsideClick(ref, () => setOpen(false));
+
+  const isActive = items.some(it => it.id === active);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="tab"
+        data-active={isActive}
+        style={{
+          cursor: "pointer",
+          background: "none",
+          border: "none",
+          padding: undefined,
+          fontFamily: "inherit",
+          color: "inherit",
+        }}
+      >
+        <Icon name="layers" size={14} aria-hidden="true" />
+        <span className="nav-label">Của tôi</span>
+        <Icon name={open ? "chevron-up" : "chevron-down"} size={11} aria-hidden="true" />
+      </button>
+
+      {open && (
+        <div role="menu" style={{ ...dropdownPanelStyle, left: 0, right: "auto", minWidth: 200 }}>
+          {items.map(it => (
+            <Link key={it.id} href={it.href} style={{ textDecoration: "none" }} onClick={() => setOpen(false)}>
+              <div
+                role="menuitem"
+                style={{
+                  ...dropdownItemStyle,
+                  background: active === it.id ? "var(--bg-2)" : undefined,
+                  color: active === it.id ? "var(--accent)" : "var(--fg-soft)",
+                  fontWeight: active === it.id ? 700 : 500,
+                }}
+                onMouseEnter={e => { if (active !== it.id) (e.currentTarget as HTMLElement).style.background = "var(--bg-2)"; }}
+                onMouseLeave={e => { if (active !== it.id) (e.currentTarget as HTMLElement).style.background = ""; }}
+              >
+                <Icon name={it.icon} size={13} />
+                {it.label}
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── User Avatar Dropdown ─────────────────────────────────────────────────────
+
+const THEME_CYCLE: Record<string, string> = { light: "dark", dark: "sepia", sepia: "light" };
+const THEME_LABEL: Record<string, string> = { light: "Sáng", dark: "Tối", sepia: "Sepia" };
+
+function UserMenu({ theme, setTheme }: { theme: string; setTheme: (t: string) => void }) {
+  const { user, logout } = useAuth();
+  const { toast } = useToast();
+  const router = useRouter();
+  const { locale, setLocale } = useI18n();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useOutsideClick(ref, () => setOpen(false));
 
   if (!user) {
     return (
@@ -63,6 +150,16 @@ function UserMenu() {
 
   const initial = getAvatarInitial(user);
   const displayName = getDisplayName(user);
+
+  const cycleTheme = () => {
+    const next = THEME_CYCLE[theme] ?? "light";
+    setTheme(next);
+  };
+
+  const toggleLocale = () => {
+    const next: Locale = locale === "vi" ? "en" : "vi";
+    setLocale(next);
+  };
 
   return (
     <div ref={ref} style={{ position: "relative" }}>
@@ -105,25 +202,13 @@ function UserMenu() {
           {displayName}
         </span>
         <span className="topbar-user-chev" style={{ display: "inline-flex" }}>
-          <Icon name="arrow-right" size={11} />
+          <Icon name="chevron-down" size={11} />
         </span>
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            right: 0,
-            minWidth: 200,
-            background: "var(--panel)",
-            border: "2px solid var(--border)",
-            boxShadow: "4px 4px 0 0 var(--border)",
-            zIndex: 200,
-            animation: "fadeIn 0.12s ease",
-          }}
-        >
+        <div style={dropdownPanelStyle}>
           {/* User info header */}
           <div style={{ padding: "14px 16px", borderBottom: "1.5px solid var(--border-soft)" }}>
             <div style={{ fontSize: 13, fontWeight: 700 }}>{displayName}</div>
@@ -131,23 +216,15 @@ function UserMenu() {
             <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>@{user.username}</div>
           </div>
 
-          {/* Menu items */}
+          {/* Account links */}
           {[
-            { label: "Hồ sơ cá nhân", icon: "home", href: "/profile" },
-            { label: "Lịch sử dịch", icon: "history", href: "/history" },
-            { label: "Cài đặt", icon: "layers", href: "/settings" },
+            { label: "Hồ sơ cá nhân", icon: "user", href: "/profile" },
+            { label: "Cài đặt", icon: "settings", href: "/settings" },
           ].map(item => (
             <Link key={item.href} href={item.href} style={{ textDecoration: "none" }}>
               <div
                 onClick={() => setOpen(false)}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  padding: "10px 16px",
-                  fontSize: 13,
-                  color: "var(--fg-soft)",
-                  cursor: "pointer",
-                  transition: "background 0.1s",
-                }}
+                style={dropdownItemStyle}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-2)"}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ""}
               >
@@ -156,6 +233,71 @@ function UserMenu() {
               </div>
             </Link>
           ))}
+
+          {/* Divider */}
+          <div style={{ height: 1, background: "var(--border-soft)", margin: "4px 0" }} />
+
+          {/* Language row */}
+          <button
+            onClick={toggleLocale}
+            aria-label={`Đổi ngôn ngữ sang ${locale === "vi" ? "EN" : "VI"}`}
+            style={{
+              ...dropdownItemStyle,
+              width: "100%",
+              justifyContent: "space-between",
+              background: "none",
+              border: "none",
+              fontFamily: "var(--font-sans)",
+              textAlign: "left",
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-2)"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ""}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <Icon name="globe" size={13} />
+              Ngôn ngữ
+            </span>
+            <span style={{
+              fontSize: 11, fontWeight: 800, letterSpacing: "0.08em",
+              border: "1.5px solid var(--border)",
+              padding: "2px 8px",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--fg)",
+            }}>
+              {locale === "vi" ? "VI" : "EN"}
+            </span>
+          </button>
+
+          {/* Theme row */}
+          <button
+            onClick={cycleTheme}
+            aria-label="Đổi giao diện"
+            style={{
+              ...dropdownItemStyle,
+              width: "100%",
+              justifyContent: "space-between",
+              background: "none",
+              border: "none",
+              fontFamily: "var(--font-sans)",
+              textAlign: "left",
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--bg-2)"}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = ""}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <Icon name={theme === "dark" ? "moon" : theme === "sepia" ? "leaf" : "sun"} size={13} />
+              Giao diện
+            </span>
+            <span style={{
+              fontSize: 11, fontWeight: 800, letterSpacing: "0.08em",
+              border: "1.5px solid var(--border)",
+              padding: "2px 8px",
+              borderRadius: "var(--radius-sm)",
+              color: "var(--fg)",
+            }}>
+              {THEME_LABEL[theme] ?? "Sáng"}
+            </span>
+          </button>
 
           {/* Divider */}
           <div style={{ height: 1, background: "var(--border-soft)", margin: "4px 0" }} />
@@ -197,10 +339,10 @@ function UserMenu() {
 // ─── TopBar ───────────────────────────────────────────────────────────────────
 
 export const TopBar = ({ active = "", compact = false }: { active?: string, compact?: boolean }) => {
-  const [theme, setTheme] = useState("light");
+  const [theme, setThemeState] = useState("light");
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
 
   // Close mobile nav on route change
   useEffect(() => { setMobileOpen(false); }, [active]);
@@ -215,35 +357,41 @@ export const TopBar = ({ active = "", compact = false }: { active?: string, comp
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
 
-  // Hydrate from localStorage on mount
+  // Hydrate theme from localStorage on mount
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? localStorage.getItem("sl-theme") || "light" : "light";
     document.documentElement.dataset.theme = saved;
     queueMicrotask(() => {
-      setTheme(saved);
+      setThemeState(saved);
       setMounted(true);
     });
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    const cycle: Record<string, string> = { light: "dark", dark: "sepia", sepia: "light" };
-    const next = cycle[theme] ?? "light";
-    setTheme(next);
+  const setTheme = useCallback((next: string) => {
+    setThemeState(next);
     document.documentElement.dataset.theme = next;
     localStorage.setItem("sl-theme", next);
-  }, [theme]);
+  }, []);
 
-  const items = [
-    { id: "home",      label: "Trang chủ", icon: "home",     href: "/" },
-    { id: "browse",    label: "Kho truyện", icon: "grid",    href: "/browse" },
-    { id: "upload",    label: "Tải lên",   icon: "upload",   href: "/upload" },
-    { id: "reader",    label: "Đọc",       icon: "book",     href: "/reader" },
+  // Primary nav — always visible on desktop
+  const primaryItems: NavItem[] = [
+    { id: "home",   label: "Trang chủ",  icon: "home",   href: "/" },
+    { id: "browse", label: "Kho truyện", icon: "grid",   href: "/browse" },
+    { id: "upload", label: "Tải lên",    icon: "upload", href: "/upload" },
+    { id: "reader", label: "Đọc",        icon: "book",   href: "/reader" },
+  ];
+
+  // Secondary — collapsed into "Của tôi" dropdown on desktop, flat on mobile
+  const groupedItems: NavItem[] = [
     { id: "series",    label: "Bộ truyện", icon: "stack",    href: "/series" },
     { id: "bookmarks", label: "Bookmark",  icon: "bookmark", href: "/bookmarks" },
     { id: "stats",     label: "Thống kê",  icon: "chart",    href: "/stats" },
     { id: "history",   label: "Lịch sử",   icon: "history",  href: "/history" },
     ...(isAdmin ? [{ id: "admin", label: "Quản trị", icon: "key", href: "/admin" }] : []),
   ];
+
+  // Mobile drawer shows everything in one flat list
+  const allItems = [...primaryItems, ...groupedItems];
 
   return (
     <>
@@ -274,7 +422,7 @@ export const TopBar = ({ active = "", compact = false }: { active?: string, comp
 
           {/* Desktop nav — hidden on mobile via CSS */}
           <nav aria-label="Main navigation" className="topbar-desktop-nav" style={{ marginLeft: 12 }}>
-            {items.map(it => (
+            {primaryItems.map(it => (
               <Link href={it.href} key={it.id} style={{ textDecoration: 'none' }}>
                 <div
                   className="tab"
@@ -288,31 +436,17 @@ export const TopBar = ({ active = "", compact = false }: { active?: string, comp
                 </div>
               </Link>
             ))}
+            {mounted && <GroupedNavMenu items={groupedItems} active={active} />}
           </nav>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          {mounted && (
-            <span className="topbar-mobile-hide" style={{ display: "inline-flex" }}>
-              <LanguageSwitcher />
-            </span>
-          )}
+          {/* Anonymous users get a standalone language switcher;
+              authenticated users find it inside the avatar dropdown. */}
+          {mounted && !user && <LanguageSwitcher />}
           {mounted && <NotificationBell />}
           {mounted && <CreditBadge />}
-
-          {mounted && (
-            <button
-              className="btn btn-sm btn-ghost topbar-mobile-hide"
-              onClick={toggleTheme}
-              aria-label="Đổi giao diện"
-              title={theme === "light" ? "Dark mode" : theme === "dark" ? "Sepia mode" : "Light mode"}
-              style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.02em" }}
-            >
-              {theme === "dark" ? <Icon name="sun" size={15}/> : theme === "sepia" ? <Icon name="leaf" size={15}/> : <Icon name="moon" size={15}/>}
-            </button>
-          )}
-
-          {mounted && <UserMenu />}
+          {mounted && <UserMenu theme={theme} setTheme={setTheme} />}
         </div>
       </header>
 
@@ -357,9 +491,9 @@ export const TopBar = ({ active = "", compact = false }: { active?: string, comp
             </button>
           </div>
 
-          {/* Nav items */}
+          {/* Nav items — flat list of primary + grouped */}
           <nav aria-label="Mobile navigation" style={{ padding: "12px 8px", flex: 1 }}>
-            {items.map(it => (
+            {allItems.map(it => (
               <Link
                 href={it.href}
                 key={it.id}
@@ -390,32 +524,19 @@ export const TopBar = ({ active = "", compact = false }: { active?: string, comp
             ))}
           </nav>
 
-          {/* Bottom: language + theme + user section */}
+          {/* Bottom: user section (lang + theme are now inside UserMenu dropdown) */}
           <div
             style={{
               padding: "16px 20px",
               borderTop: "2px solid var(--border)",
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
+              justifyContent: "flex-end",
               gap: 10,
               flexWrap: "wrap",
             }}
           >
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              {mounted && <LanguageSwitcher />}
-              {mounted && (
-                <button
-                  className="btn btn-sm"
-                  onClick={toggleTheme}
-                  aria-label="Đổi giao diện"
-                  style={{ fontSize: 13 }}
-                >
-                  {theme === "dark" ? <><Icon name="sun" size={14}/> Light</> : theme === "sepia" ? <><Icon name="leaf" size={14}/> Light</> : <><Icon name="moon" size={14}/> Dark</>}
-                </button>
-              )}
-            </div>
-            {mounted && <UserMenu />}
+            {mounted && <UserMenu theme={theme} setTheme={setTheme} />}
           </div>
         </div>
       )}
