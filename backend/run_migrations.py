@@ -30,6 +30,7 @@ MIGRATIONS_ORDER = [
     "supabase_migration_v3_features.sql",
     "supabase_migration_v4_features.sql",
     "supabase_migration_v4_security.sql",
+    "supabase_migration_v5_forum.sql",
 ]
 
 

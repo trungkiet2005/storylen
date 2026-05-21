@@ -166,6 +166,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_REGISTER: str = "5/minute"
     RATE_LIMIT_UPLOAD: str = "30/minute"
     RATE_LIMIT_QA: str = "30/minute"
+    RATE_LIMIT_FORUM_THREAD: str = "5/minute"
+    RATE_LIMIT_FORUM_REPLY: str = "20/minute"
+    RATE_LIMIT_FORUM_VOTE: str = "60/minute"
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod

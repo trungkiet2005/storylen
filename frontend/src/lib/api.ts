@@ -2099,3 +2099,154 @@ export async function createBillingPortalSession(): Promise<CheckoutSessionRespo
     headers: { "Content-Type": "application/json" },
   });
 }
+
+// ─── Community forum (v5) ────────────────────────────────────────────────────
+
+export type ForumCategory = "discussion" | "qna" | "recommend" | "feedback" | "announcement";
+export type ForumSort = "hot" | "top" | "new";
+export type ForumVoteValue = -1 | 0 | 1;
+export type ForumTargetType = "thread" | "reply";
+
+export interface ForumThread {
+  thread_id: string;
+  user_id: string;
+  username: string | null;
+  category: ForumCategory;
+  title: string;
+  body: string;
+  is_pinned: boolean;
+  is_locked: boolean;
+  score: number;
+  reply_count: number;
+  my_vote: ForumVoteValue;
+  last_reply_at: string | null;
+  created_at: string;
+  can_edit: boolean;
+  can_delete: boolean;
+}
+
+export interface ForumThreadListResponse {
+  items: ForumThread[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ForumReply {
+  reply_id: string;
+  thread_id: string;
+  parent_reply_id: string | null;
+  user_id: string;
+  username: string | null;
+  body: string;
+  score: number;
+  my_vote: ForumVoteValue;
+  created_at: string;
+  can_delete: boolean;
+}
+
+export interface ForumThreadDetail {
+  thread: ForumThread;
+  replies: ForumReply[];
+}
+
+export interface ForumVoteResponse {
+  target_type: ForumTargetType;
+  target_id: string;
+  score: number;
+  my_vote: ForumVoteValue;
+}
+
+export async function listForumThreads(opts: {
+  category?: ForumCategory;
+  sort?: ForumSort;
+  q?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<ForumThreadListResponse> {
+  const params = new URLSearchParams();
+  if (opts.category) params.set("category", opts.category);
+  if (opts.sort) params.set("sort", opts.sort);
+  if (opts.q) params.set("q", opts.q);
+  if (opts.limit) params.set("limit", String(opts.limit));
+  if (opts.offset) params.set("offset", String(opts.offset));
+  const qs = params.toString();
+  return request<ForumThreadListResponse>(`/forum/threads${qs ? `?${qs}` : ""}`);
+}
+
+export async function getForumThread(threadId: string): Promise<ForumThreadDetail> {
+  return request<ForumThreadDetail>(`/forum/threads/${encodeURIComponent(threadId)}`);
+}
+
+export async function createForumThread(input: {
+  category: ForumCategory;
+  title: string;
+  body: string;
+}): Promise<ForumThread> {
+  return request<ForumThread>("/forum/threads", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function editForumThread(
+  threadId: string,
+  input: { title?: string; body?: string },
+): Promise<ForumThread> {
+  return request<ForumThread>(`/forum/threads/${encodeURIComponent(threadId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteForumThread(threadId: string): Promise<void> {
+  return request<void>(`/forum/threads/${encodeURIComponent(threadId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function createForumReply(
+  threadId: string,
+  input: { body: string; parent_reply_id?: string | null },
+): Promise<ForumReply> {
+  return request<ForumReply>(`/forum/threads/${encodeURIComponent(threadId)}/replies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      body: input.body,
+      parent_reply_id: input.parent_reply_id ?? null,
+    }),
+  });
+}
+
+export async function deleteForumReply(replyId: string): Promise<void> {
+  return request<void>(`/forum/replies/${encodeURIComponent(replyId)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function voteForumTarget(
+  targetType: ForumTargetType,
+  targetId: string,
+  value: ForumVoteValue,
+): Promise<ForumVoteResponse> {
+  return request<ForumVoteResponse>("/forum/vote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target_type: targetType, target_id: targetId, value }),
+  });
+}
+
+export async function toggleForumPin(threadId: string): Promise<ForumThread> {
+  return request<ForumThread>(`/forum/threads/${encodeURIComponent(threadId)}/pin`, {
+    method: "POST",
+  });
+}
+
+export async function toggleForumLock(threadId: string): Promise<ForumThread> {
+  return request<ForumThread>(`/forum/threads/${encodeURIComponent(threadId)}/lock`, {
+    method: "POST",
+  });
+}

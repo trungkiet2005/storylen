@@ -379,6 +379,7 @@ export const TopBar = ({ active = "", compact = false }: { active?: string, comp
     { id: "browse", label: "Kho truyện", icon: "grid",   href: "/browse" },
     { id: "upload", label: "Tải lên",    icon: "upload", href: "/upload" },
     { id: "reader", label: "Đọc",        icon: "book",   href: "/reader" },
+    { id: "forum",  label: "Diễn đàn",   icon: "chat",   href: "/forum" },
   ];
 
   // Secondary — collapsed into "Của tôi" dropdown on desktop, flat on mobile

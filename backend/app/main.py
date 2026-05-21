@@ -22,7 +22,7 @@ from app.middleware import (
 from app.observability import init_observability
 from app.rate_limit import limiter
 from app.routers import (
-    admin, ai_module, auth, comments, credits, history, library, mangadex, notifications,
+    admin, ai_module, auth, comments, credits, forum, history, library, mangadex, notifications,
     pages, payments, qa, scrape, search, series, share, status, upload, wibu, ws,
 )
 
@@ -186,6 +186,7 @@ app.include_router(search.router,  prefix=API_PREFIX)
 app.include_router(payments.router, prefix=API_PREFIX)
 app.include_router(library.router, prefix=API_PREFIX)
 app.include_router(comments.router, prefix=API_PREFIX)
+app.include_router(forum.router,   prefix=API_PREFIX)
 app.include_router(admin.router,   prefix=API_PREFIX)
 
 # WebSocket router lives under /v1/ws/* — same prefix as REST so clients
