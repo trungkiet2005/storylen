@@ -67,6 +67,8 @@ const VI: Dict = {
   "forum.attach.too_large_video": "Video vượt quá 50MB.",
   "forum.attach.unsupported": "Loại file không hỗ trợ. Dùng JPG/PNG/WebP/GIF hoặc MP4/WebM.",
   "forum.attach.over_limit": "Tối đa 10 file/post.",
+  "forum.mention.searching": "Đang tìm...",
+  "forum.mention.no_results": "Không tìm thấy người dùng.",
 
   // ── Common buttons / actions ────────────────────────────────────────
   "common.search": "Tìm kiếm",
@@ -175,6 +177,8 @@ const EN: Dict = {
   "forum.attach.too_large_video": "Video exceeds 50MB.",
   "forum.attach.unsupported": "Unsupported file type. Use JPG/PNG/WebP/GIF or MP4/WebM.",
   "forum.attach.over_limit": "Max 10 files per post.",
+  "forum.mention.searching": "Searching...",
+  "forum.mention.no_results": "No users found.",
 
   // Common
   "common.search": "Search",

@@ -801,6 +801,85 @@ def toggle_lock(thread_id: str, admin: AuthUser = Depends(get_current_admin)):
     return _thread_to_out(row, usernames=usernames, votes={}, current_user=admin)
 
 
+# ─── User search for @mention autocomplete ──────────────────────────────────
+
+class MentionUserOut(BaseModel):
+    user_id: str
+    username: str
+    display_name: Optional[str] = None
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+@router.get("/users/search", response_model=list[MentionUserOut])
+def search_users_for_mention(
+    q: str = Query(..., min_length=1, max_length=50),
+    limit: int = Query(8, ge=1, le=20),
+    _user: AuthUser = Depends(get_current_user),
+):
+    """Autocomplete for @mention pickers in the forum composer. Matches
+    `username`, `display_name`, and `full_name` case-insensitively. Ranks
+    username-prefix matches first so typing `@kie` surfaces `@kiet`
+    before someone whose display_name happens to contain `kie`."""
+    needle = q.strip()
+    if not needle:
+        return []
+    pat = f"%{needle}%"
+    pat_prefix = f"{needle}%"
+
+    sb = get_supabase()
+    try:
+        # Two cheap queries instead of one big OR — keeps the username-prefix
+        # path on the unique index and avoids a sequential scan when the
+        # profiles table grows.
+        prefix_rows = (
+            sb.table("profiles")
+            .select("user_id, username, display_name, full_name, avatar_url")
+            .ilike("username", pat_prefix)
+            .not_.is_("username", "null")
+            .limit(limit)
+            .execute()
+            .data
+            or []
+        )
+        if len(prefix_rows) >= limit:
+            rows = prefix_rows
+        else:
+            seen = {r["user_id"] for r in prefix_rows}
+            remaining = limit - len(prefix_rows)
+            # `or_` filter pattern uses PostgREST's comma-separated syntax.
+            fuzzy_rows = (
+                sb.table("profiles")
+                .select("user_id, username, display_name, full_name, avatar_url")
+                .or_(
+                    f"username.ilike.{pat},"
+                    f"display_name.ilike.{pat},"
+                    f"full_name.ilike.{pat}"
+                )
+                .not_.is_("username", "null")
+                .limit(remaining + len(seen))
+                .execute()
+                .data
+                or []
+            )
+            rows = prefix_rows + [r for r in fuzzy_rows if r["user_id"] not in seen][:remaining]
+    except Exception as exc:
+        logger.warning("mention search failed: %s", exc)
+        return []
+
+    return [
+        MentionUserOut(
+            user_id=r["user_id"],
+            username=r.get("username") or "",
+            display_name=r.get("display_name") or None,
+            full_name=r.get("full_name") or None,
+            avatar_url=r.get("avatar_url") or None,
+        )
+        for r in rows
+        if r.get("username")
+    ]
+
+
 # ─── Attachment upload ───────────────────────────────────────────────────────
 
 class AttachmentUploadResponse(BaseModel):

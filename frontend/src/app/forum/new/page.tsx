@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/contexts/I18nContext";
 import { AttachmentPicker } from "@/components/forum/AttachmentPicker";
+import { MentionTextarea } from "@/components/forum/MentionTextarea";
 import {
   APIError,
   createForumThread,
@@ -137,13 +138,12 @@ export default function NewForumThreadPage() {
             <span className="caps-xs" style={{ fontSize: 11 }}>
               {t("forum.body_label")} ({body.length}/{MAX_BODY})
             </span>
-            <textarea
+            <MentionTextarea
               value={body}
-              onChange={e => setBody(e.target.value)}
+              onChange={setBody}
               placeholder={t("forum.body_placeholder")}
               maxLength={MAX_BODY}
               rows={10}
-              required
               style={{
                 padding: "10px 12px",
                 fontSize: 13,
@@ -153,6 +153,8 @@ export default function NewForumThreadPage() {
                 resize: "vertical",
                 fontFamily: "inherit",
                 lineHeight: 1.55,
+                width: "100%",
+                boxSizing: "border-box",
               }}
             />
             <span style={{ fontSize: 11, color: "var(--muted)" }}>{t("forum.mention_hint")}</span>

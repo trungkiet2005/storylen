@@ -2292,3 +2292,16 @@ export async function toggleForumLock(threadId: string): Promise<ForumThread> {
     method: "POST",
   });
 }
+
+export interface ForumMentionUser {
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+export async function searchForumMentionUsers(query: string, limit = 8): Promise<ForumMentionUser[]> {
+  const params = new URLSearchParams({ q: query, limit: String(limit) });
+  return request<ForumMentionUser[]>(`/forum/users/search?${params.toString()}`);
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
@@ -12,7 +12,8 @@ import {
   type ForumAttachment,
   type ForumReply,
 } from "@/lib/api";
-import { AttachmentPicker } from "./AttachmentPicker";
+import { AttachmentPicker, type AttachmentPickerHandle } from "./AttachmentPicker";
+import { MentionTextarea } from "./MentionTextarea";
 
 interface Props {
   threadId: string;
@@ -41,6 +42,12 @@ export function ReplyComposer({
   const [draft, setDraft] = useState(parentUsername ? `@${parentUsername} ` : "");
   const [attachments, setAttachments] = useState<ForumAttachment[]>([]);
   const [posting, setPosting] = useState(false);
+  // Collapsed-by-default for the top-level composer (Facebook-style). Nested-reply usages
+  // pass autoFocus=true after the user clicks "Trả lời", so those start expanded.
+  // onCancel is also a signal that the parent owns the lifecycle (already expanded).
+  const [expanded, setExpanded] = useState<boolean>(autoFocus || !!onCancel);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pickerRef = useRef<AttachmentPickerHandle>(null);
 
   if (!isAuthenticated) {
     return (
@@ -80,6 +87,49 @@ export function ReplyComposer({
     );
   }
 
+  // Collapsed pill: only shown for the top-level composer before the user engages.
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setExpanded(true);
+          // Focus the textarea after the next paint so the cursor lands inside it.
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        }}
+        className="stroke-ink"
+        style={{
+          width: "100%",
+          background: "var(--bg-2)",
+          padding: "10px 14px",
+          fontSize: 13,
+          color: "var(--muted)",
+          textAlign: "left",
+          fontFamily: "inherit",
+          cursor: "text",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <Icon name="chat" size={14} />
+        <span>{t("forum.reply_placeholder")}</span>
+      </button>
+    );
+  }
+
+  const collapseIfTopLevel = () => {
+    // Only the top-level composer self-collapses; nested-reply usages let the parent
+    // unmount the composer via onCancel.
+    if (onCancel) {
+      onCancel();
+    } else {
+      setExpanded(false);
+      setDraft("");
+      setAttachments([]);
+    }
+  };
+
   const submit = async () => {
     const body = draft.trim();
     if ((!body && attachments.length === 0) || posting) return;
@@ -93,7 +143,13 @@ export function ReplyComposer({
       onPosted(created);
       setDraft("");
       setAttachments([]);
-      if (onCancel) onCancel();
+      if (onCancel) {
+        onCancel();
+      } else {
+        // Collapse the top-level composer back to the pill so it stays out of the way
+        // after sending — matches Facebook/IG behavior.
+        setExpanded(false);
+      }
     } catch (err) {
       const msg = err instanceof APIError ? err.message : "Không gửi được trả lời.";
       toast(msg, "error");
@@ -118,9 +174,20 @@ export function ReplyComposer({
           {t("forum.reply_to")}: <strong>@{parentUsername}</strong>
         </div>
       )}
-      <textarea
+
+      {/* Thumbnails strip — only renders when there are attachments. */}
+      <AttachmentPicker
+        ref={pickerRef}
+        value={attachments}
+        onChange={setAttachments}
+        disabled={posting}
+        compact
+      />
+
+      <MentionTextarea
+        ref={textareaRef}
         value={draft}
-        onChange={e => setDraft(e.target.value)}
+        onChange={setDraft}
         placeholder={t("forum.reply_placeholder")}
         rows={3}
         maxLength={MAX}
@@ -133,19 +200,43 @@ export function ReplyComposer({
           color: "var(--fg)",
           resize: "vertical",
           fontFamily: "inherit",
+          width: "100%",
+          boxSizing: "border-box",
         }}
       />
-      <AttachmentPicker value={attachments} onChange={setAttachments} disabled={posting} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 10, color: "var(--muted)" }}>
-          {draft.length} / {MAX} · {t("forum.mention_hint")}
-        </span>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            type="button"
+            onClick={() => pickerRef.current?.open()}
+            disabled={posting || attachments.length >= 10}
+            title={t("forum.attach.label", "Đính kèm ảnh / video")}
+            aria-label={t("forum.attach.label", "Đính kèm ảnh / video")}
+            style={{
+              width: 30,
+              height: 30,
+              padding: 0,
+              background: "transparent",
+              color: "var(--muted)",
+              border: "1.5px solid var(--border)",
+              cursor: posting || attachments.length >= 10 ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Icon name="image" size={14} />
+          </button>
+          <span style={{ fontSize: 10, color: "var(--muted)" }}>
+            {draft.length} / {MAX}
+            {attachments.length > 0 && ` · ${attachments.length}/10 file`}
+          </span>
+        </div>
         <div style={{ display: "flex", gap: 6 }}>
-          {onCancel && (
-            <button type="button" onClick={onCancel} className="btn btn-sm" style={{ fontSize: 12 }}>
-              {t("common.cancel")}
-            </button>
-          )}
+          <button type="button" onClick={collapseIfTopLevel} className="btn btn-sm" style={{ fontSize: 12 }}>
+            {t("common.cancel")}
+          </button>
           <button
             type="button"
             onClick={submit}
@@ -156,6 +247,9 @@ export function ReplyComposer({
             <Icon name="send" size={11} /> {posting ? t("common.loading") : t("forum.reply_submit")}
           </button>
         </div>
+      </div>
+      <div style={{ fontSize: 10, color: "var(--muted)", lineHeight: 1.4 }}>
+        {t("forum.mention_hint")}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { useI18n } from "@/contexts/I18nContext";
@@ -19,6 +19,17 @@ interface Props {
   value: ForumAttachment[];
   onChange: (next: ForumAttachment[]) => void;
   disabled?: boolean;
+  /**
+   * Compact mode hides the panel chrome (border, padding, label, hint, "Chọn file" button).
+   * Use when the parent composer renders its own attach trigger via the imperative ref
+   * and just needs the thumbnail strip + drag-drop wiring (Facebook-style composer).
+   */
+  compact?: boolean;
+}
+
+export interface AttachmentPickerHandle {
+  /** Programmatically open the OS file picker. Used by compact mode where the trigger lives in the parent toolbar. */
+  open: () => void;
 }
 
 interface PendingItem {
@@ -30,12 +41,19 @@ interface PendingItem {
   error?: string;
 }
 
-export function AttachmentPicker({ value, onChange, disabled }: Props) {
+export const AttachmentPicker = forwardRef<AttachmentPickerHandle, Props>(function AttachmentPicker(
+  { value, onChange, disabled, compact = false },
+  ref,
+) {
   const { toast } = useToast();
   const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   // Track only in-flight uploads here; finalized files move into `value` (parent).
   const [pending, setPending] = useState<PendingItem[]>([]);
+
+  useImperativeHandle(ref, () => ({
+    open: () => inputRef.current?.click(),
+  }), []);
 
   const remaining = MAX - value.length - pending.filter(p => p.progress === "uploading").length;
 
@@ -132,6 +150,24 @@ export function AttachmentPicker({ value, onChange, disabled }: Props) {
     if (e.dataTransfer.files?.length) void handleFiles(e.dataTransfer.files);
   };
 
+  // In compact mode with no attachments, render only the hidden <input> — the parent's
+  // toolbar owns the trigger button, so we don't want any visible chrome here.
+  if (compact && allItems.length === 0) {
+    return (
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPT}
+        multiple
+        hidden
+        onChange={e => {
+          if (e.target.files?.length) void handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+    );
+  }
+
   return (
     <div>
       <input
@@ -150,29 +186,29 @@ export function AttachmentPicker({ value, onChange, disabled }: Props) {
       <div
         onDragOver={e => { e.preventDefault(); }}
         onDrop={onDrop}
-        className="stroke-ink"
-        style={{
-          padding: 10,
-          background: "var(--bg-2)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
+        className={compact ? undefined : "stroke-ink"}
+        style={
+          compact
+            ? { display: "flex", flexDirection: "column", gap: 8 }
+            : { padding: 10, background: "var(--bg-2)", display: "flex", flexDirection: "column", gap: 8 }
+        }
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 11, color: "var(--muted)" }}>
-            {t("forum.attach.label", "Đính kèm ảnh / video")} ({value.length}/{MAX})
+        {!compact && (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 11, color: "var(--muted)" }}>
+              {t("forum.attach.label", "Đính kèm ảnh / video")} ({value.length}/{MAX})
+            </div>
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              disabled={disabled || remaining <= 0}
+              className="btn btn-sm"
+              style={{ fontSize: 11 }}
+            >
+              + {t("forum.attach.add", "Chọn file")}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={disabled || remaining <= 0}
-            className="btn btn-sm"
-            style={{ fontSize: 11 }}
-          >
-            + {t("forum.attach.add", "Chọn file")}
-          </button>
-        </div>
+        )}
 
         {allItems.length === 0 ? (
           <div style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic", padding: "8px 4px" }}>
@@ -255,4 +291,4 @@ export function AttachmentPicker({ value, onChange, disabled }: Props) {
       </div>
     </div>
   );
-}
+});
