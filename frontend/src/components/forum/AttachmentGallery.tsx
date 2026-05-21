@@ -74,11 +74,14 @@ export function AttachmentGallery({ attachments, compact = false }: Props) {
               onClick={() => setOpenIndex(i)}
               style={{
                 position: "relative",
-                paddingBottom: visible.length === 1 ? "56.25%" : "75%",
                 background: "var(--panel)",
                 cursor: "pointer",
                 overflow: "hidden",
+                // `padding: 0` MUST come before `paddingBottom` — shorthand
+                // would otherwise overwrite the aspect-ratio padding and
+                // collapse the cell to height 0 (silent rendering failure).
                 padding: 0,
+                paddingBottom: visible.length === 1 ? "56.25%" : "75%",
                 border: "none",
                 ...cellStyle,
               }}
