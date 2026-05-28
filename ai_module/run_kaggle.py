@@ -55,6 +55,13 @@ PORT = int(os.environ.get("AI_MODULE_PORT", "8001"))
 # file that appears so the worker's tracebacks (which never reach uvicorn's
 # stdout) are surfaced in the Kaggle cell output.
 WORKER_LOG_DIR = SERVICE_DIR / "result"
+# Dedicated stdout/stderr capture for the shared subprocess (the grandchild
+# that actually loads YOLO/manga-ocr/lama). Exported to the env so
+# ai_module/server/main.py:start_translator_client_proc redirects there.
+SHARED_LOG_FILE = Path(
+    os.environ.get("SHARED_LOG_FILE", str(WORKER_LOG_DIR / "shared.log"))
+)
+os.environ["SHARED_LOG_FILE"] = str(SHARED_LOG_FILE)
 VERBOSE_WORKER = os.environ.get("AI_MODULE_VERBOSE", "1") not in ("0", "false", "")
 
 
@@ -190,9 +197,14 @@ def _tail_worker_logs(stop_event: threading.Event) -> None:
     WORKER_LOG_DIR.mkdir(parents=True, exist_ok=True)
     handles: dict[Path, int] = {}  # path -> next byte offset to read
 
+    def _watched_files():
+        yield from WORKER_LOG_DIR.glob("log_*.txt")
+        if SHARED_LOG_FILE.exists():
+            yield SHARED_LOG_FILE
+
     while not stop_event.is_set():
         try:
-            for entry in WORKER_LOG_DIR.glob("log_*.txt"):
+            for entry in _watched_files():
                 if entry not in handles:
                     handles[entry] = 0
                     sys.stdout.write(f"[worker-log] following {entry.name}\n")
@@ -396,23 +408,29 @@ def open_tunnel() -> str | None:
 # ---------------------------------------------------------------------------
 
 def _dump_latest_worker_log(tail_lines: int = 80) -> None:
+    files = []
     try:
         files = sorted(WORKER_LOG_DIR.glob("log_*.txt"), key=lambda p: p.stat().st_mtime)
     except FileNotFoundError:
+        pass
+    candidates = []
+    if files:
+        candidates.append(("worker", files[-1]))
+    if SHARED_LOG_FILE.exists():
+        candidates.append(("shared", SHARED_LOG_FILE))
+    if not candidates:
         return
-    if not files:
-        return
-    latest = files[-1]
-    try:
-        text = latest.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError as exc:
-        print(f"[worker-log] could not read {latest}: {exc}")
-        return
-    print(f"\n[worker-log] last {tail_lines} lines of {latest}:")
-    print("-" * 60)
-    for line in text[-tail_lines:]:
-        print(line)
-    print("-" * 60)
+    for label, path in candidates:
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            print(f"[{label}-log] could not read {path}: {exc}")
+            continue
+        print(f"\n[{label}-log] last {tail_lines} lines of {path}:")
+        print("-" * 60)
+        for line in text[-tail_lines:]:
+            print(line)
+        print("-" * 60)
 
 
 def main() -> int:
@@ -437,6 +455,7 @@ def main() -> int:
         print("\n[run] server alive — Ctrl+C or stop the cell to terminate")
         print(f"[run] launcher log: tail -f {LOG_FILE}")
         print(f"[run] worker logs: ls {WORKER_LOG_DIR}")
+        print(f"[run] shared log : tail -f {SHARED_LOG_FILE}")
         # Block the foreground so the Kaggle cell stays alive and the tunnel
         # keeps serving. Exits when the uvicorn child dies.
         proc.wait()

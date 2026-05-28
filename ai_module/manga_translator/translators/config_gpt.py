@@ -92,10 +92,22 @@ class ConfigGPT:
                 '<|3|>なんだこいつ 空気読めて ないのか…？'
             ),
             (
-                
+
                 "<|1|>부끄러워... 눈에 띄고 싶지 않아... 나 숨고 싶어...\n"
                 "<|2|>너 괜찮아?\n"
                 "<|3|>이 녀석, 뭐야? 분위기 못 읽는 거야...?\n"
+            )
+        ],
+        'Vietnamese': [
+            (
+                '<|1|>恥ずかしい… 目立ちたくない… 私が消えたい…\n'
+                '<|2|>きみ… 大丈夫⁉\n'
+                '<|3|>なんだこいつ 空気読めて ないのか…？'
+            ),
+            (
+                "<|1|>Xấu hổ quá… Không muốn bị chú ý… Tôi muốn biến mất…\n"
+                "<|2|>Cậu… không sao chứ⁉\n"
+                "<|3|>Cái tên này là sao vậy? Không đọc được bầu không khí à…?"
             )
         ]
     }
@@ -146,6 +158,22 @@ class ConfigGPT:
                     TextValue(ID=1,text="부끄러워... 눈에 띄고 싶지 않아... 나 숨고 싶어..."),
                     TextValue(ID=2,text="괜찮아?!"),
                     TextValue(ID=3,text="이 녀석, 뭐야? 분위기 못 읽는 거야...?")
+                ]
+            )
+        ],
+        'Vietnamese': [
+            TranslationList(
+                TextList=[
+                    TextValue(ID=1,text="恥ずかしい… 目立ちたくない… 私が消えたい…"),
+                    TextValue(ID=2,text="きみ… 大丈夫⁉"),
+                    TextValue(ID=3,text="なんだこいつ 空気読めて ないのか…？")
+                ]
+            ),
+            TranslationList(
+                TextList=[
+                    TextValue(ID=1,text="Xấu hổ quá… Không muốn bị chú ý… Tôi muốn biến mất…"),
+                    TextValue(ID=2,text="Cậu… không sao chứ?!"),
+                    TextValue(ID=3,text="Cái tên này là sao vậy? Không đọc được bầu không khí à…?")
                 ]
             )
         ]

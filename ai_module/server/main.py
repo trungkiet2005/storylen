@@ -333,8 +333,12 @@ def generate_nonce():
     return secrets.token_hex(16)
 
 def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+    # `-u` so the shared subprocess writes line-by-line; without it Python
+    # block-buffers when stdout is a pipe and tracebacks get lost when the
+    # process exits or is killed (e.g. Kaggle OOM kill).
     cmds = [
         sys.executable,
+        '-u',
         '-m', 'manga_translator',
         'shared',
         '--host', host,
@@ -354,14 +358,40 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
     if getattr(params, 'pre_dict', None):
         cmds.extend(['--pre-dict', params.pre_dict])
     if getattr(params, 'post_dict', None):
-        cmds.extend(['--post-dict', params.post_dict])       
+        cmds.extend(['--post-dict', params.post_dict])
     base_path = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(base_path)
-    proc = subprocess.Popen(cmds, cwd=parent)
+
+    # Redirect grandchild stdout/stderr to a dedicated log file so callers
+    # (Kaggle / Docker / local) can tail tracebacks without grovelling
+    # through the parent's piped log. SHARED_LOG_FILE env override exists
+    # for environments where /tmp is volatile.
+    shared_log_path = os.environ.get(
+        'SHARED_LOG_FILE',
+        os.path.join(parent, 'result', 'shared.log'),
+    )
+    os.makedirs(os.path.dirname(shared_log_path), exist_ok=True)
+    shared_log_fh = open(shared_log_path, 'a', buffering=1, encoding='utf-8')
+    shared_log_fh.write(f'\n===== shared subprocess started =====\n')
+    shared_log_fh.flush()
+
+    child_env = {**os.environ, 'PYTHONUNBUFFERED': '1'}
+    proc = subprocess.Popen(
+        cmds,
+        cwd=parent,
+        stdout=shared_log_fh,
+        stderr=subprocess.STDOUT,
+        env=child_env,
+    )
+    print(f'[shared-proc] pid={proc.pid} log={shared_log_path}', flush=True)
     executor_instances.register(ExecutorInstance(ip=host, port=port))
 
     def handle_exit_signals(signal, frame):
         proc.terminate()
+        try:
+            shared_log_fh.close()
+        except Exception:
+            pass
         sys.exit(0)
 
     signal.signal(signal.SIGINT, handle_exit_signals)
