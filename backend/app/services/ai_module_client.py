@@ -99,7 +99,7 @@ _FALLBACK_TARGET_LANGUAGES = [
     "IND",
     "FIL",
 ]
-_FALLBACK_DETECTORS = ["default", "dbconvnext", "ctd", "craft", "paddle", "none"]
+_FALLBACK_DETECTORS = ["default", "dbconvnext", "ctd", "craft", "paddle", "manga_yolo", "none"]
 _FALLBACK_OCR_MODELS = ["32px", "48px", "48px_ctc", "mocr"]
 _FALLBACK_INPAINTERS = ["default", "lama_large", "lama_mpe", "sd", "none", "original"]
 _FALLBACK_RENDERERS = ["default", "manga2eng", "manga2eng_pillow", "none"]

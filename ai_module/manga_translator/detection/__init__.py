@@ -5,6 +5,7 @@ from .dbnet_convnext import DBConvNextDetector
 from .ctd import ComicTextDetector
 from .craft import CRAFTDetector
 from .paddle_rust import PaddleDetector
+from .manga_yolo import MangaYoloDetector
 from .none import NoneDetector
 from .common import CommonDetector, OfflineDetector
 from ..config import Detector
@@ -15,6 +16,7 @@ DETECTORS = {
     Detector.ctd: ComicTextDetector,
     Detector.craft: CRAFTDetector,
     Detector.paddle: PaddleDetector,
+    Detector.manga_yolo: MangaYoloDetector,
     Detector.none: NoneDetector,
 }
 detector_cache = {}

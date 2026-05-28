@@ -108,8 +108,8 @@ class Settings(BaseSettings):
     AI_MODULE_TOKEN: str = ""
     AI_MODULE_TRANSLATOR: str = "gemini"
     AI_MODULE_TARGET_LANG: str = "VIN"
-    AI_MODULE_DETECTOR: str = "default"
-    AI_MODULE_OCR: str = "48px"
+    AI_MODULE_DETECTOR: str = "manga_yolo"
+    AI_MODULE_OCR: str = "mocr"
     AI_MODULE_INPAINTER: str = "lama_large"
     AI_MODULE_RENDERER: str = "default"
 

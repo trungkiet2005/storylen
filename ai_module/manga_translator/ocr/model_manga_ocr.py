@@ -21,6 +21,34 @@ from ..config import OcrConfig
 from ..textline_merge import split_text_region
 from ..utils import TextBlock, Quadrilateral, quadrilateral_can_merge_region, chunks
 from ..utils.generic import AvgMeter
+from ..utils.inference import ModelWrapper
+
+
+# Local fine-tuned manga-ocr checkpoint produced by
+# ai_module/training/manga109/03_train_ocr.py. Layout is the HuggingFace
+# VisionEncoderDecoderModel save format (config.json, model.safetensors,
+# tokenizer_config.json, vocab.txt, processor_config.json, ...).
+_FINETUNED_DIR = os.path.join(
+    ModelWrapper._MODEL_DIR, 'manga_ocr', 'weights'
+)
+
+
+def _resolve_mocr_weights() -> str:
+    """Return local fine-tuned dir if present, else fall back to HF hub id.
+
+    The training pipeline saves the image-processor config as
+    ``processor_config.json`` (HF transformers ≥ 5 style), but
+    ``ViTImageProcessor.from_pretrained`` looks for the legacy
+    ``preprocessor_config.json`` first. If only the former exists, materialise
+    a copy under the legacy name so the loader succeeds on either version.
+    """
+    if not os.path.isfile(os.path.join(_FINETUNED_DIR, 'config.json')):
+        return 'kha-white/manga-ocr-base'
+    legacy = os.path.join(_FINETUNED_DIR, 'preprocessor_config.json')
+    modern = os.path.join(_FINETUNED_DIR, 'processor_config.json')
+    if not os.path.isfile(legacy) and os.path.isfile(modern):
+        shutil.copyfile(modern, legacy)
+    return _FINETUNED_DIR
 
 async def merge_bboxes(bboxes: List[Quadrilateral], width: int, height: int) -> Tuple[List[Quadrilateral], int]:
     # step 1: divide into multiple text region candidates
@@ -112,7 +140,9 @@ class ModelMangaOCR(OfflineOCR):
             dictionary = [s[:-1] for s in fp.readlines()]
 
         self.model = OCR(dictionary, 768)
-        self.mocr = MangaOcr()
+        mocr_src = _resolve_mocr_weights()
+        self.logger.info(f'manga-ocr weights: {mocr_src}')
+        self.mocr = MangaOcr(pretrained_model_name_or_path=mocr_src)
         sd = torch.load(self._get_file_path('ocr_ar_48px.ckpt'))
         self.model.load_state_dict(sd)
         self.model.eval()

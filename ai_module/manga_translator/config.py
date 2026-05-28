@@ -87,6 +87,7 @@ class Detector(str, Enum):
     ctd = "ctd"
     craft = "craft"
     paddle = "paddle"
+    manga_yolo = "manga_yolo"
     none = "none"
 
 class Inpainter(str, Enum):
