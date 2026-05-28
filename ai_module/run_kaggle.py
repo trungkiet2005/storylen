@@ -51,6 +51,12 @@ LOG_FILE = Path(os.environ.get("AI_MODULE_LOG", "/kaggle/working/ai_module.log")
 HOST = os.environ.get("AI_MODULE_HOST", "0.0.0.0")
 PORT = int(os.environ.get("AI_MODULE_PORT", "8001"))
 
+# manga_translator's shared mode writes per-session logs here. We tail every
+# file that appears so the worker's tracebacks (which never reach uvicorn's
+# stdout) are surfaced in the Kaggle cell output.
+WORKER_LOG_DIR = SERVICE_DIR / "result"
+VERBOSE_WORKER = os.environ.get("AI_MODULE_VERBOSE", "1") not in ("0", "false", "")
+
 
 # ---------------------------------------------------------------------------
 # Environment detection
@@ -171,6 +177,49 @@ def install_deps() -> None:
 # Server
 # ---------------------------------------------------------------------------
 
+def _tail_worker_logs(stop_event: threading.Event) -> None:
+    """Watch result/log_*.txt and stream new lines to stdout.
+
+    manga_translator's `shared` worker writes its own per-session log file
+    instead of using uvicorn's stdout. Without this tailer, model-loading
+    tracebacks are invisible — only the trailing uvicorn ``500`` line shows
+    up in the Kaggle cell. We poll the directory cheaply and follow every
+    file we haven't started yet, surfacing each line with a ``[worker]``
+    prefix so it's easy to grep.
+    """
+    WORKER_LOG_DIR.mkdir(parents=True, exist_ok=True)
+    handles: dict[Path, int] = {}  # path -> next byte offset to read
+
+    while not stop_event.is_set():
+        try:
+            for entry in WORKER_LOG_DIR.glob("log_*.txt"):
+                if entry not in handles:
+                    handles[entry] = 0
+                    sys.stdout.write(f"[worker-log] following {entry.name}\n")
+                    sys.stdout.flush()
+                try:
+                    size = entry.stat().st_size
+                except FileNotFoundError:
+                    continue
+                if size <= handles[entry]:
+                    continue
+                try:
+                    with open(entry, "rb") as fh:
+                        fh.seek(handles[entry])
+                        chunk = fh.read(size - handles[entry])
+                    handles[entry] = size
+                    for line in chunk.decode("utf-8", errors="replace").splitlines():
+                        sys.stdout.write(f"[worker] {line}\n")
+                    sys.stdout.flush()
+                except OSError as exc:
+                    sys.stdout.write(f"[worker-log] read failed for {entry}: {exc}\n")
+                    sys.stdout.flush()
+        except Exception as exc:  # never let the tailer crash the launcher
+            sys.stdout.write(f"[worker-log] tailer error: {exc}\n")
+            sys.stdout.flush()
+        time.sleep(0.5)
+
+
 def _tee_to_stdout_and_file(pipe, log_fh) -> None:
     """Drain a subprocess pipe to both the parent stdout and a log file.
 
@@ -201,6 +250,8 @@ def start_server() -> subprocess.Popen:
         "--port", str(PORT),
         "--use-gpu",
     ]
+    if VERBOSE_WORKER:
+        cmd.append("--verbose")
     print(f"[server] spawning: {' '.join(cmd)}")
     proc = subprocess.Popen(
         cmd,
@@ -344,6 +395,26 @@ def open_tunnel() -> str | None:
 # Main
 # ---------------------------------------------------------------------------
 
+def _dump_latest_worker_log(tail_lines: int = 80) -> None:
+    try:
+        files = sorted(WORKER_LOG_DIR.glob("log_*.txt"), key=lambda p: p.stat().st_mtime)
+    except FileNotFoundError:
+        return
+    if not files:
+        return
+    latest = files[-1]
+    try:
+        text = latest.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError as exc:
+        print(f"[worker-log] could not read {latest}: {exc}")
+        return
+    print(f"\n[worker-log] last {tail_lines} lines of {latest}:")
+    print("-" * 60)
+    for line in text[-tail_lines:]:
+        print(line)
+    print("-" * 60)
+
+
 def main() -> int:
     print(f"[env] kaggle={is_kaggle()} service_dir={SERVICE_DIR}")
 
@@ -351,20 +422,30 @@ def main() -> int:
     link_models()
     install_deps()
 
+    tailer_stop = threading.Event()
+    tailer = threading.Thread(target=_tail_worker_logs, args=(tailer_stop,), daemon=True)
+    tailer.start()
+
     proc = start_server()
     try:
         if not wait_for_health(proc):
+            _dump_latest_worker_log()
             return 1
 
         open_tunnel()
 
         print("\n[run] server alive — Ctrl+C or stop the cell to terminate")
-        print(f"[run] logs: tail -f {LOG_FILE}")
+        print(f"[run] launcher log: tail -f {LOG_FILE}")
+        print(f"[run] worker logs: ls {WORKER_LOG_DIR}")
         # Block the foreground so the Kaggle cell stays alive and the tunnel
         # keeps serving. Exits when the uvicorn child dies.
         proc.wait()
+        if proc.returncode not in (0, None):
+            print(f"[server] exited with code {proc.returncode}")
+            _dump_latest_worker_log()
         return proc.returncode or 0
     finally:
+        tailer_stop.set()
         if proc.poll() is None:
             proc.terminate()
             try:
