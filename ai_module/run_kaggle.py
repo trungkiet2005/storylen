@@ -30,6 +30,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -120,18 +121,21 @@ def link_models() -> None:
 # ---------------------------------------------------------------------------
 
 RUST_INDEX = "https://frederik-uni.github.io/manga-image-translator-rust/python/wheels/simple/"
-# pydensecrf is mandatory (mask_refinement imports it at module level), but
-# it builds from source — needs gcc + cython, both present on Kaggle's base.
-SKIP_PACKAGES: tuple[str, ...] = ()
-EXTRA_PACKAGES = ("ngrok",)  # not in requirements.txt — Kaggle-only tunnel
+# pydensecrf is mandatory (mask_refinement imports it at module level). The
+# upstream PyPI package is unmaintained and fails to build on Python >=3.10
+# (legacy Cython API). pydensecrf2 is a maintained fork with prebuilt wheels
+# and identical `import pydensecrf` namespace -> drop-in replacement.
+SKIP_PACKAGES: tuple[str, ...] = ("pydensecrf",)
+EXTRA_PACKAGES = ("ngrok", "pydensecrf2")
 
 
 def _filtered_requirements() -> list[str]:
     req_file = SERVICE_DIR / "requirements.txt"
     out: list[str] = []
     for raw in req_file.read_text().splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or line.startswith("--"):
+        # Strip inline comments first so 'protobuf<6 # note' becomes 'protobuf<6'.
+        line = raw.split("#", 1)[0].strip()
+        if not line or line.startswith("--"):
             continue
         if any(skip in line.lower() for skip in SKIP_PACKAGES):
             print(f"[pip] skipping {line}")
@@ -163,12 +167,31 @@ def install_deps() -> None:
 # Server
 # ---------------------------------------------------------------------------
 
+def _tee_to_stdout_and_file(pipe, log_fh) -> None:
+    """Drain a subprocess pipe to both the parent stdout and a log file.
+
+    PYTHONUNBUFFERED in the child env ensures we see lines as they happen
+    instead of waiting for the child's libc to flush its block buffer.
+    """
+    for raw in iter(pipe.readline, b""):
+        try:
+            line = raw.decode("utf-8", errors="replace")
+        except Exception:
+            line = repr(raw)
+        sys.stdout.write(line)
+        sys.stdout.flush()
+        log_fh.write(line)
+        log_fh.flush()
+    pipe.close()
+
+
 def start_server() -> subprocess.Popen:
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    log_fh = open(LOG_FILE, "w", buffering=1)
+    log_fh = open(LOG_FILE, "w", buffering=1, encoding="utf-8")
 
     cmd = [
         sys.executable,
+        "-u",  # unbuffered stdout from the child interpreter
         str(SERVICE_DIR / "main.py"),
         "--host", HOST,
         "--port", str(PORT),
@@ -178,20 +201,33 @@ def start_server() -> subprocess.Popen:
     proc = subprocess.Popen(
         cmd,
         cwd=str(SERVICE_DIR),
-        stdout=log_fh,
+        stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        env={**os.environ},
+        bufsize=1,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
     )
+    tee = threading.Thread(
+        target=_tee_to_stdout_and_file,
+        args=(proc.stdout, log_fh),
+        daemon=True,
+    )
+    tee.start()
     return proc
 
 
-def wait_for_health(timeout: int = 600) -> bool:
+def wait_for_health(proc: subprocess.Popen, timeout: int = 600) -> bool:
+    """Poll /health until the server is ready. Aborts immediately if the
+    child process dies — no point waiting 10 minutes for a corpse."""
     import urllib.request
     import urllib.error
 
     url = f"http://127.0.0.1:{PORT}/health"
     deadline = time.time() + timeout
     while time.time() < deadline:
+        if proc.poll() is not None:
+            print(f"[health] server exited early with code {proc.returncode} — "
+                  "see traceback above")
+            return False
         try:
             with urllib.request.urlopen(url, timeout=2) as r:
                 if r.status == 200:
@@ -242,9 +278,7 @@ def main() -> int:
 
     proc = start_server()
     try:
-        if not wait_for_health():
-            print("[health] server did not become ready, tailing log:")
-            subprocess.run(["tail", "-200", str(LOG_FILE)])
+        if not wait_for_health(proc):
             return 1
 
         open_tunnel()
