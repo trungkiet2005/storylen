@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.services.ai_module_source import get_active_ai_module_url
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -106,7 +107,7 @@ _FALLBACK_RENDERERS = ["default", "manga2eng", "manga2eng_pillow", "none"]
 
 
 def _ai_module_url(path: str) -> str:
-    base = settings.AI_MODULE_URL.rstrip("/")
+    base = get_active_ai_module_url().rstrip("/")
     return f"{base}{path}"
 
 

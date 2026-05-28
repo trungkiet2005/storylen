@@ -1583,6 +1583,47 @@ export async function adminDeleteSetting(key: string): Promise<void> {
   return request<void>(`/admin/settings/${encodeURIComponent(key)}`, { method: "DELETE" });
 }
 
+// ─── AI module source (HuggingFace vs Kaggle tunnel) ──────────────────────────
+
+export type AISourceProvider = "huggingface" | "kaggle";
+
+export interface AISourceState {
+  provider: AISourceProvider;
+  kaggle_url: string;
+  huggingface_url: string;
+  active_url: string;
+}
+
+export interface AISourceTestResult {
+  ok: boolean;
+  http_status: number | null;
+  latency_ms: number | null;
+  detail: string | null;
+}
+
+export async function adminGetAISource(): Promise<AISourceState> {
+  return request<AISourceState>("/admin/ai-source");
+}
+
+export async function adminUpdateAISource(
+  provider: AISourceProvider,
+  kaggleUrl: string,
+): Promise<AISourceState> {
+  return request<AISourceState>("/admin/ai-source", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, kaggle_url: kaggleUrl }),
+  });
+}
+
+export async function adminTestAISource(url: string): Promise<AISourceTestResult> {
+  return request<AISourceTestResult>("/admin/ai-source/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+}
+
 // ─── Health ───────────────────────────────────────────────────────────────────
 
 export interface AdminServiceHealth {

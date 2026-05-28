@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from app.config import get_settings
 from app.database import get_supabase
 from app.routers.auth import AuthUser, get_current_admin
+from app.services.ai_module_source import get_active_ai_module_url
 
 router = APIRouter(tags=["admin"])
 logger = logging.getLogger(__name__)
@@ -70,7 +71,7 @@ def get_admin_health(_admin: AuthUser = Depends(get_current_admin)) -> AdminHeal
 
     services = [
         _check_supabase(),
-        _check_http("ai_module", settings.AI_MODULE_URL),
+        _check_http("ai_module", get_active_ai_module_url()),
         _check_http("hf_space", settings.HF_SPACE_URL),
     ]
     return AdminHealthResponse(

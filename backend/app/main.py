@@ -248,7 +248,8 @@ def health_deep():
     try:
         import httpx
         with httpx.Client(timeout=3.0) as c:
-            r = c.get(f"{settings.AI_MODULE_URL.rstrip('/')}/health")
+            from app.services.ai_module_source import get_active_ai_module_url
+            r = c.get(f"{get_active_ai_module_url().rstrip('/')}/health")
             checks["ai_module"] = {
                 "status": "ok" if r.status_code < 500 else "degraded",
                 "http_status": r.status_code,

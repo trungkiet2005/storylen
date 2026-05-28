@@ -20,6 +20,7 @@ const NAV: ReadonlyArray<{
   { href: "/admin/analytics", label: "Phân tích",  icon: "layers",   match: (p) => p.startsWith("/admin/analytics") },
   { href: "/admin/audit",     label: "Audit log",  icon: "history",  match: (p) => p.startsWith("/admin/audit") },
   { href: "/admin/settings",  label: "Cấu hình",   icon: "settings", match: (p) => p.startsWith("/admin/settings") },
+  { href: "/admin/ai-source", label: "AI source",  icon: "layers",   match: (p) => p.startsWith("/admin/ai-source") },
   { href: "/admin/health",    label: "Sức khoẻ",   icon: "alert",    match: (p) => p.startsWith("/admin/health") },
 ];
 
