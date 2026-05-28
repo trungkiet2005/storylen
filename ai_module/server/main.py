@@ -417,16 +417,31 @@ def prepare(args):
 async def simple_execute_translate(req: Request):
     """Internal single image translation endpoint - receives pickled image and config"""
     import pickle
+    import traceback
     from manga_translator import MangaTranslator
-    
+
     body = await req.body()
     attributes = pickle.loads(body)
     image = attributes["image"]
     config = attributes["config"]
-    
-    translator = MangaTranslator({'verbose': getattr(config, 'verbose', False)})
-    ctx = await translator.translate(image, config)
-    return to_translation(ctx)
+
+    try:
+        translator = MangaTranslator({'verbose': getattr(config, 'verbose', False)})
+        ctx = await translator.translate(image, config)
+        return to_translation(ctx)
+    except Exception as e:
+        # Without this dump the traceback is lost when FastAPI's default
+        # 500 handler swallows it (uvicorn's exception logger writes to
+        # its own stream that doesn't reach our shared.log).
+        print(
+            f'[simple_execute/translate] {type(e).__name__}: {e}',
+            file=sys.stderr,
+            flush=True,
+        )
+        traceback.print_exc(file=sys.stderr)
+        sys.stderr.flush()
+        head = traceback.format_exception_only(type(e), e)[-1].strip()
+        raise HTTPException(500, detail=f"translate failed: {head}")
 
 @app.post("/execute/translate", tags=["internal-api"])
 async def execute_translate_stream(req: Request):

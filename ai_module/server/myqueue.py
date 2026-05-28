@@ -1,5 +1,7 @@
 import asyncio
 import os
+import sys
+import traceback
 from typing import List, Optional
 
 from PIL import Image
@@ -135,11 +137,24 @@ async def wait_in_queue(task: QueueElement | BatchQueueElement, notify: NotifyTy
                 # 确保实例被释放
                 await executor_instances.free_executor(instance)
 
+                # Always dump the full traceback to stderr so it lands in
+                # shared.log / launcher log. The HTTPException detail keeps
+                # only the head line — full trace is for the operator.
+                print(
+                    f'[wait_in_queue] task {type(task).__name__} failed: '
+                    f'{type(e).__name__}: {e}',
+                    file=sys.stderr,
+                    flush=True,
+                )
+                traceback.print_exc(file=sys.stderr)
+                sys.stderr.flush()
+
                 # 如果是连接错误，发送友好的错误消息
                 if "Cannot connect to host" in str(e) or "Connection refused" in str(e):
                     error_msg = "Translation service is starting up, please wait a moment and try again."
                 else:
-                    error_msg = f"Translation failed: {str(e)}"
+                    head = traceback.format_exception_only(type(e), e)[-1].strip()
+                    error_msg = f"Translation failed: {head}"
 
                 if notify:
                     notify(2, error_msg.encode('utf-8'))
