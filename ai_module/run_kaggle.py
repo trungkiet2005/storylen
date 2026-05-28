@@ -112,48 +112,51 @@ def link_models() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Dependencies — only the deltas vs the Kaggle base image.
-# Idempotent: pip is a no-op when the wheel is already satisfied.
+# Dependencies — install from the bundled requirements.txt so we never drift
+# from what the HF Spaces / Docker build uses. Two surgical workarounds:
+#   * skip pydensecrf (builds from source, needs apt deps Kaggle doesn't have)
+#   * pass --extra-index-url for the rusty-manga-image-translator wheel
+# Idempotent: pip is a no-op when a wheel is already satisfied.
 # ---------------------------------------------------------------------------
 
-EXTRA_PACKAGES = [
-    "numpy==1.26.4",
-    "ngrok",
-    "manga-ocr",
-    "ultralytics",
-    "google-genai",
-    "groq",
-    "deepl",
-    "pyclipper",
-    "shapely",
-    "freetype-py",
-    "editdistance",
-    "arabic-reshaper",
-    "pyhyphen",
-    "py3langid==0.2.2",
-    "open_clip_torch",
-    "ctranslate2",
-    "tiktoken",
-    "httpx==0.27.2",
-    "nest-asyncio",
-    "aioshutil",
-    "aiofiles",
-    "protobuf>=3.20.2,<6.0.0",
-    "python-bidi",
-    "langcodes",
-    "ImageHash",
-    "kornia",
-    "tensorboardX",
-]
+RUST_INDEX = "https://frederik-uni.github.io/manga-image-translator-rust/python/wheels/simple/"
+# pydensecrf is mandatory (mask_refinement imports it at module level), but
+# it builds from source — needs gcc + cython, both present on Kaggle's base.
+SKIP_PACKAGES: tuple[str, ...] = ()
+EXTRA_PACKAGES = ("ngrok",)  # not in requirements.txt — Kaggle-only tunnel
+
+
+def _filtered_requirements() -> list[str]:
+    req_file = SERVICE_DIR / "requirements.txt"
+    out: list[str] = []
+    for raw in req_file.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("--"):
+            continue
+        if any(skip in line.lower() for skip in SKIP_PACKAGES):
+            print(f"[pip] skipping {line}")
+            continue
+        out.append(line)
+    return out
 
 
 def install_deps() -> None:
     if os.environ.get("SKIP_PIP_INSTALL") == "1":
         print("[pip] SKIP_PIP_INSTALL=1, skipping")
         return
-    cmd = [sys.executable, "-m", "pip", "install", "-q", *EXTRA_PACKAGES]
-    print("[pip] installing extras (this may take 2-3 min on first run)")
-    subprocess.run(cmd, check=False)
+
+    packages = _filtered_requirements() + list(EXTRA_PACKAGES)
+    cmd = [
+        sys.executable, "-m", "pip", "install", "-q",
+        "--extra-index-url", RUST_INDEX,
+        *packages,
+    ]
+    print(f"[pip] installing {len(packages)} packages from requirements.txt "
+          "(first run: 3-5 min)")
+    rc = subprocess.run(cmd).returncode
+    if rc != 0:
+        print(f"[pip] returned {rc} — some packages may have failed, "
+              "check above. Continuing anyway.")
 
 
 # ---------------------------------------------------------------------------
