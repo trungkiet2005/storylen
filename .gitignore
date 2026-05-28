@@ -22,6 +22,7 @@ Desktop.ini
 .settings/
 .classpath
 
+
 # =========================
 # Environment Variables
 # =========================
@@ -92,7 +93,7 @@ ai_module/**/*.gguf
 ai_module/**/*.ggml
 ai_module/**/*.tflite
 ai_module/**/*.pb
-
+ai_module/models.zip
 # Pytest / Coverage
 .tox/
 .nox/
