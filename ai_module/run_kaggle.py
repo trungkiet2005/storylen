@@ -117,6 +117,7 @@ def link_models() -> None:
 # ---------------------------------------------------------------------------
 
 EXTRA_PACKAGES = [
+    "numpy==1.26.4",
     "ngrok",
     "manga-ocr",
     "ultralytics",
