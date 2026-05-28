@@ -11,9 +11,13 @@ Usage on Kaggle (one cell):
     !python /kaggle/working/storylen/ai_module/run_kaggle.py
 
 Required Kaggle Secrets (Add-ons -> Secrets):
-    NGROK_AUTHTOKEN   - https://dashboard.ngrok.com
     GEMINI_API_KEY    - https://aistudio.google.com (comma-separated for rotation)
+    NGROK_AUTHTOKEN   - optional; if absent, Cloudflare quick tunnel is used
     HF_TOKEN          - optional, for gated HuggingFace models
+
+Pick a tunnel provider explicitly with env TUNNEL_PROVIDER=ngrok|cloudflare.
+Cloudflare quick tunnels (TryCloudflare) need no account or domain — they
+return a random https://*.trycloudflare.com URL valid for the session.
 
 Pre-uploaded model dataset layout (read-only mount):
     /kaggle/input/datasets/trungkiet/storylen-models/models/
@@ -240,29 +244,100 @@ def wait_for_health(proc: subprocess.Popen, timeout: int = 600) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# ngrok tunnel
+# Tunnel — ngrok or Cloudflare quick tunnel (TryCloudflare).
+# Cloudflare quick tunnels are anonymous, free, and don't need an account or
+# domain — they hand out a random `https://*.trycloudflare.com` URL.
+# Default provider: ngrok if NGROK_AUTHTOKEN is set, else cloudflare.
+# Force a provider via env TUNNEL_PROVIDER=ngrok|cloudflare.
 # ---------------------------------------------------------------------------
 
-def open_tunnel() -> str | None:
-    token = os.environ.get("NGROK_AUTHTOKEN")
-    if not token:
-        print("[ngrok] NGROK_AUTHTOKEN not set; tunnel disabled")
-        return None
-    try:
-        import ngrok  # type: ignore
-    except ImportError:
-        print("[ngrok] python package not installed, run pip install ngrok")
-        return None
+_cloudflared_proc: subprocess.Popen | None = None
 
-    listener = ngrok.forward(PORT, authtoken=token)
-    url = listener.url()
+
+def _print_url_banner(url: str) -> None:
     print("=" * 60)
     print(f"  AI_MODULE_URL = {url}")
     print("=" * 60)
     print("Set this in your backend .env:")
     print(f"  AI_MODULE_URL={url}")
-    print(f"  AI_MODULE_TOKEN=")
+    print("  AI_MODULE_TOKEN=")
+
+
+def _open_ngrok() -> str | None:
+    token = os.environ.get("NGROK_AUTHTOKEN")
+    if not token:
+        print("[ngrok] NGROK_AUTHTOKEN not set")
+        return None
+    try:
+        import ngrok  # type: ignore
+    except ImportError:
+        print("[ngrok] python package missing — pip install ngrok")
+        return None
+    listener = ngrok.forward(PORT, authtoken=token)
+    url = listener.url()
+    _print_url_banner(url)
     return url
+
+
+def _open_cloudflare() -> str | None:
+    import re
+
+    global _cloudflared_proc
+    binary = Path("/kaggle/working/cloudflared")
+    if not binary.exists():
+        print("[cloudflare] downloading cloudflared binary")
+        rc = subprocess.run(
+            ["wget", "-q", "-O", str(binary),
+             "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"],
+        ).returncode
+        if rc != 0 or not binary.exists():
+            print("[cloudflare] download failed")
+            return None
+        binary.chmod(0o755)
+
+    log_path = LOG_FILE.parent / "cloudflared.log"
+    log_fh = open(log_path, "w", buffering=1, encoding="utf-8")
+    print(f"[cloudflare] launching tunnel -> http://127.0.0.1:{PORT}")
+    _cloudflared_proc = subprocess.Popen(
+        [str(binary), "tunnel", "--no-autoupdate",
+         "--url", f"http://127.0.0.1:{PORT}"],
+        stdout=log_fh,
+        stderr=subprocess.STDOUT,
+    )
+
+    url_re = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
+    deadline = time.time() + 90
+    while time.time() < deadline:
+        if _cloudflared_proc.poll() is not None:
+            print(f"[cloudflare] cloudflared exited early — see {log_path}")
+            return None
+        try:
+            text = log_path.read_text(encoding="utf-8", errors="replace")
+            m = url_re.search(text)
+            if m:
+                url = m.group(0)
+                _print_url_banner(url)
+                print(f"[cloudflare] tunnel log: {log_path}")
+                return url
+        except FileNotFoundError:
+            pass
+        time.sleep(1)
+    print(f"[cloudflare] no URL emitted within 90s; check {log_path}")
+    return None
+
+
+def open_tunnel() -> str | None:
+    provider = os.environ.get("TUNNEL_PROVIDER", "").lower().strip()
+    if not provider:
+        provider = "ngrok" if os.environ.get("NGROK_AUTHTOKEN") else "cloudflare"
+
+    print(f"[tunnel] provider = {provider}")
+    if provider == "ngrok":
+        return _open_ngrok()
+    if provider in ("cloudflare", "cf", "trycloudflare"):
+        return _open_cloudflare()
+    print(f"[tunnel] unknown provider '{provider}'")
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -296,6 +371,12 @@ def main() -> int:
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 proc.kill()
+        if _cloudflared_proc and _cloudflared_proc.poll() is None:
+            _cloudflared_proc.terminate()
+            try:
+                _cloudflared_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                _cloudflared_proc.kill()
 
 
 if __name__ == "__main__":
