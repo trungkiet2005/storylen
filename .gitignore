@@ -59,6 +59,8 @@ lib64/
 !frontend/src/lib/**
 !frontend/__tests__/unit/lib/
 !frontend/__tests__/unit/lib/**
+!ai_module/manga_translator/utils/panel/lib/
+!ai_module/manga_translator/utils/panel/lib/**
 parts/
 sdist/
 var/
