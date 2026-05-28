@@ -41,14 +41,46 @@ def _resolve_mocr_weights() -> str:
     ``ViTImageProcessor.from_pretrained`` looks for the legacy
     ``preprocessor_config.json`` first. If only the former exists, materialise
     a copy under the legacy name so the loader succeeds on either version.
+
+    On Kaggle the weights dir is a symlink to ``/kaggle/input/...`` which is
+    read-only; in that case copy the whole dir once into a writable cache
+    (``MOCR_CACHE_DIR`` env override, else next to the symlink under
+    ``models/manga_ocr/weights_cache``) and run the rename there.
     """
     if not os.path.isfile(os.path.join(_FINETUNED_DIR, 'config.json')):
         return 'kha-white/manga-ocr-base'
-    legacy = os.path.join(_FINETUNED_DIR, 'preprocessor_config.json')
-    modern = os.path.join(_FINETUNED_DIR, 'processor_config.json')
-    if not os.path.isfile(legacy) and os.path.isfile(modern):
+
+    target_dir = _FINETUNED_DIR
+    legacy = os.path.join(target_dir, 'preprocessor_config.json')
+    modern = os.path.join(target_dir, 'processor_config.json')
+
+    if os.path.isfile(legacy) or not os.path.isfile(modern):
+        return target_dir
+
+    try:
         shutil.copyfile(modern, legacy)
-    return _FINETUNED_DIR
+        return target_dir
+    except OSError as exc:
+        # Read-only mount (Kaggle dataset symlink). Materialise a writable
+        # mirror once, then rename inside that mirror.
+        cache_dir = os.environ.get(
+            'MOCR_CACHE_DIR',
+            os.path.join(ModelWrapper._MODEL_DIR, 'manga_ocr', 'weights_cache'),
+        )
+        mirror_legacy = os.path.join(cache_dir, 'preprocessor_config.json')
+        if not os.path.isfile(mirror_legacy):
+            os.makedirs(cache_dir, exist_ok=True)
+            for name in os.listdir(target_dir):
+                src = os.path.join(target_dir, name)
+                dst = os.path.join(cache_dir, name)
+                if os.path.isfile(dst):
+                    continue
+                shutil.copyfile(src, dst)
+            shutil.copyfile(
+                os.path.join(cache_dir, 'processor_config.json'),
+                mirror_legacy,
+            )
+        return cache_dir
 
 async def merge_bboxes(bboxes: List[Quadrilateral], width: int, height: int) -> Tuple[List[Quadrilateral], int]:
     # step 1: divide into multiple text region candidates

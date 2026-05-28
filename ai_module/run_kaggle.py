@@ -62,6 +62,16 @@ SHARED_LOG_FILE = Path(
     os.environ.get("SHARED_LOG_FILE", str(WORKER_LOG_DIR / "shared.log"))
 )
 os.environ["SHARED_LOG_FILE"] = str(SHARED_LOG_FILE)
+
+# manga_ocr/weights/ on Kaggle is a symlink into /kaggle/input/... (read-only),
+# so any in-place fixup (e.g. writing preprocessor_config.json for older
+# transformers) fails with EROFS. Point the cache to /kaggle/working/ so the
+# resolver in model_manga_ocr.py can materialise a writable mirror there.
+MOCR_CACHE_DIR = Path(
+    os.environ.get("MOCR_CACHE_DIR", "/kaggle/working/mocr_weights_cache")
+)
+os.environ["MOCR_CACHE_DIR"] = str(MOCR_CACHE_DIR)
+
 VERBOSE_WORKER = os.environ.get("AI_MODULE_VERBOSE", "1") not in ("0", "false", "")
 
 
@@ -456,6 +466,7 @@ def main() -> int:
         print(f"[run] launcher log: tail -f {LOG_FILE}")
         print(f"[run] worker logs: ls {WORKER_LOG_DIR}")
         print(f"[run] shared log : tail -f {SHARED_LOG_FILE}")
+        print(f"[run] mocr cache : {MOCR_CACHE_DIR}")
         # Block the foreground so the Kaggle cell stays alive and the tunnel
         # keeps serving. Exits when the uvicorn child dies.
         proc.wait()
