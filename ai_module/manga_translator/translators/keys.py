@@ -35,7 +35,7 @@ def _split_api_keys(value: str) -> list[str]:
 
 GEMINI_API_KEYS = _split_api_keys(os.getenv('GEMINI_API_KEYS', '')) or _split_api_keys(os.getenv('GEMINI_API_KEY', ''))
 GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else ''
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-1.5-flash-002')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
 
 # deepseek
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')

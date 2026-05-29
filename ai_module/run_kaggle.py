@@ -100,7 +100,7 @@ def load_secrets() -> None:
         return
 
     client = UserSecretsClient()
-    for name in ("NGROK_AUTHTOKEN", "GEMINI_API_KEY", "HF_TOKEN", "GROQ_API_KEY"):
+    for name in ("NGROK_AUTHTOKEN", "GEMINI_API_KEY", "GEMINI_MODEL", "HF_TOKEN", "GROQ_API_KEY"):
         if os.environ.get(name):
             continue
         try:
