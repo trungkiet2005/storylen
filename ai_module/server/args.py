@@ -45,7 +45,11 @@ def parse_arguments():
     parser.add_argument('--nonce', default=os.getenv('MT_WEB_NONCE') or None, type=str, help='Nonce for securing internal web server communication, set to "None" to disable')
     parser.add_argument('--models-ttl', default='0', type=int, help='models TTL in memory in seconds')
     parser.add_argument('--pre-dict', default=None, type=file_path, help='Path to the pre-translation dictionary file')
-    parser.add_argument('--post-dict', default=None, type=file_path, help='Path to the post-translation dictionary file')    
+    parser.add_argument('--post-dict', default=None, type=file_path, help='Path to the post-translation dictionary file')
+    # 0 = auto: torch.cuda.device_count() when --use-gpu, else 1. AI_MODULE_WORKERS env
+    # overrides the default; explicit CLI wins. Forced to 1 on CPU regardless.
+    parser.add_argument('--workers', default=int(os.getenv('AI_MODULE_WORKERS', '0')), type=int,
+                        help='Number of translator worker subprocesses to spawn (0 = auto-detect from GPU count)')
     g = parser.add_mutually_exclusive_group()
     g.add_argument('--use-gpu', action='store_true', help='Turn on/off gpu (auto switch between mps and cuda)')
     g.add_argument('--use-gpu-limited', action='store_true', help='Turn on/off gpu (excluding offline translator)')

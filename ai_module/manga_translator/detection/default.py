@@ -19,7 +19,11 @@ def det_batch_forward_default(batch: np.ndarray, device: str):
     batch = einops.rearrange(batch.astype(np.float32) / 127.5 - 1.0, 'n h w c -> n c h w')
     batch = torch.from_numpy(batch).to(device)
     with torch.no_grad():
-        db, mask = MODEL(batch)
+        if isinstance(device, str) and device.startswith('cuda'):
+            with torch.autocast(device_type='cuda', dtype=torch.float16):
+                db, mask = MODEL(batch)
+        else:
+            db, mask = MODEL(batch)
         db = db.sigmoid().cpu().numpy()
         mask = mask.cpu().numpy()
     return db, mask

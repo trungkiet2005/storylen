@@ -10,7 +10,13 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/app/.cache/huggingface \
-    TRANSFORMERS_CACHE=/app/.cache/huggingface
+    TRANSFORMERS_CACHE=/app/.cache/huggingface \
+    # Production defaults — overridable via HF Space Secrets.
+    # AI_MODULE_TOKEN unset = dev mode (logs WARN). Set via Space Secrets.
+    AI_MODULE_WORKERS=1 \
+    AI_MODULE_ALLOWED_ORIGINS="" \
+    RESULT_TTL_HOURS=6 \
+    RESULT_CLEANUP_INTERVAL_MIN=30
 
 WORKDIR /app
 

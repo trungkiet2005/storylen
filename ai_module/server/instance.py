@@ -1,5 +1,5 @@
 from asyncio import Event, Lock
-from typing import List
+from typing import List, Optional
 
 from PIL import Image
 from pydantic import BaseModel
@@ -11,6 +11,10 @@ class ExecutorInstance(BaseModel):
     ip: str
     port: int
     busy: bool = False
+    # Observability-only metadata: which logical worker / physical GPU each
+    # instance is pinned to. None when running CPU or single-worker legacy mode.
+    worker_id: Optional[int] = None
+    gpu_index: Optional[int] = None
 
     def _get_headers(self) -> dict:
         """Get headers with nonce for internal communication"""
@@ -54,6 +58,17 @@ class Executors:
 
     def free_executors(self) -> int:
         return len([item for item in self.list if not item.busy])
+
+    def list_status(self) -> list[dict]:
+        return [
+            {
+                "worker_id": item.worker_id,
+                "gpu_index": item.gpu_index,
+                "port": item.port,
+                "busy": item.busy,
+            }
+            for item in self.list
+        ]
 
     async def _find_instance(self):
         while True:

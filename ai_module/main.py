@@ -40,8 +40,12 @@ def run() -> None:
     try:
         uvicorn.run(app, host=args.host, port=args.port)
     finally:
-        if proc:
-            proc.terminate()
+        procs = proc if isinstance(proc, list) else ([proc] if proc else [])
+        for p in procs:
+            try:
+                p.terminate()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

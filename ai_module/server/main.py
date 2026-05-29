@@ -1,13 +1,16 @@
 import io
+import logging
 import os
 import secrets
 import shutil
 import signal
 import subprocess
 import sys
+import time
 import base64
 from argparse import Namespace
 import asyncio
+from contextlib import asynccontextmanager
 from typing import Any
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -30,19 +33,106 @@ from pydantic import BaseModel
 
 from server.to_json import to_translation, TranslationResponse
 
-app = FastAPI()
+logger = logging.getLogger("ai_module.server")
+if not logger.handlers:
+    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
+
 nonce = None
 
 BASE_DIR = Path(__file__).resolve().parent
 RESULT_ROOT = (BASE_DIR.parent / "result").resolve()
 RESULT_ROOT.mkdir(parents=True, exist_ok=True)
 
+# ─── Production config (envs) ────────────────────────────────────────────────
+# AI_MODULE_ALLOWED_ORIGINS: comma-separated list of origins for CORS.
+#   Empty list = no browser may call this service (server-to-server only).
+# RESULT_TTL_HOURS: result/ folders older than this are auto-purged. 0 disables.
+# RESULT_CLEANUP_INTERVAL_MIN: how often the purger runs.
+_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("AI_MODULE_ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
+try:
+    _RESULT_TTL_HOURS = float(os.environ.get("RESULT_TTL_HOURS", "6"))
+except ValueError:
+    _RESULT_TTL_HOURS = 6.0
+try:
+    _RESULT_CLEANUP_INTERVAL_MIN = float(
+        os.environ.get("RESULT_CLEANUP_INTERVAL_MIN", "30")
+    )
+except ValueError:
+    _RESULT_CLEANUP_INTERVAL_MIN = 30.0
+
+
+async def _purge_old_results_once() -> int:
+    """Walk RESULT_ROOT and delete folders whose mtime is older than TTL.
+    Returns the number of folders removed. Best-effort; logs and continues on error."""
+    if _RESULT_TTL_HOURS <= 0:
+        return 0
+    cutoff = time.time() - _RESULT_TTL_HOURS * 3600.0
+    removed = 0
+    try:
+        entries = list(RESULT_ROOT.iterdir())
+    except FileNotFoundError:
+        return 0
+    for entry in entries:
+        try:
+            if not entry.is_dir():
+                continue
+            if entry.stat().st_mtime >= cutoff:
+                continue
+            shutil.rmtree(entry, ignore_errors=True)
+            removed += 1
+        except OSError as exc:
+            logger.warning("cleanup: could not remove %s: %s", entry, exc)
+    return removed
+
+
+async def _result_cleanup_loop() -> None:
+    interval = max(60.0, _RESULT_CLEANUP_INTERVAL_MIN * 60.0)
+    logger.info(
+        "result cleanup loop active: ttl=%.2fh interval=%.1fmin",
+        _RESULT_TTL_HOURS,
+        interval / 60.0,
+    )
+    while True:
+        try:
+            removed = await _purge_old_results_once()
+            if removed:
+                logger.info("result cleanup removed %d stale folders", removed)
+        except Exception as exc:  # never let the loop die
+            logger.warning("result cleanup error: %s", exc)
+        await asyncio.sleep(interval)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    if not _ALLOWED_ORIGINS:
+        logger.info("AI_MODULE_ALLOWED_ORIGINS is empty — browsers cannot call this service (server-to-server only).")
+    cleanup_task = None
+    if _RESULT_TTL_HOURS > 0:
+        cleanup_task = asyncio.create_task(_result_cleanup_loop())
+    try:
+        yield
+    finally:
+        if cleanup_task is not None:
+            cleanup_task.cancel()
+            try:
+                await cleanup_task
+            except (asyncio.CancelledError, Exception):
+                pass
+
+
+app = FastAPI(lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=bool(_ALLOWED_ORIGINS),
+    allow_methods=["GET", "POST", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "X-Nonce"],
 )
 
 # 添加result文件夹静态文件服务
@@ -251,6 +341,9 @@ async def health():
         "status": "ok",
         "queue_size": len(task_queue.queue),
         "result_root": str(RESULT_ROOT),
+        "workers": executor_instances.list_status(),
+        "allowed_origins": _ALLOWED_ORIGINS,
+        "result_ttl_hours": _RESULT_TTL_HOURS,
     }
 
 
@@ -332,7 +425,67 @@ async def manual():
 def generate_nonce():
     return secrets.token_hex(16)
 
-def start_translator_client_proc(host: str, port: int, nonce: str, params: Namespace):
+def _resolve_worker_count(params: Namespace) -> int:
+    """Decide how many shared workers to spawn.
+
+    Rules:
+    - CPU mode (no --use-gpu / --use-gpu-limited) → always 1. There is no GPU
+      index to pin against; running multiple workers on CPU just thrashes RAM.
+    - GPU mode: explicit --workers wins, else AI_MODULE_WORKERS env, else
+      torch.cuda.device_count(). Clamped to ≥1, capped at the visible GPU
+      count so we never try to pin to cuda:2 when only 2 GPUs exist.
+    """
+    use_gpu = bool(getattr(params, 'use_gpu', False) or getattr(params, 'use_gpu_limited', False))
+    if not use_gpu:
+        return 1
+    requested = int(getattr(params, 'workers', 0) or 0)
+    if requested <= 0:
+        try:
+            import torch
+            requested = max(1, torch.cuda.device_count())
+        except Exception:
+            requested = 1
+    # Cap at physical GPU count so we never over-pin.
+    try:
+        import torch
+        gpu_count = max(1, torch.cuda.device_count())
+        requested = min(requested, gpu_count)
+    except Exception:
+        pass
+    return max(1, requested)
+
+
+def _shared_log_path(parent: str, worker_id: int, total_workers: int) -> str:
+    """Per-worker log path. If SHARED_LOG_DIR env is set, use that as parent.
+    Falls back to <result>/shared_w{n}.log. The legacy SHARED_LOG_FILE env is
+    honored only when running a single worker — for multi-worker we MUST
+    separate files to avoid interleaved log corruption."""
+    if total_workers == 1:
+        legacy = os.environ.get('SHARED_LOG_FILE')
+        if legacy:
+            os.makedirs(os.path.dirname(legacy) or '.', exist_ok=True)
+            return legacy
+    base_dir = os.environ.get('SHARED_LOG_DIR') or os.path.join(parent, 'result')
+    os.makedirs(base_dir, exist_ok=True)
+    return os.path.join(base_dir, f'shared_w{worker_id}.log')
+
+
+def start_translator_client_proc(
+    host: str,
+    port: int,
+    nonce: str,
+    params: Namespace,
+    *,
+    worker_id: int = 0,
+    gpu_index: int | None = None,
+    total_workers: int = 1,
+) -> subprocess.Popen:
+    """Spawn ONE `manga_translator shared` subprocess and register it.
+
+    For multi-GPU: caller passes a unique `gpu_index` per worker; we set
+    CUDA_VISIBLE_DEVICES in the child env so each worker sees its assigned GPU
+    as cuda:0 — no change needed inside manga_translator.py device resolution.
+    """
     # `-u` so the shared subprocess writes line-by-line; without it Python
     # block-buffers when stdout is a pipe and tracebacks get lost when the
     # process exits or is killed (e.g. Kaggle OOM kill).
@@ -362,20 +515,18 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
     base_path = os.path.dirname(os.path.abspath(__file__))
     parent = os.path.dirname(base_path)
 
-    # Redirect grandchild stdout/stderr to a dedicated log file so callers
-    # (Kaggle / Docker / local) can tail tracebacks without grovelling
-    # through the parent's piped log. SHARED_LOG_FILE env override exists
-    # for environments where /tmp is volatile.
-    shared_log_path = os.environ.get(
-        'SHARED_LOG_FILE',
-        os.path.join(parent, 'result', 'shared.log'),
-    )
-    os.makedirs(os.path.dirname(shared_log_path), exist_ok=True)
+    shared_log_path = _shared_log_path(parent, worker_id, total_workers)
     shared_log_fh = open(shared_log_path, 'a', buffering=1, encoding='utf-8')
-    shared_log_fh.write(f'\n===== shared subprocess started =====\n')
+    shared_log_fh.write(
+        f'\n===== shared subprocess started (worker {worker_id}, gpu={gpu_index}) =====\n'
+    )
     shared_log_fh.flush()
 
     child_env = {**os.environ, 'PYTHONUNBUFFERED': '1'}
+    if gpu_index is not None:
+        # Pin this worker to one physical GPU. Inside the child, that GPU
+        # appears as cuda:0 — no other code change required.
+        child_env['CUDA_VISIBLE_DEVICES'] = str(gpu_index)
     proc = subprocess.Popen(
         cmds,
         cwd=parent,
@@ -383,21 +534,95 @@ def start_translator_client_proc(host: str, port: int, nonce: str, params: Names
         stderr=subprocess.STDOUT,
         env=child_env,
     )
-    print(f'[shared-proc] pid={proc.pid} log={shared_log_path}', flush=True)
-    executor_instances.register(ExecutorInstance(ip=host, port=port))
-
-    def handle_exit_signals(signal, frame):
-        proc.terminate()
-        try:
-            shared_log_fh.close()
-        except Exception:
-            pass
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, handle_exit_signals)
-    signal.signal(signal.SIGTERM, handle_exit_signals)
-
+    print(
+        f'[shared-proc] worker={worker_id} gpu={gpu_index} pid={proc.pid} log={shared_log_path}',
+        flush=True,
+    )
+    executor_instances.register(
+        ExecutorInstance(ip=host, port=port, worker_id=worker_id, gpu_index=gpu_index)
+    )
     return proc
+
+
+_spawned_procs: list[subprocess.Popen] = []
+# (worker_id, gpu_index, port) tuples so the supervisor can respawn with the
+# same identity (same GPU pin, same port to re-register on).
+_worker_specs: list[tuple[int, int | None, int]] = []
+_restart_history: dict[int, list[float]] = {}  # worker_id → [unix_ts of recent restarts]
+_supervisor_started = False
+
+
+def _supervise_workers(args: Namespace) -> None:
+    """Background thread: respawn any shared subprocess that died.
+
+    Rate-limited to 3 restarts per worker per 5 min so a chronically broken
+    worker (e.g. weight file missing) does not pin the GPU in an infinite
+    spawn loop.
+    """
+    import time as _time
+
+    RESTART_WINDOW_SEC = 300.0
+    MAX_RESTARTS = 3
+    POLL_SEC = 10.0
+
+    while True:
+        _time.sleep(POLL_SEC)
+        for idx, proc in list(enumerate(_spawned_procs)):
+            if proc.poll() is None:
+                continue
+            # Worker died.
+            worker_id, gpu_index, child_port = _worker_specs[idx]
+            now = _time.time()
+            history = _restart_history.setdefault(worker_id, [])
+            history[:] = [t for t in history if now - t < RESTART_WINDOW_SEC]
+            if len(history) >= MAX_RESTARTS:
+                print(
+                    f'[supervisor] worker {worker_id} (gpu={gpu_index}) died '
+                    f'(rc={proc.returncode}) but already restarted '
+                    f'{len(history)}× in last {RESTART_WINDOW_SEC:.0f}s — giving up',
+                    flush=True,
+                )
+                continue
+            history.append(now)
+            print(
+                f'[supervisor] worker {worker_id} (gpu={gpu_index}) died '
+                f'(rc={proc.returncode}) — respawning (attempt {len(history)}/{MAX_RESTARTS})',
+                flush=True,
+            )
+            # Remove the dead instance from the registry so the queue does not
+            # dispatch to it during the gap, then spawn fresh.
+            executor_instances.list = [
+                inst for inst in executor_instances.list
+                if not (inst.worker_id == worker_id and inst.port == child_port)
+            ]
+            new_proc = start_translator_client_proc(
+                args.host,
+                child_port,
+                nonce,
+                args,
+                worker_id=worker_id,
+                gpu_index=gpu_index,
+                total_workers=len(_worker_specs),
+            )
+            _spawned_procs[idx] = new_proc
+
+
+def _maybe_start_supervisor(args: Namespace) -> None:
+    global _supervisor_started
+    if _supervisor_started:
+        return
+    if not _spawned_procs:
+        return
+    import threading as _threading
+    t = _threading.Thread(
+        target=_supervise_workers,
+        args=(args,),
+        name='shared-worker-supervisor',
+        daemon=True,
+    )
+    t.start()
+    _supervisor_started = True
+
 
 def prepare(args):
     global nonce
@@ -407,7 +632,40 @@ def prepare(args):
         nonce = args.nonce
     set_nonce(nonce)  # Export for internal communication
     if args.start_instance:
-        return start_translator_client_proc(args.host, args.port + 1, nonce, args)
+        worker_count = _resolve_worker_count(args)
+        use_gpu = bool(getattr(args, 'use_gpu', False) or getattr(args, 'use_gpu_limited', False))
+        procs: list[subprocess.Popen] = []
+        for i in range(worker_count):
+            child_port = args.port + 1 + i
+            gpu_index = i if use_gpu else None
+            proc = start_translator_client_proc(
+                args.host,
+                child_port,
+                nonce,
+                args,
+                worker_id=i,
+                gpu_index=gpu_index,
+                total_workers=worker_count,
+            )
+            procs.append(proc)
+            _worker_specs.append((i, gpu_index, child_port))
+        _spawned_procs.extend(procs)
+        _maybe_start_supervisor(args)
+
+        def handle_exit_signals(signal_num, frame):
+            for p in procs:
+                try:
+                    p.terminate()
+                except Exception:
+                    pass
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, handle_exit_signals)
+        signal.signal(signal.SIGTERM, handle_exit_signals)
+        # Backward-compat: callers (main.py, run_kaggle.py) expected a single
+        # Popen. Return the first proc when only one was spawned; otherwise
+        # return the list and let new callers consume it.
+        return procs[0] if len(procs) == 1 else procs
     folder_name= "upload-cache"
     if os.path.exists(folder_name):
         shutil.rmtree(folder_name)
@@ -553,9 +811,7 @@ async def delete_result(folder_name: str):
     except Exception as e:
         raise HTTPException(500, detail=f"Error deleting result: {str(e)}")
 
-#todo: restart if crash
 #todo: cache results
-#todo: cleanup cache
 
 if __name__ == '__main__':
     import uvicorn
@@ -568,5 +824,9 @@ if __name__ == '__main__':
     try:
         uvicorn.run(app, host=args.host, port=args.port)
     except Exception:
-        if proc:
-            proc.terminate()
+        procs = proc if isinstance(proc, list) else ([proc] if proc else [])
+        for p in procs:
+            try:
+                p.terminate()
+            except Exception:
+                pass

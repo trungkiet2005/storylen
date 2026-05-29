@@ -22,8 +22,13 @@ settings = get_settings()
 
 _HTTP_TIMEOUT = httpx.Timeout(connect=15.0, read=600.0, write=30.0, pool=5.0)
 _OPTIONS_TIMEOUT = httpx.Timeout(connect=2.0, read=4.0, write=2.0, pool=2.0)
-_MAX_RETRIES = 2
-_RETRY_DELAY_SEC = 3.0
+_MAX_RETRIES = 3
+_RETRY_DELAY_SEC = 5.0
+
+# HF Spaces sit behind Cloudflare which terminates idle connections at ~100s
+# (524) and emits 520/521/522/523/525/526/527 on other gateway failures. After
+# the worker warms up, a retry almost always succeeds.
+_RETRYABLE_STATUS = {502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527}
 
 # ─── Simple circuit breaker ───────────────────────────────────────────────────
 # After _CB_THRESHOLD consecutive terminal failures the breaker opens and fast-
@@ -147,6 +152,13 @@ def _render_tuning() -> dict[str, Any]:
     }
 
 
+def _inpainter_tuning() -> dict[str, Any]:
+    return {
+        "inpainting_size": int(settings.AI_MODULE_INPAINTING_SIZE),
+        "inpainting_precision": str(settings.AI_MODULE_INPAINTING_PRECISION),
+    }
+
+
 def _fallback_options() -> dict[str, Any]:
     return {
         "current": _current_config(),
@@ -194,6 +206,7 @@ def _translation_config(config_override: dict[str, Any] | None = None) -> dict[s
 
     detector_cfg: dict[str, Any] = {"detector": current["detector"], **_detector_tuning()}
     render_cfg: dict[str, Any] = {"renderer": current["renderer"], **_render_tuning()}
+    inpainter_cfg: dict[str, Any] = {"inpainter": current["inpainter"], **_inpainter_tuning()}
 
     return {
         "translator": {
@@ -203,7 +216,7 @@ def _translation_config(config_override: dict[str, Any] | None = None) -> dict[s
         },
         "detector": detector_cfg,
         "ocr": {"ocr": current["ocr"]},
-        "inpainter": {"inpainter": current["inpainter"]},
+        "inpainter": inpainter_cfg,
         "render": render_cfg,
     }
 
@@ -296,12 +309,14 @@ def call_translate(
                     "rendered_image_bytes": image_resp.content,
                 }
 
-            if resp.status_code in (502, 503, 504):
+            if resp.status_code in _RETRYABLE_STATUS:
                 last_exc = RuntimeError(f"ai_module returned HTTP {resp.status_code}")
                 logger.warning(
-                    "ai_module returned %d for page %s, retrying in %.0fs",
+                    "ai_module returned %d for page %s (attempt %d/%d), retrying in %.0fs",
                     resp.status_code,
                     page_id,
+                    attempt,
+                    _MAX_RETRIES,
                     _RETRY_DELAY_SEC,
                 )
             else:

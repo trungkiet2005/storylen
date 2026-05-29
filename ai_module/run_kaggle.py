@@ -55,13 +55,14 @@ PORT = int(os.environ.get("AI_MODULE_PORT", "8001"))
 # file that appears so the worker's tracebacks (which never reach uvicorn's
 # stdout) are surfaced in the Kaggle cell output.
 WORKER_LOG_DIR = SERVICE_DIR / "result"
-# Dedicated stdout/stderr capture for the shared subprocess (the grandchild
-# that actually loads YOLO/manga-ocr/lama). Exported to the env so
-# ai_module/server/main.py:start_translator_client_proc redirects there.
-SHARED_LOG_FILE = Path(
-    os.environ.get("SHARED_LOG_FILE", str(WORKER_LOG_DIR / "shared.log"))
+# Dual-worker mode writes per-worker logs as shared_w0.log / shared_w1.log
+# under SHARED_LOG_DIR. server/main.py:_shared_log_path derives them when
+# total_workers > 1; for backward compat with single-worker mode we still
+# honor SHARED_LOG_FILE if explicitly set.
+SHARED_LOG_DIR = Path(
+    os.environ.get("SHARED_LOG_DIR", str(WORKER_LOG_DIR))
 )
-os.environ["SHARED_LOG_FILE"] = str(SHARED_LOG_FILE)
+os.environ["SHARED_LOG_DIR"] = str(SHARED_LOG_DIR)
 
 # manga_ocr/weights/ on Kaggle is a symlink into /kaggle/input/... (read-only),
 # so any in-place fixup (e.g. writing preprocessor_config.json for older
@@ -209,8 +210,12 @@ def _tail_worker_logs(stop_event: threading.Event) -> None:
 
     def _watched_files():
         yield from WORKER_LOG_DIR.glob("log_*.txt")
-        if SHARED_LOG_FILE.exists():
-            yield SHARED_LOG_FILE
+        # Per-worker logs: shared_w0.log, shared_w1.log, ...
+        yield from SHARED_LOG_DIR.glob("shared_w*.log")
+        # Legacy single-file path (kept so manual SHARED_LOG_FILE overrides still work).
+        legacy = Path(os.environ.get("SHARED_LOG_FILE", ""))
+        if legacy and legacy.exists():
+            yield legacy
 
     while not stop_event.is_set():
         try:
@@ -260,9 +265,39 @@ def _tee_to_stdout_and_file(pipe, log_fh) -> None:
     pipe.close()
 
 
+def _detect_gpu_count() -> int:
+    """Probe nvidia-smi quickly without importing torch in the launcher.
+
+    Importing torch here would force-load CUDA libraries before deps are
+    installed. nvidia-smi is always present on Kaggle GPU runtimes; on
+    non-GPU runtimes the command fails and we return 0.
+    """
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if out.returncode == 0:
+            return len([ln for ln in out.stdout.splitlines() if ln.strip()])
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return 0
+
+
 def start_server() -> subprocess.Popen:
     LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     log_fh = open(LOG_FILE, "w", buffering=1, encoding="utf-8")
+
+    # Auto-set AI_MODULE_WORKERS from GPU count if not already in env.
+    # On Kaggle T4×2 this resolves to 2; single-GPU runtime → 1.
+    if not os.environ.get("AI_MODULE_WORKERS"):
+        gpu_count = _detect_gpu_count()
+        if gpu_count >= 1:
+            os.environ["AI_MODULE_WORKERS"] = str(gpu_count)
+            print(f"[server] detected {gpu_count} GPU(s), AI_MODULE_WORKERS={gpu_count}")
+        else:
+            print("[server] no GPU detected via nvidia-smi; AI_MODULE_WORKERS=1")
+            os.environ["AI_MODULE_WORKERS"] = "1"
 
     cmd = [
         sys.executable,
@@ -426,8 +461,15 @@ def _dump_latest_worker_log(tail_lines: int = 80) -> None:
     candidates = []
     if files:
         candidates.append(("worker", files[-1]))
-    if SHARED_LOG_FILE.exists():
-        candidates.append(("shared", SHARED_LOG_FILE))
+    # Per-worker shared logs (one per GPU).
+    try:
+        for sh in sorted(SHARED_LOG_DIR.glob("shared_w*.log")):
+            candidates.append((f"shared-{sh.stem}", sh))
+    except FileNotFoundError:
+        pass
+    legacy = Path(os.environ.get("SHARED_LOG_FILE", ""))
+    if legacy and legacy.exists():
+        candidates.append(("shared-legacy", legacy))
     if not candidates:
         return
     for label, path in candidates:
@@ -463,10 +505,11 @@ def main() -> int:
         open_tunnel()
 
         print("\n[run] server alive — Ctrl+C or stop the cell to terminate")
-        print(f"[run] launcher log: tail -f {LOG_FILE}")
-        print(f"[run] worker logs: ls {WORKER_LOG_DIR}")
-        print(f"[run] shared log : tail -f {SHARED_LOG_FILE}")
-        print(f"[run] mocr cache : {MOCR_CACHE_DIR}")
+        print(f"[run] launcher log : tail -f {LOG_FILE}")
+        print(f"[run] worker logs  : ls {WORKER_LOG_DIR}")
+        print(f"[run] shared logs  : ls {SHARED_LOG_DIR}/shared_w*.log")
+        print(f"[run] mocr cache   : {MOCR_CACHE_DIR}")
+        print(f"[run] AI_MODULE_WORKERS={os.environ.get('AI_MODULE_WORKERS', '?')}")
         # Block the foreground so the Kaggle cell stays alive and the tunnel
         # keeps serving. Exits when the uvicorn child dies.
         proc.wait()

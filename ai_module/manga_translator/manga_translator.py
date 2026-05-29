@@ -1458,8 +1458,6 @@ class MangaTranslator:
                         logger.warning(f'High memory usage during pre-processing: {memory_percent:.1f}%')
                         import gc
                         gc.collect()
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
                 except ImportError:
                     pass  # psutil 不可用时忽略
                 except Exception as e:
@@ -1495,9 +1493,7 @@ class MangaTranslator:
                     # 强制清理
                     import gc
                     gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-                    
+
                     # 重新设置图片上下文
                     self._set_image_context(recovery_config, image)
                     # 保存fallback图片上下文
@@ -1568,9 +1564,7 @@ class MangaTranslator:
                     # 每页翻译后都清理内存
                     import gc
                     gc.collect()
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-                        
+
                 except Exception as individual_error:
                     logger.error(f'Individual page translation failed: {individual_error}')
                     translated_contexts.append((ctx, config))
@@ -1964,9 +1958,7 @@ class MangaTranslator:
             # 强制垃圾回收以释放内存
             import gc
             gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                
+
         return results
 
     async def _concurrent_translate_contexts(self, contexts_with_configs: List[tuple]) -> List[tuple]:
