@@ -36,7 +36,7 @@ def fg_bg_compare(fg, bg):
 
 def count_text_length(text: str) -> float:
     """Calculate text length, treating っッぁぃぅぇぉ as 0.5 characters"""
-    half_width_chars = 'っッぁぃぅぇぉ'  
+    half_width_chars = 'っッぁぃぅぇぉ'
     length = 0.0
     for char in text.strip():
         if char in half_width_chars:
@@ -44,6 +44,97 @@ def count_text_length(text: str) -> float:
         else:
             length += 1.0
     return length
+
+
+def _bbox_wh_from_polygon(dst_points: np.ndarray) -> tuple[int, int]:
+    """
+    Derive (width, height) of the (possibly rotated) quadrilateral dst_points.
+    Width  = average of edges 0–1 and 2–3 (the "horizontal" sides).
+    Height = average of edges 1–2 and 3–0 (the "vertical" sides).
+    """
+    pts = np.asarray(dst_points, dtype=np.float32).reshape(4, 2)
+    e = [float(np.linalg.norm(pts[(i + 1) % 4] - pts[i])) for i in range(4)]
+    w = max(1, int(round((e[0] + e[2]) * 0.5)))
+    h = max(1, int(round((e[1] + e[3]) * 0.5)))
+    return w, h
+
+
+def _fit_font_size_to_dims(
+    region,
+    max_w: int,
+    max_h: int,
+    max_font_size: int,
+    min_font_size: int,
+    line_spacing_ratio: float = 0.01,
+) -> int:
+    """
+    Binary-search the largest font size in [min_font_size, max_font_size]
+    such that the wrapped *translation* (region.translation) fits inside
+    a rectangle of (max_w, max_h). Falls back to min_font_size if even that
+    doesn't fit (text overflow is preferable to invisibly tiny text).
+
+    This is the source-of-truth fit logic: it uses the exact same
+    `calc_horizontal` / `calc_vertical` functions that `put_text_horizontal`
+    / `put_text_vertical` call internally, and evaluates against the
+    *Vietnamese* translation — not the original CN/JA source. That is what
+    makes it robust to "translation is much longer than source" cases.
+    """
+    translation = (region.translation or "").strip()
+    if not translation or max_font_size <= min_font_size:
+        return max(1, min_font_size)
+
+    lang = getattr(region, "target_lang", "en_US")
+
+    def fits(fs: int) -> bool:
+        if fs <= 0:
+            return False
+        if region.horizontal:
+            lines, widths = text_render.calc_horizontal(
+                fs, translation, max_width=max_w, max_height=max_h, language=lang
+            )
+            if not lines:
+                return True
+            n = len(lines)
+            spacing_y = max(1, int(fs * line_spacing_ratio))
+            text_w = max(widths) if widths else 0
+            text_h = n * fs + spacing_y * max(0, n - 1)
+            return text_w <= max_w and text_h <= max_h
+        # vertical
+        cols, _ = text_render.calc_vertical(fs, translation, max_height=max_h)
+        if not cols:
+            return True
+        n = len(cols)
+        text_w = n * fs + max(1, int(fs * line_spacing_ratio)) * max(0, n - 1)
+        return text_w <= max_w
+
+    lo, hi = max(1, min_font_size), int(max_font_size)
+    best = lo
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        try:
+            ok = fits(mid)
+        except Exception:
+            ok = False
+        if ok:
+            best = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return best
+
+
+def _fit_font_size_to_bbox(
+    region,
+    dst_points: np.ndarray,
+    max_font_size: int,
+    min_font_size: int,
+    line_spacing_ratio: float = 0.01,
+) -> int:
+    """Polygon-based wrapper around `_fit_font_size_to_dims`."""
+    max_w, max_h = _bbox_wh_from_polygon(dst_points)
+    return _fit_font_size_to_dims(
+        region, max_w, max_h, max_font_size, min_font_size, line_spacing_ratio
+    )
 
 def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock'], font_size_fixed: int, font_size_offset: int, font_size_minimum: int):  
     """
@@ -230,8 +321,20 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             else:
                 dst_points = region.min_rect
 
+        # Shrink-to-fit: derive the true max font size that keeps the wrapped
+        # translation inside the *final* dst_points bbox. Without this, JA/CN→VI
+        # text (≈2–3× longer than source) overflows the bubble.
+        if dst_points is not None:
+            fitted_font_size = _fit_font_size_to_bbox(
+                region,
+                dst_points,
+                max_font_size=int(target_font_size),
+                min_font_size=int(font_size_minimum),
+            )
+            target_font_size = fitted_font_size
+
         # Store results and update font size
-        dst_points_list.append(dst_points)  
+        dst_points_list.append(dst_points)
         region.font_size = int(target_font_size)
 
     return dst_points_list
@@ -298,12 +401,29 @@ def render(
 
     #print(f"Region text: {region.text}, forced_direction: {forced_direction}, render_horizontally: {render_horizontally}")
 
+    # Draw-time fit: the *Vietnamese* translation is typically 2–3× longer than
+    # the original CN/JA. The pre-computed `region.font_size` may still be too
+    # big for the actual draw bbox, so binary-search down here using the exact
+    # (max_w, max_h) that put_text_horizontal/_vertical is about to receive.
+    draw_w = round(norm_h[0])
+    draw_h = round(norm_v[0])
+    img_h, img_w = img.shape[:2]
+    min_fs = max(8, round((img_h + img_w) / 400))
+    region.font_size = _fit_font_size_to_dims(
+        region,
+        max_w=draw_w,
+        max_h=draw_h,
+        max_font_size=int(region.font_size),
+        min_font_size=min_fs,
+        line_spacing_ratio=float(line_spacing) if line_spacing else 0.01,
+    )
+
     if render_horizontally:
         temp_box = text_render.put_text_horizontal(
             region.font_size,
             region.get_translation_for_rendering(),
-            round(norm_h[0]),
-            round(norm_v[0]),
+            draw_w,
+            draw_h,
             region.alignment,
             region.direction == 'hl',
             fg,
