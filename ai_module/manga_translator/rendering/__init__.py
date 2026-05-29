@@ -167,10 +167,14 @@ def resize_regions_to_font_size(img: np.ndarray, text_regions: List['TextBlock']
             char_count_trans = count_text_length(region.translation.strip())     
             length_ratio = 1.0
 
-            if char_count_orig > 0 and char_count_trans > char_count_orig:  
+            if char_count_orig > 0 and char_count_trans > char_count_orig:
                 increase_percentage = (char_count_trans - char_count_orig) / char_count_orig
                 font_increase_ratio = 1 + (increase_percentage * 0.3)
-                font_increase_ratio = min(1.5, max(1.0, font_increase_ratio))
+                # Cap at 1.1 (was 1.5). Upstream assumed CN/JA → EN where translation
+                # is roughly same length; for JA/CN → VI the translation is ~3× longer
+                # so a 1.5× font boost on top of YOLO/DBNet bbox = overflow out of
+                # bubble. 1.1 still lets a small upscale for slightly-longer pairs.
+                font_increase_ratio = min(1.1, max(1.0, font_increase_ratio))
                 # logger.debug(f"Translation is {increase_percentage:.2%} longer, font increase ratio: {font_increase_ratio:.2f}")
                 target_font_size = int(target_font_size * font_increase_ratio)
                 # logger.debug(f"Adjusted target font size: {target_font_size}")
