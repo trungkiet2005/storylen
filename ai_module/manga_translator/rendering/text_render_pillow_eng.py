@@ -147,8 +147,48 @@ def render_textblock_list_eng(
         ballon_mask, xyxy = extract_ballon_region(original_img, region.xywh, enlarge_ratio=getattr(region, 'enlarge_ratio', 1))
         if isinstance(xyxy, tuple):
             xyxy = list(xyxy)
-        font = ImageFont.truetype(font_path, font_size)
-        words = merge_seg_eng(region.translation, font, region.xywh[2])
+
+        # JA/CN → VI containment: binary-search the largest font size whose
+        # wrapped translation body fits strictly inside the YOLO bbox dimensions.
+        # `merge_seg_eng` is called with size_ratio=1.0 (no 20% overflow allowance).
+        # The original downscale_constraint=0.95 path only allowed ~5% shrink,
+        # which is far less than the 2–3× length expansion of VI vs JA, so VI text
+        # spilled out of the bubble. Binary search lets the font drop all the way
+        # to `min_font_size` to keep the text inside YOLO bbox.
+        yolo_w = max(1, int(region.xywh[2]))
+        yolo_h = max(1, int(region.xywh[3]))
+        min_font_size = max(8, round((img.shape[0] + img.shape[1]) / 200))
+
+        def _measure_fit(fs: int):
+            f = ImageFont.truetype(font_path, fs)
+            wrapped = merge_seg_eng(region.translation, f, yolo_w, size_ratio=1.0)
+            if not wrapped:
+                return 0, 0, f, []
+            _tmp = Image.new('RGBA', (1, 1))
+            _drw = ImageDraw.Draw(_tmp)
+            bb = _drw.multiline_textbbox(
+                (0, 0), '\n'.join(wrapped), font=f,
+                spacing=int(fs * 0.01), align="center",
+            )
+            return bb[2] - bb[0], bb[3] - bb[1], f, wrapped
+
+        _lo, _hi = min_font_size, max(min_font_size, font_size)
+        _fit_fs, _fit_font, _fit_words = min_font_size, None, None
+        while _lo <= _hi:
+            _mid = (_lo + _hi) // 2
+            _tw, _th, _mf, _mw = _measure_fit(_mid)
+            if _mw and _tw <= yolo_w and _th <= yolo_h:
+                _fit_fs, _fit_font, _fit_words = _mid, _mf, _mw
+                _lo = _mid + 1
+            else:
+                _hi = _mid - 1
+        if _fit_font is None:
+            _, _, _fit_font, _fit_words = _measure_fit(min_font_size)
+            _fit_fs = min_font_size
+
+        font_size = _fit_fs
+        font = _fit_font
+        words = _fit_words
         if not words:
             continue
 
@@ -182,24 +222,15 @@ def render_textblock_list_eng(
             ry *= resize_ratio
             ballon_mask = cv2.resize(ballon_mask, None, fx=resize_ratio, fy=resize_ratio)
 
-        # Calculate font size multiplier
-        region_x, region_y, region_w, region_h = cv2.boundingRect(cv2.findNonZero(ballon_mask))
-        if word_lengths:
-            longest_word_idx = max(range(len(word_lengths)), key=lambda i: word_lengths[i])
-            base_length_word = words[longest_word_idx]
-            if base_length_word:
-                lines_needed = len(region.translation) / max(len(base_length_word), 1)
-                lines_available = max(1, abs(xyxy[3] - xyxy[1]) // line_height + 1)
-                font_size_multiplier = max(min(region_w / (base_length + 2*sw), lines_available / lines_needed), downscale_constraint)
+        # Font size was already fitted to YOLO bbox via binary search above; the
+        # legacy `font_size_multiplier` shrink (capped at downscale_constraint≈0.95)
+        # would only re-shrink by at most 5%, which we no longer need and which
+        # could undershoot the binary-search result. Skip it.
 
-                if font_size_multiplier < 1:
-                    font_size = int(font_size * font_size_multiplier)
-                    font = ImageFont.truetype(font_path, font_size)
-                    words = merge_seg_eng(region.translation, font, region.xywh[2])
-                    sw, line_height, delimiter_len, base_length, word_lengths = calculate_font_values(font, words)
-
-        # Create text layer
-        bbox_center_x, bbox_center_y = (xyxy[0] + xyxy[2]) / 2, (xyxy[1] + xyxy[3]) / 2
+        # Anchor the text at the YOLO bbox center (not the ballon-extractor xyxy),
+        # so the rendered VI text body lands inside the bbox we just fitted it to.
+        bbox_center_x = float(region.xywh[0]) + yolo_w / 2.0
+        bbox_center_y = float(region.xywh[1]) + yolo_h / 2.0
         words_text = '\n'.join(words)
         line_spacing_px = int(font.size * 0.01)
         padding = (font.size + sw) * 4
@@ -230,8 +261,27 @@ def render_textblock_list_eng(
         paste_x = bbox_center_x - rotated_width / 2
         paste_y = bbox_center_y - rotated_height / 2
 
-        paste_x = max(bounds_padding - tx1, min(paste_x, x - bounds_padding - tx2))
-        paste_y = max(bounds_padding - ty1, min(paste_y, y - bounds_padding - ty2))
+        # Clamp paste so the text-body bbox (tx1..tx2, ty1..ty2) stays inside the
+        # YOLO bbox in image space. After the binary-search fit above, text-body
+        # dimensions ≤ YOLO dimensions, so a valid range always exists for axis-
+        # aligned text. For tilted text (region.angle≠0) the rotated layer extents
+        # differ from tx/ty; fall back to image-bounds clamping in that case.
+        yolo_x1 = float(region.xywh[0])
+        yolo_y1 = float(region.xywh[1])
+        yolo_x2 = yolo_x1 + yolo_w
+        yolo_y2 = yolo_y1 + yolo_h
+        if abs(region.angle) <= 3:
+            paste_x_lo = yolo_x1 - tx1
+            paste_x_hi = yolo_x2 - tx2
+            paste_y_lo = yolo_y1 - ty1
+            paste_y_hi = yolo_y2 - ty2
+            if paste_x_lo <= paste_x_hi:
+                paste_x = max(paste_x_lo, min(paste_x, paste_x_hi))
+            if paste_y_lo <= paste_y_hi:
+                paste_y = max(paste_y_lo, min(paste_y, paste_y_hi))
+        else:
+            paste_x = max(bounds_padding - tx1, min(paste_x, x - bounds_padding - tx2))
+            paste_y = max(bounds_padding - ty1, min(paste_y, y - bounds_padding - ty2))
 
         paste_x, paste_y = int(paste_x), int(paste_y)
         bboxes.append([
