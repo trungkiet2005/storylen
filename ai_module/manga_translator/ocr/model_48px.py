@@ -117,11 +117,9 @@ class Model48pxOCR(OfflineOCR):
             if self.use_gpu:
                 image_tensor = image_tensor.to(self.device)
             with torch.no_grad():
-                if self.use_gpu and isinstance(self.device, str) and self.device.startswith('cuda'):
-                    with torch.autocast(device_type='cuda', dtype=torch.float16):
-                        ret = self.model.infer_beam_batch_tensor(image_tensor, widths, beams_k = 5, max_seq_length = 255)
-                else:
-                    ret = self.model.infer_beam_batch_tensor(image_tensor, widths, beams_k = 5, max_seq_length = 255)
+                # FP16 autocast on beam-search softmax saturates probabilities
+                # and degrades character predictions. Keep FP32.
+                ret = self.model.infer_beam_batch_tensor(image_tensor, widths, beams_k = 5, max_seq_length = 255)
             for i, (pred_chars_index, prob, fg_pred, bg_pred, fg_ind_pred, bg_ind_pred) in enumerate(ret):
                 if prob < threshold:
                     continue

@@ -220,13 +220,8 @@ class ModelMangaOCR(OfflineOCR):
                 merged_text_height = q.aabb.h
                 merged_d = 'h'
             merged_region_imgs.append(q.get_transformed_region(image, merged_d, merged_text_height))
-        use_cuda_amp = bool(self.use_gpu) and isinstance(self.device, str) and self.device.startswith('cuda')
         for idx in range(len(merged_region_imgs)):
-            if use_cuda_amp:
-                with torch.autocast(device_type='cuda', dtype=torch.float16):
-                    texts[idx] = self.mocr(Image.fromarray(merged_region_imgs[idx]))
-            else:
-                texts[idx] = self.mocr(Image.fromarray(merged_region_imgs[idx]))
+            texts[idx] = self.mocr(Image.fromarray(merged_region_imgs[idx]))
             
         ix = 0
         out_regions = {}
@@ -253,11 +248,8 @@ class ModelMangaOCR(OfflineOCR):
             if self.use_gpu:
                 image_tensor = image_tensor.to(self.device)
             with torch.no_grad():
-                if use_cuda_amp:
-                    with torch.autocast(device_type='cuda', dtype=torch.float16):
-                        ret = self.model.infer_beam_batch(image_tensor, widths, beams_k = 5, max_seq_length = 255)
-                else:
-                    ret = self.model.infer_beam_batch(image_tensor, widths, beams_k = 5, max_seq_length = 255)
+                # FP16 autocast on beam-search softmax degrades predictions; keep FP32.
+                ret = self.model.infer_beam_batch(image_tensor, widths, beams_k = 5, max_seq_length = 255)
             for i, (pred_chars_index, prob, fg_pred, bg_pred, fg_ind_pred, bg_ind_pred) in enumerate(ret):
                 if prob < 0.2:
                     continue

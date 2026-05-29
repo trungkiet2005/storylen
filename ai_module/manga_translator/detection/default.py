@@ -19,11 +19,12 @@ def det_batch_forward_default(batch: np.ndarray, device: str):
     batch = einops.rearrange(batch.astype(np.float32) / 127.5 - 1.0, 'n h w c -> n c h w')
     batch = torch.from_numpy(batch).to(device)
     with torch.no_grad():
-        if isinstance(device, str) and device.startswith('cuda'):
-            with torch.autocast(device_type='cuda', dtype=torch.float16):
-                db, mask = MODEL(batch)
-        else:
-            db, mask = MODEL(batch)
+        # NOTE: do NOT wrap this forward in torch.autocast(fp16). DBNet's `db`
+        # output is a probability map fed directly into threshold-based blob
+        # extraction; FP16 precision loss near bubble boundaries causes
+        # adjacent bubbles to merge into one giant box and the renderer
+        # dumps all translations on top of each other. Keep FP32.
+        db, mask = MODEL(batch)
         db = db.sigmoid().cpu().numpy()
         mask = mask.cpu().numpy()
     return db, mask
