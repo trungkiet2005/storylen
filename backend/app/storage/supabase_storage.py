@@ -22,7 +22,7 @@ from app.database import get_supabase
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-SIGNED_URL_EXPIRES_SECONDS = 60 * 60
+SIGNED_URL_EXPIRES_SECONDS = 6 * 60 * 60
 
 # Correct MIME type mapping
 _EXT_TO_MIME: dict[str, str] = {
@@ -104,14 +104,23 @@ def _storage_path_from_public_url(bucket: str, url: str | None) -> str | None:
 
 
 def signed_url_from_public_url(bucket: str, public_url: str | None) -> str | None:
-    """Create a signed URL from a stored public URL, falling back to the input."""
+    """Create a signed URL from a stored public URL.
+
+    Returns None when signing fails (or the input URL can't be parsed back to a
+    storage path). The originals/thumbnails buckets are private, so an unsigned
+    "public" URL would 400 in the browser — better to return None and let the
+    frontend render a placeholder + retry.
+    """
     storage_path = _storage_path_from_public_url(bucket, public_url)
     if not storage_path:
-        return public_url
-    return _get_signed_url(bucket, storage_path) or public_url
+        return None
+    return _get_signed_url(bucket, storage_path)
 
 
 def signed_translated_image_url(page_id: str, fallback_url: str | None = None) -> str | None:
+    # fallback_url is kept for callers that may want a deterministic public URL
+    # for non-private bucket setups; currently the bucket is private so callers
+    # should treat None as "render placeholder".
     storage_path = f"{page_id}/translated.png"
     return _get_signed_url(settings.SUPABASE_BUCKET_ORIGINALS, storage_path) or fallback_url
 

@@ -2,8 +2,10 @@ name: Keep Services Alive
 
 on:
   schedule:
-    # Ping every 10 minutes to prevent Render (15min) and HuggingFace from sleeping
-    - cron: '*/10 * * * *'
+    # Ping every 5 minutes. Render free tier sleeps after 15 min of idle and
+    # GitHub Actions cron can lag/skip 5-15 min when runners are busy, so a
+    # 10-minute cadence sometimes lets the backend sleep. 5 min keeps headroom.
+    - cron: '*/5 * * * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:

@@ -64,7 +64,10 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<AuthResult>;
   register: (username: string, email: string, password: string, captchaToken?: string) => Promise<AuthResult>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<User | null>;
+  // Returns the fetched user, null when the session is provably expired (401/403),
+  // or undefined when the backend was unreachable (network/5xx) — caller should
+  // treat undefined as "no change".
+  refreshUser: () => Promise<User | null | undefined>;
   refreshCredits: () => Promise<void>;
   updateProfile: (patch: ProfileUpdate) => Promise<User>;
   uploadAvatar: (file: File) => Promise<User>;
@@ -101,35 +104,77 @@ async function parseAuthResponse(res: Response, fallback: string): Promise<AuthR
   };
 }
 
-async function authFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${BASE_URL}${path}`, {
-    ...init,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  });
+// Render free-tier cold start can take 30-90s. When the request throws
+// TypeError ("Failed to fetch") the server never received it, so retrying is
+// safe even for POST/PATCH. Mirrors the pattern in lib/api.ts.
+const AUTH_RETRY_DELAYS_MS = [8000, 15000];
+
+class AuthNetworkError extends Error {
+  constructor(
+    message = "Không thể kết nối đến máy chủ. Backend có thể đang khởi động (Render cold start ~30-90s) — thử lại sau ít phút.",
+  ) {
+    super(message);
+    this.name = "AuthNetworkError";
+  }
+}
+
+async function authFetch(
+  path: string,
+  init?: RequestInit,
+  _attempt = 0,
+): Promise<Response> {
+  try {
+    return await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...init?.headers,
+      },
+    });
+  } catch {
+    if (_attempt < AUTH_RETRY_DELAYS_MS.length) {
+      await new Promise((r) => setTimeout(r, AUTH_RETRY_DELAYS_MS[_attempt]));
+      return authFetch(path, init, _attempt + 1);
+    }
+    throw new AuthNetworkError();
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // refreshUser distinguishes "session expired" (401/403 → clear user) from
+  // "backend unreachable" (network throw → keep existing user). The latter
+  // prevents a brief Render cold-start window from logging the user out of
+  // the SPA when their cookie is still perfectly valid.
   const refreshUser = useCallback(async () => {
+    let res: Response;
     try {
-      const res = await authFetch("/auth/me", { method: "GET" });
-      if (!res.ok) {
-        setUser(null);
-        return null;
-      }
+      res = await authFetch("/auth/me", { method: "GET" });
+    } catch {
+      // Network error after retries. Don't touch user state; the next
+      // interaction will retry. Return current value via the setter closure
+      // by reading from state would race — caller treats undefined as "no-op".
+      return undefined;
+    }
 
+    if (res.status === 401 || res.status === 403) {
+      setUser(null);
+      return null;
+    }
+    if (!res.ok) {
+      // 5xx or other unexpected — leave user state alone.
+      return undefined;
+    }
+
+    try {
       const data = await parseAuthResponse(res, "Không thể tải phiên đăng nhập");
       setUser(data.user);
       return data.user;
     } catch {
-      setUser(null);
-      return null;
+      return undefined;
     }
   }, []);
 
@@ -137,9 +182,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function hydrate() {
-      const nextUser = await refreshUser();
+      // On first mount we don't know whether the user is logged in. Only flip
+      // isLoading to false after the request resolves (or definitively fails).
+      // A network failure here means "we couldn't ask" — show the logged-out
+      // UI so the user can re-login, but don't actively wipe any state.
+      await refreshUser();
       if (!cancelled) {
-        setUser(nextUser);
         setIsLoading(false);
       }
     }

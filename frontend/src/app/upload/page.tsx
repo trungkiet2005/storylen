@@ -193,7 +193,7 @@ export default function UploadPage() {
 
 function UploadPageInner() {
   const { toast } = useToast();
-  const { isAuthenticated, isLoading: authLoading, refreshUser } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, refreshUser } = useAuth();
   const searchParams = useSearchParams();
   const [state, setState] = useState<UploadState>("idle");
   const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([]);
@@ -492,7 +492,12 @@ function UploadPageInner() {
       return;
     }
 
-    const activeUser = isAuthenticated ? await refreshUser() : null;
+    // refreshUser may return undefined when the backend is temporarily
+    // unreachable (Render cold start). Fall back to the cached user so we
+    // don't block uploads on a transient outage — the backend will reject
+    // the request if the session is truly expired.
+    const refreshed = isAuthenticated ? await refreshUser() : null;
+    const activeUser = refreshed === undefined ? user : refreshed;
     if (!activeUser) {
       toast("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.", "error");
       return;
@@ -585,7 +590,12 @@ function UploadPageInner() {
       return;
     }
 
-    const activeUser = isAuthenticated ? await refreshUser() : null;
+    // refreshUser may return undefined when the backend is temporarily
+    // unreachable (Render cold start). Fall back to the cached user so we
+    // don't block uploads on a transient outage — the backend will reject
+    // the request if the session is truly expired.
+    const refreshed = isAuthenticated ? await refreshUser() : null;
+    const activeUser = refreshed === undefined ? user : refreshed;
     if (!activeUser) {
       const msg = "Phiên đăng nhập không hợp lệ hoặc cookie đăng nhập chưa được trình duyệt gửi. Vui lòng đăng nhập lại.";
       setErrorMsg(msg);

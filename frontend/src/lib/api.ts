@@ -73,7 +73,7 @@ export interface BubbleData {
 
 export interface PageData {
   page_id: string;
-  original_image_url: string;
+  original_image_url: string | null;
   translated_image_url?: string | null;
   thumbnail_url?: string;
   status?: PageStatus["status"];

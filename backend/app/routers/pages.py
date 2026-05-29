@@ -228,11 +228,12 @@ def get_page(page_id: str, user: AuthUser = Depends(get_current_user)):
 
     return PageDataResponse(
         page_id=page_id,
-        original_image_url=signed_original_image_url(page["original_image_url"]) or page["original_image_url"],
-        translated_image_url=signed_translated_image_url(
-            page_id,
-            translated_public_url,
-        ) or translated_public_url,
+        # When signing fails or the input URL can't be reparsed, return None so
+        # the frontend renders a placeholder + auto-retries via getPage onError.
+        # Falling back to the unsigned public URL would 400 in the browser
+        # because the bucket is private.
+        original_image_url=signed_original_image_url(page["original_image_url"]),
+        translated_image_url=signed_translated_image_url(page_id, translated_public_url),
         processed_data=processed_data,
         metadata=PageMetadata(
             batch_id=page.get("batch_id"),

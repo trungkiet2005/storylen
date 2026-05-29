@@ -576,13 +576,15 @@ function StudioContent({ pageId }: { pageId: string }) {
                   boxShadow: "3px 3px 0 var(--border)",
                 }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={page.original_image_url}
-                  alt="Trang gốc"
-                  onLoad={(e) => setImgSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-                  style={{ width: "100%", display: "block" }}
-                />
+                {page.original_image_url && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={page.original_image_url}
+                    alt="Trang gốc"
+                    onLoad={(e) => setImgSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                    style={{ width: "100%", display: "block" }}
+                  />
+                )}
                 <BubbleOverlay
                   bubbles={bubbles}
                   imageW={imgSize.w}

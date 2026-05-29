@@ -94,6 +94,7 @@ export default function ReviewPage({ params }: { params: Promise<{ pageId: strin
             >
               {(() => {
                 const src = showOriginal ? page.original_image_url : (page.translated_image_url || page.original_image_url);
+                if (!src) return null;
                 return (
                   <Image
                     src={src}

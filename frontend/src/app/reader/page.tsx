@@ -707,6 +707,9 @@ function ReaderContent() {
   // Real page data from API
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
+  // Tracks per-page whether we've already retried after an <img> load error.
+  // Prevents an infinite refetch loop if the signed URL stays broken.
+  const imgRetriedRef = useRef<Set<string>>(new Set());
   const [editTexts, setEditTexts] = useState<Record<string, string>>({});
   const [savingBubbleId, setSavingBubbleId] = useState<string | null>(null);
   const [openHistoryBubbleId, setOpenHistoryBubbleId] = useState<string | null>(null);
@@ -850,6 +853,23 @@ function ReaderContent() {
         toast(msg, "error");
       })
       .finally(() => setIsLoadingPage(false));
+  }, [pageIdParam, toast]);
+
+  // Re-fetch page data when an <img> load fails. Most likely cause is an
+  // expired signed URL (TTL is 6h server-side). One retry per page is enough;
+  // imgRetriedRef stops it from looping if the second URL is also bad.
+  const handleImageError = useCallback(() => {
+    if (!pageIdParam || imgRetriedRef.current.has(pageIdParam)) return;
+    imgRetriedRef.current.add(pageIdParam);
+    toast("Đang làm mới ảnh…", "info");
+    getPage(pageIdParam)
+      .then((data) => {
+        setPageData(data);
+        setImgNaturalSize(null);
+      })
+      .catch(() => {
+        // Swallow — placeholder will already be showing.
+      });
   }, [pageIdParam, toast]);
 
   // Reset chat when navigating to a new page
@@ -1366,6 +1386,7 @@ function ReaderContent() {
                                   setImgNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
                                 }
                               }}
+                              onError={handleImageError}
                             />
                           ) : (
                             <MangaPage w={SIDE_W} h={computedSideH} panels="default" showBubbles showOverlay={false}/>
@@ -1375,9 +1396,14 @@ function ReaderContent() {
                       <div>
                         <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 6 }}>BẢN DỊCH</div>
                         <div className="stroke-ink-thick panel-shadow-lg" style={{ background: "#fff", position: "relative", width: SIDE_W, height: computedSideH }}>
-                          {pageData?.original_image_url ? (
+                          {(translatedImageUrl || pageData?.original_image_url) ? (
                             /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={translatedImageUrl || pageData.original_image_url} alt="Ảnh đã dịch" style={{ width: "100%", height: "100%", display: "block" }}/>
+                            <img
+                              src={translatedImageUrl || pageData!.original_image_url!}
+                              alt="Ảnh đã dịch"
+                              style={{ width: "100%", height: "100%", display: "block" }}
+                              onError={handleImageError}
+                            />
                           ) : (
                             <MangaPage w={SIDE_W} h={computedSideH} panels="default" showBubbles showOverlay overlayLang="vn"/>
                           )}
@@ -1405,6 +1431,7 @@ function ReaderContent() {
                             src={mainImageUrl}
                             alt="Trang truyện"
                             style={{ width: "100%", height: "100%", display: "block" }}
+                            onError={handleImageError}
                             onLoad={(e) => {
                               if (!imgNaturalSize) {
                                 setImgNaturalSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight });
