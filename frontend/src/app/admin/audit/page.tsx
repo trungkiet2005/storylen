@@ -54,12 +54,13 @@ export default function AdminAuditPage() {
     }
   }, [offset, action, targetType]);
 
+  // Offset reset happens inside the filter onChange handlers below so React
+  // batches setAction/setTargetType + setOffset into one render → `load`
+  // identity changes once → exactly one fetch. Splitting them into a separate
+  // effect caused a stale-offset fetch + correct-offset fetch race.
   useEffect(() => {
     void load();
   }, [load]);
-  useEffect(() => {
-    setOffset(0);
-  }, [action, targetType]);
 
   const hasPrev = offset > 0;
   const hasNext = offset + PAGE_SIZE < total;
@@ -75,13 +76,13 @@ export default function AdminAuditPage() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 10, marginBottom: 14 }}>
-        <select value={action} onChange={(e) => setAction(e.target.value)} className="stroke-ink" style={{ padding: "9px 10px", fontSize: 12, background: "var(--panel)" }}>
+        <select value={action} onChange={(e) => { setAction(e.target.value); setOffset(0); }} className="stroke-ink" style={{ padding: "9px 10px", fontSize: 12, background: "var(--panel)" }}>
           <option value="">Mọi hành động</option>
           {Object.entries(ACTION_LABELS).map(([key, label]) => (
             <option key={key} value={key}>{label}</option>
           ))}
         </select>
-        <select value={targetType} onChange={(e) => setTargetType(e.target.value)} className="stroke-ink" style={{ padding: "9px 10px", fontSize: 12, background: "var(--panel)" }}>
+        <select value={targetType} onChange={(e) => { setTargetType(e.target.value); setOffset(0); }} className="stroke-ink" style={{ padding: "9px 10px", fontSize: 12, background: "var(--panel)" }}>
           <option value="">Mọi đối tượng</option>
           <option value="user">User</option>
           <option value="page">Page</option>

@@ -921,14 +921,21 @@ function ReaderContent() {
   // Sync bookmark state when page changes
   useEffect(() => {
     if (pageIdParam) setBookmarked(wibu.isBookmarked(pageIdParam));
-  }, [pageIdParam, wibu]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageIdParam]);
 
-  // Mark page read + save progress when page data loads
+  // Mark page read + save progress when page data loads.
+  // `wibu` is intentionally omitted: its reference changes whenever stats
+  // update, and markRead itself calls setStats — including it would cause
+  // an infinite loop that floods POST /v1/wibu/pages/read and crashes the
+  // Render free-tier instance via worker-pool saturation.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!pageData || !pageIdParam) return;
     wibu.markRead(pageIdParam);
     sessionStartRef.current = Date.now();
-  }, [pageData, pageIdParam, wibu]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageData, pageIdParam]);
 
   // Track reading time on unmount or page change
   useEffect(() => {
