@@ -422,6 +422,34 @@ def render_textblock_list_eng(
 
         font_size, sw, line_height, delimiter_len, base_length, word_lengths = calculate_font_values(region.font_size, words)
 
+        # JA/CN → VI containment: binary-search the largest font size whose
+        # word layout fits inside the YOLO bbox dimensions. The legacy
+        # `font_size_multiplier` shrink below is capped at downscale_constraint
+        # (≈0.8 from caller), which only allows ~20% reduction — far less than
+        # VI's 2–3× length expansion vs JA. Floor at 4px: the font keeps
+        # shrinking until the layout fits, no pixel cropping.
+        _yolo_w = max(1, int(region.xywh[2]))
+        _yolo_h = max(1, int(region.xywh[3]))
+        _min_fs = 4
+        _lo, _hi = _min_fs, max(_min_fs, font_size)
+        _fit_fs = _min_fs
+        while _lo <= _hi:
+            _mid = (_lo + _hi) // 2
+            _fs_t, _sw_t, _lh_t, _dl_t, _bl_t, _wls_t = calculate_font_values(_mid, words)
+            if not _wls_t:
+                _hi = _mid - 1
+                continue
+            _total_w = sum(_wls_t) + _dl_t * (len(_wls_t) - 1)
+            _lines = max(1, int(np.ceil(_total_w / float(_yolo_w))))
+            _total_h = _lines * _lh_t
+            _longest = max(_wls_t)
+            if _total_h <= _yolo_h and _longest <= _yolo_w:
+                _fit_fs = _mid
+                _lo = _mid + 1
+            else:
+                _hi = _mid - 1
+        font_size, sw, line_height, delimiter_len, base_length, word_lengths = calculate_font_values(_fit_fs, words)
+
         # non-dl textballon segmentation
         # Extract ballon region
         ballon_mask, xyxy = extract_ballon_region(original_img, region.xywh, enlarge_ratio=region.enlarge_ratio)
@@ -471,13 +499,9 @@ def render_textblock_list_eng(
         base_length_word = words[max(enumerate(word_lengths), key = lambda x: x[1])[0]]
         if len(base_length_word) == 0 :
             continue
-        lines_needed = len(region.translation) / len(base_length_word)
-        lines_available = abs(xyxy[3] - xyxy[1]) // line_height + 1
-        font_size_multiplier = max(min(region_w / (base_length + 2*sw), lines_available / lines_needed), downscale_constraint)
-        # print(region.translation, font_size, font_size_multiplier, int(font_size * font_size_multiplier))
-        if font_size_multiplier < 1:
-            font_size = int(font_size * font_size_multiplier)
-            font_size, sw, line_height, delimiter_len, base_length, word_lengths = calculate_font_values(font_size, words)
+        # Font size was already fitted to YOLO bbox via the binary search above;
+        # the legacy `font_size_multiplier` shrink (capped at downscale_constraint,
+        # ~20% max reduction) is no longer needed and could overshoot. Skipped.
 
         textlines = layout_lines_aligncenter(ballon_mask, words, word_lengths, delimiter_len, line_height, delimiter=delimiter)
 

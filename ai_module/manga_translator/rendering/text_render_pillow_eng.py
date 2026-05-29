@@ -157,7 +157,13 @@ def render_textblock_list_eng(
         # to `min_font_size` to keep the text inside YOLO bbox.
         yolo_w = max(1, int(region.xywh[2]))
         yolo_h = max(1, int(region.xywh[3]))
-        min_font_size = max(8, round((img.shape[0] + img.shape[1]) / 200))
+        # Floor at 4px so the binary search can keep shrinking VI text whenever
+        # it overflows. At this floor, even very long VI translations will fit
+        # inside small bubbles — the text just becomes very small (and may be
+        # hard to read). This is intentional: tiny-but-whole text over text
+        # that spills outside the YOLO bbox. No pixel-level cropping; the font
+        # simply shrinks until the wrapped layout fits.
+        min_font_size = 4
 
         def _measure_fit(fs: int):
             f = ImageFont.truetype(font_path, fs)
