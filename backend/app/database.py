@@ -17,37 +17,59 @@ from app.config import get_settings
 # subsequent request fails with `httpcore.WriteError: [Errno 32] Broken pipe`.
 # Forcing HTTP/1.1 here makes each request open a short-lived connection, so a
 # dropped socket is retried by httpcore instead of poisoning the pool.
-_HTTP1_TARGETS: tuple[tuple[str, str], ...] = (
-    ("postgrest", "session"),
-    ("storage", "session"),
-    ("storage", "_client"),
-    ("auth", "_http_client"),
+#
+# `auth.admin` is constructed with the same http_client reference as `auth`,
+# so it must be rewritten too — otherwise admin endpoints (list_users, etc.)
+# keep a stale reference to the closed client and fail with
+# "Cannot send a request, as the client has been closed."
+_HTTP1_TARGETS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("postgrest",), "session"),
+    (("storage",), "session"),
+    (("storage",), "_client"),
+    (("auth",), "_http_client"),
+    (("auth", "admin"), "_http_client"),
 )
+
+
+def _resolve(client: Client, path: tuple[str, ...]):
+    obj: object | None = client
+    for name in path:
+        obj = getattr(obj, name, None)
+        if obj is None:
+            return None
+    return obj
 
 
 def _force_http1(client: Client) -> None:
     seen: set[int] = set()
-    for sub_name, attr in _HTTP1_TARGETS:
-        sub = getattr(client, sub_name, None)
+    replacements: dict[int, httpx.Client] = {}
+    for path, attr in _HTTP1_TARGETS:
+        sub = _resolve(client, path)
         if sub is None:
             continue
         old = getattr(sub, attr, None)
         if not isinstance(old, httpx.Client):
             continue
-        new = httpx.Client(
-            headers=dict(old.headers),
-            base_url=str(old.base_url),
-            timeout=old.timeout,
-            follow_redirects=old.follow_redirects,
-            http1=True,
-            http2=False,
-        )
-        if id(old) not in seen:
-            seen.add(id(old))
-            try:
-                old.close()
-            except Exception:
-                pass
+        # Reuse the replacement if the same client object is shared across
+        # sub-clients (e.g. auth and auth.admin) — closing it twice or
+        # creating two HTTP/1 pools for one logical connection is wasteful.
+        new = replacements.get(id(old))
+        if new is None:
+            new = httpx.Client(
+                headers=dict(old.headers),
+                base_url=str(old.base_url),
+                timeout=old.timeout,
+                follow_redirects=old.follow_redirects,
+                http1=True,
+                http2=False,
+            )
+            replacements[id(old)] = new
+            if id(old) not in seen:
+                seen.add(id(old))
+                try:
+                    old.close()
+                except Exception:
+                    pass
         setattr(sub, attr, new)
 
 
