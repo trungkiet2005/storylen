@@ -111,7 +111,16 @@ class Settings(BaseSettings):
     AI_MODULE_DETECTOR: str = "manga_yolo"
     AI_MODULE_OCR: str = "mocr"
     AI_MODULE_INPAINTER: str = "lama_large"
-    AI_MODULE_RENDERER: str = "default"
+    AI_MODULE_RENDERER: str = "manga2eng_pillow"
+
+    AI_MODULE_DETECTOR_BOX_THRESHOLD: float = 0.4
+    AI_MODULE_DETECTOR_TEXT_THRESHOLD: float = 0.3
+    AI_MODULE_DETECTOR_UNCLIP_RATIO: float = 2.6
+    AI_MODULE_DETECTION_SIZE: int = 2048
+
+    AI_MODULE_FONT_SIZE_OFFSET: int = 0
+    AI_MODULE_FONT_SIZE_MINIMUM: int = 10
+    AI_MODULE_DISABLE_FONT_BORDER: bool = False
 
     @field_validator(
         "HF_SPACE_TOKEN",

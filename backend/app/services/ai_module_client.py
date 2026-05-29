@@ -130,6 +130,23 @@ def _current_config() -> dict[str, str]:
     }
 
 
+def _detector_tuning() -> dict[str, Any]:
+    return {
+        "box_threshold": float(settings.AI_MODULE_DETECTOR_BOX_THRESHOLD),
+        "text_threshold": float(settings.AI_MODULE_DETECTOR_TEXT_THRESHOLD),
+        "unclip_ratio": float(settings.AI_MODULE_DETECTOR_UNCLIP_RATIO),
+        "detection_size": int(settings.AI_MODULE_DETECTION_SIZE),
+    }
+
+
+def _render_tuning() -> dict[str, Any]:
+    return {
+        "font_size_offset": int(settings.AI_MODULE_FONT_SIZE_OFFSET),
+        "font_size_minimum": int(settings.AI_MODULE_FONT_SIZE_MINIMUM),
+        "disable_font_border": bool(settings.AI_MODULE_DISABLE_FONT_BORDER),
+    }
+
+
 def _fallback_options() -> dict[str, Any]:
     return {
         "current": _current_config(),
@@ -175,16 +192,19 @@ def _translation_config(config_override: dict[str, Any] | None = None) -> dict[s
             if isinstance(value, str) and value.strip():
                 current[key] = value.strip()
 
+    detector_cfg: dict[str, Any] = {"detector": current["detector"], **_detector_tuning()}
+    render_cfg: dict[str, Any] = {"renderer": current["renderer"], **_render_tuning()}
+
     return {
         "translator": {
             "translator": current["translator"],
             "target_lang": current["target_lang"],
             "no_text_lang_skip": True,
         },
-        "detector": {"detector": current["detector"]},
+        "detector": detector_cfg,
         "ocr": {"ocr": current["ocr"]},
         "inpainter": {"inpainter": current["inpainter"]},
-        "render": {"renderer": current["renderer"]},
+        "render": render_cfg,
     }
 
 

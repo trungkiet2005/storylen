@@ -424,7 +424,9 @@ async def dispatch_eng_render_pillow(img_canvas: np.ndarray, original_img: np.nd
         return img_canvas
 
     if not font_path:
-        font_path = os.path.join(BASE_PATH, 'fonts/NotoSansMonoCJK-VF.ttf.ttc')
+        # Arial Unicode covers Vietnamese precomposed diacritics (ặ ẫ ử ợ …);
+        # the original NotoSansMonoCJK-VF fallback misses them.
+        font_path = os.path.join(BASE_PATH, 'fonts/Arial-Unicode-Regular.ttf')
     text_render.set_font(font_path)
 
     return render_textblock_list_eng_pillow(font_path, img_canvas, text_regions, original_img=original_img, downscale_constraint=0.95)
