@@ -13,10 +13,11 @@ services:
     branch: main
     autoDeploy: true
 
-    # Pre-deploy hook applies any pending Supabase migrations BEFORE the new
-    # version starts serving traffic, so the app never sees a schema it doesn't
-    # know about. The script is idempotent (every migration uses IF NOT EXISTS).
-    preDeployCommand: python -m app.scripts.apply_migrations
+    # NOTE: Render free tier does NOT support preDeployCommand. Apply Supabase
+    # migrations manually before pushing schema changes:
+    #   python -m app.scripts.apply_migrations
+    # All migrations are idempotent (IF NOT EXISTS), so re-running is safe.
+    # Upgrade to Starter ($7/mo) to re-enable an automated pre-deploy hook.
 
     envVars:
       # ─── Supabase ──────────────────────────────────────────────────────
