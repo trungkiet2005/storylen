@@ -296,6 +296,15 @@ class DetectorConfig(BaseModel):
     bboxes, while unclip_ratio (default 2.3) is designed for DBNet's thin stroke
     polygons. Using unclip_ratio for YOLO inflates font_size by ~2.3× → oversized
     rendered text. Ignored by all non-YOLO detectors."""
+    yolo_expected_font_px: int = 28
+    """For manga_yolo detector only: estimated character/font size in detection-
+    resolution pixels. Used to sub-divide each YOLO bbox into N≈short_side/this
+    fake textline strips before textline_merge, so Quadrilateral.font_size ≈ real
+    font instead of bubble short-side. Reason: Manga109 `<text>` annotation is
+    per-text-region (whole multi-line block), so YOLO emits one bbox per bubble,
+    not per line — without sub-division font_size scales with line/column count.
+    Tune up if your manga has bigger fonts, down for tighter text. Ignored by
+    non-YOLO detectors."""
 
 class InpainterConfig(BaseModel):
     inpainter: Inpainter = Inpainter.lama_large

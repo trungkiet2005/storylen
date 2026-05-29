@@ -94,7 +94,14 @@ class MangaYoloDetector(OfflineDetector):
         # padding_ratio (set by dispatch()) for a small inpaint headroom instead.
         padding_ratio = float(getattr(self, 'padding_ratio', 0.1))
         margin = max(0.0, padding_ratio)
+        # Manga109 `<text>` is per-block (multi-line per bubble), not per-line, so
+        # each YOLO bbox covers multiple text lines/columns. Quadrilateral.font_size
+        # = box short side → inflates with line/column count. Sub-divide each box
+        # into N≈short/expected_font fake textline strips so font_size ≈ real font;
+        # textline_merge groups them back into one TextBlock with correct font_size.
+        expected_font_px = max(1, int(getattr(self, 'expected_font_px', 28)))
 
+        total_strips = 0
         for (x1, y1, x2, y2), score in zip(xyxy, scores):
             bw = x2 - x1
             bh = y2 - y1
@@ -108,18 +115,58 @@ class MangaYoloDetector(OfflineDetector):
             y1 = int(max(0, np.floor(y1)))
             x2 = int(min(w, np.ceil(x2)))
             y2 = int(min(h, np.ceil(y2)))
-            if x2 - x1 < 2 or y2 - y1 < 2:
+            bw_i = x2 - x1
+            bh_i = y2 - y1
+            if bw_i < 2 or bh_i < 2:
                 continue
-            pts = np.array(
-                [[x1, y1], [x2, y1], [x2, y2], [x1, y2]],
-                dtype=np.int64,
-            )
-            textlines.append(Quadrilateral(pts, '', float(score)))
+
+            # Inpaint mask covers the full bbox (one filled rect per detection).
             cv2.rectangle(raw_mask, (x1, y1), (x2, y2), 255, thickness=-1)
+
+            short = min(bw_i, bh_i)
+            is_vertical = bh_i > bw_i
+            N = max(1, int(round(short / expected_font_px)))
+
+            if N == 1:
+                pts = np.array(
+                    [[x1, y1], [x2, y1], [x2, y2], [x1, y2]],
+                    dtype=np.int64,
+                )
+                textlines.append(Quadrilateral(pts, '', float(score)))
+                total_strips += 1
+                continue
+
+            # Sub-divide along the short side. Vertical block → split width into N
+            # columns; horizontal block → split height into N rows.
+            if is_vertical:
+                edges = np.linspace(x1, x2, N + 1).astype(np.int64)
+                for i in range(N):
+                    sx1, sx2 = int(edges[i]), int(edges[i + 1])
+                    if sx2 - sx1 < 2:
+                        continue
+                    pts = np.array(
+                        [[sx1, y1], [sx2, y1], [sx2, y2], [sx1, y2]],
+                        dtype=np.int64,
+                    )
+                    textlines.append(Quadrilateral(pts, '', float(score)))
+                    total_strips += 1
+            else:
+                edges = np.linspace(y1, y2, N + 1).astype(np.int64)
+                for i in range(N):
+                    sy1, sy2 = int(edges[i]), int(edges[i + 1])
+                    if sy2 - sy1 < 2:
+                        continue
+                    pts = np.array(
+                        [[x1, sy1], [x2, sy1], [x2, sy2], [x1, sy2]],
+                        dtype=np.int64,
+                    )
+                    textlines.append(Quadrilateral(pts, '', float(score)))
+                    total_strips += 1
 
         if verbose:
             self.logger.info(
-                f'manga_yolo: {len(textlines)} text regions @ conf>={box_threshold or 0.25}'
+                f'manga_yolo: {len(xyxy)} bboxes → {total_strips} strips '
+                f'@ conf>={box_threshold or 0.25}, expected_font={expected_font_px}px'
             )
 
         return textlines, raw_mask, None

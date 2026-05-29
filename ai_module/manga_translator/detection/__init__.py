@@ -36,14 +36,15 @@ async def prepare(detector_key: Detector):
 
 async def dispatch(detector_key: Detector, image: np.ndarray, detect_size: int, text_threshold: float, box_threshold: float, unclip_ratio: float,
                    invert: bool, gamma_correct: bool, rotate: bool, auto_rotate: bool = False, device: str = 'cpu', verbose: bool = False,
-                   yolo_padding_ratio: float = 0.1):
+                   yolo_padding_ratio: float = 0.1, yolo_expected_font_px: int = 28):
     detector = get_detector(detector_key)
     if isinstance(detector, OfflineDetector):
         await detector.load(device)
-    # YOLO-specific knob, set via instance attribute so we don't have to thread
-    # an extra kwarg through every detector's _infer signature.
+    # YOLO-specific knobs, set via instance attributes so we don't have to thread
+    # extra kwargs through every detector's _infer signature.
     if isinstance(detector, MangaYoloDetector):
         detector.padding_ratio = float(yolo_padding_ratio)
+        detector.expected_font_px = int(yolo_expected_font_px)
     return await detector.detect(image, detect_size, text_threshold, box_threshold, unclip_ratio, invert, gamma_correct, rotate, auto_rotate, verbose)
 
 async def unload(detector_key: Detector):
