@@ -21,6 +21,8 @@ NRML='\033[0m' # Revert to Normal formatting
 class _GeminiClientPool:
     _RATE_LIMIT_COOLDOWN_SECONDS = 90
     _SERVER_ERROR_COOLDOWN_SECONDS = 15
+    # Quarantine suspended / invalid keys for the rest of the session.
+    _KEY_DISABLED_COOLDOWN_SECONDS = 24 * 60 * 60
 
     def __init__(self, api_keys: List[str], logger):
         self._api_keys = api_keys
@@ -28,6 +30,7 @@ class _GeminiClientPool:
         self._clients = [genai.Client(api_key=api_key) for api_key in api_keys]
         self._current_index = 0
         self._cooldowns = [0.0] * len(api_keys)
+        self._disabled_reported = [False] * len(api_keys)
         self._lock = asyncio.Lock()
 
     @property
@@ -37,6 +40,14 @@ class _GeminiClientPool:
     @property
     def current_key_number(self) -> int:
         return self._current_index + 1
+
+    @staticmethod
+    def _mask_key(key: str) -> str:
+        if not key:
+            return '<empty>'
+        if len(key) <= 8:
+            return key[:2] + '…'
+        return f'{key[:6]}…{key[-4:]}'
 
     def _error_text(self, error: Exception) -> str:
         parts = [
@@ -70,14 +81,40 @@ class _GeminiClientPool:
             'deadline',
         ))
 
+    def is_key_disabled_error(self, error: Exception) -> bool:
+        """403 PERMISSION_DENIED / CONSUMER_SUSPENDED / API_KEY_INVALID — key is dead, not transient."""
+        text = self._error_text(error)
+        return any(marker in text for marker in (
+            'permission_denied',
+            'permission denied',
+            'consumer_suspended',
+            'api_key_invalid',
+            'api key not valid',
+            'api_key_expired',
+            'api key expired',
+            'unauthenticated',
+        ))
+
+    def is_recoverable_error(self, error: Exception) -> bool:
+        return (
+            self.is_key_disabled_error(error)
+            or self.is_key_exhausted_error(error)
+            or self.is_retryable_server_error(error)
+        )
+
     async def switch_after_error(self, error: Exception) -> bool:
         if len(self._clients) <= 1:
             return False
 
-        if self.is_key_exhausted_error(error):
+        if self.is_key_disabled_error(error):
+            cooldown = self._KEY_DISABLED_COOLDOWN_SECONDS
+            disabled = True
+        elif self.is_key_exhausted_error(error):
             cooldown = self._RATE_LIMIT_COOLDOWN_SECONDS
+            disabled = False
         elif self.is_retryable_server_error(error):
             cooldown = self._SERVER_ERROR_COOLDOWN_SECONDS
+            disabled = False
         else:
             return False
 
@@ -86,19 +123,37 @@ class _GeminiClientPool:
             failed_index = self._current_index
             self._cooldowns[failed_index] = max(self._cooldowns[failed_index], now + cooldown)
 
+            if disabled and not self._disabled_reported[failed_index]:
+                self._disabled_reported[failed_index] = True
+                masked = self._mask_key(self._api_keys[failed_index])
+                self._logger.error(
+                    f'Gemini API key #{failed_index + 1} ({masked}) is suspended/invalid '
+                    f'and has been quarantined for the rest of the session. '
+                    f'Remove it from GEMINI_API_KEY / GEMINI_API_KEYS to silence this warning.'
+                )
+
             available_indices = [
                 index for index, cooldown_until in enumerate(self._cooldowns)
                 if index != failed_index and cooldown_until <= now
             ]
 
             if not available_indices:
-                wait_seconds = max(0.0, min(self._cooldowns) - now)
+                # Pick whichever key clears soonest. If every key is quarantined for ~24h,
+                # there is no point in busy-waiting — give up so the caller fails fast.
+                next_index = min(range(len(self._cooldowns)), key=self._cooldowns.__getitem__)
+                wait_seconds = max(0.0, self._cooldowns[next_index] - now)
+                if wait_seconds > self._RATE_LIMIT_COOLDOWN_SECONDS:
+                    self._logger.error(
+                        f'All Gemini API keys are quarantined (soonest available in '
+                        f'{wait_seconds:.0f}s). Aborting failover.'
+                    )
+                    return False
                 if wait_seconds:
                     self._logger.warning(
                         f'All Gemini API keys are cooling down. Waiting {wait_seconds:.1f}s before retrying.'
                     )
                     await asyncio.sleep(wait_seconds)
-                self._current_index = min(range(len(self._cooldowns)), key=self._cooldowns.__getitem__)
+                self._current_index = next_index
             else:
                 self._current_index = available_indices[0]
 
@@ -214,11 +269,15 @@ class GeminiTranslator(CommonGPTTranslator):
                     break
                 except genai.errors.APIError as genai_err:
                     last_error = genai_err
-                    if not (
-                        self.client_pool.is_key_exhausted_error(genai_err)
-                        or self.client_pool.is_retryable_server_error(genai_err)
-                    ):
+                    if not self.client_pool.is_recoverable_error(genai_err):
                         raise
+                    if self.client_pool.is_key_disabled_error(genai_err):
+                        masked = self.client_pool._mask_key(GEMINI_API_KEYS[key_index])
+                        self.logger.error(
+                            f'Gemini API key #{key_index + 1} ({masked}) is suspended/invalid during startup probe — skipping.'
+                        )
+                        self.client_pool._cooldowns[key_index] = time.monotonic() + self.client_pool._KEY_DISABLED_COOLDOWN_SECONDS
+                        self.client_pool._disabled_reported[key_index] = True
             if model_list is None:
                 raise last_error
         except genai.errors.APIError as genai_err:
@@ -385,13 +444,21 @@ class GeminiTranslator(CommonGPTTranslator):
             try:
                 return self.client.models.count_tokens(model=GEMINI_MODEL, contents=text).total_tokens
             except genai.errors.APIError as genai_err:
-                if not (
-                    self.client_pool.is_key_exhausted_error(genai_err)
-                    or self.client_pool.is_retryable_server_error(genai_err)
-                ):
+                if not self.client_pool.is_recoverable_error(genai_err):
                     raise
                 if len(GEMINI_API_KEYS) <= 1:
                     raise
+                failed_index = self.client_pool._current_index
+                if self.client_pool.is_key_disabled_error(genai_err):
+                    self.client_pool._cooldowns[failed_index] = (
+                        time.monotonic() + self.client_pool._KEY_DISABLED_COOLDOWN_SECONDS
+                    )
+                    if not self.client_pool._disabled_reported[failed_index]:
+                        self.client_pool._disabled_reported[failed_index] = True
+                        masked = self.client_pool._mask_key(GEMINI_API_KEYS[failed_index])
+                        self.logger.error(
+                            f'Gemini API key #{failed_index + 1} ({masked}) is suspended/invalid (token count) — quarantined.'
+                        )
                 self.client_pool._current_index = (self.client_pool._current_index + 1) % len(GEMINI_API_KEYS)
                 self._clear_context_cache()
                 self.logger.warning(f'Retrying Gemini token count with API key #{self.client_pool.current_key_number}.')
