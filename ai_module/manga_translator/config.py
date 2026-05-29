@@ -289,6 +289,13 @@ class DetectorConfig(BaseModel):
     """Threshold for bbox generation"""
     unclip_ratio: float = 2.3
     """How much to extend text skeleton to form bounding box"""
+    yolo_padding_ratio: float = 0.1
+    """For manga_yolo detector only: expand each detected text box by this ratio
+    of its short side on each axis (e.g. 0.1 → ~10% headroom around the text for
+    inpainter). Replaces unclip_ratio for YOLO since YOLO already emits whole-text
+    bboxes, while unclip_ratio (default 2.3) is designed for DBNet's thin stroke
+    polygons. Using unclip_ratio for YOLO inflates font_size by ~2.3× → oversized
+    rendered text. Ignored by all non-YOLO detectors."""
 
 class InpainterConfig(BaseModel):
     inpainter: Inpainter = Inpainter.lama_large

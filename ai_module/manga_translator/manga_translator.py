@@ -649,7 +649,8 @@ class MangaTranslator:
                                         config.detector.box_threshold,
                                         config.detector.unclip_ratio, config.detector.det_invert, config.detector.det_gamma_correct, config.detector.det_rotate,
                                         config.detector.det_auto_rotate,
-                                        self.device, self.verbose)        
+                                        self.device, self.verbose,
+                                        yolo_padding_ratio=config.detector.yolo_padding_ratio)
         return result
 
     async def _unload_model(self, tool: str, model: str):

@@ -87,9 +87,13 @@ class MangaYoloDetector(OfflineDetector):
         xyxy = res.boxes.xyxy.cpu().numpy()
         scores = res.boxes.conf.cpu().numpy()
 
-        # Optional unclip: expand each box outward by `unclip_ratio` * shorter
-        # side so the inpainter has a small margin around the text.
-        margin = max(0.0, float(unclip_ratio) - 1.0) if unclip_ratio else 0.0
+        # IGNORE unclip_ratio: DBNet's unclip semantics expand thin stroke polygons
+        # to cover the whole text, but YOLO already emits whole-text bboxes — applying
+        # unclip_ratio=2.3 here inflates short_side by ~2.3× → Quadrilateral.font_size
+        # blows up → renderer draws oversized text. Use the YOLO-specific
+        # padding_ratio (set by dispatch()) for a small inpaint headroom instead.
+        padding_ratio = float(getattr(self, 'padding_ratio', 0.1))
+        margin = max(0.0, padding_ratio)
 
         for (x1, y1, x2, y2), score in zip(xyxy, scores):
             bw = x2 - x1
