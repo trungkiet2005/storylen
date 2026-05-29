@@ -209,13 +209,22 @@ def _tail_worker_logs(stop_event: threading.Event) -> None:
     handles: dict[Path, int] = {}  # path -> next byte offset to read
 
     def _watched_files():
-        yield from WORKER_LOG_DIR.glob("log_*.txt")
+        for p in WORKER_LOG_DIR.glob("log_*.txt"):
+            if p.is_file():
+                yield p
         # Per-worker logs: shared_w0.log, shared_w1.log, ...
-        yield from SHARED_LOG_DIR.glob("shared_w*.log")
+        for p in SHARED_LOG_DIR.glob("shared_w*.log"):
+            if p.is_file():
+                yield p
         # Legacy single-file path (kept so manual SHARED_LOG_FILE overrides still work).
-        legacy = Path(os.environ.get("SHARED_LOG_FILE", ""))
-        if legacy and legacy.exists():
-            yield legacy
+        # NOTE: Path("") resolves to Path("."), so guard on the raw string before
+        # constructing the Path — otherwise we tail the working directory and the
+        # reader hits Errno 21 ("Is a directory") every poll.
+        legacy_str = os.environ.get("SHARED_LOG_FILE", "").strip()
+        if legacy_str:
+            legacy = Path(legacy_str)
+            if legacy.is_file():
+                yield legacy
 
     while not stop_event.is_set():
         try:
