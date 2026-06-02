@@ -1,21 +1,17 @@
 "use client";
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { TopBar } from "@/components/TopBar";
 import { Icon } from "@/components/Icons";
 import { useToast } from "@/components/Toast";
 import { FadeIn, StaggerContainer, StaggerItem } from "@/components/Animations";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   mdxPopular,
   mdxSearch,
-  mdxChapters,
   mdxCoverFromManga,
   mdxMangaTitle,
-  mdxLanguageFlag,
   type MdxManga,
-  type MdxChapter,
 } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -57,13 +53,7 @@ function MangaStatusBadge({ status }: { status: string }) {
   );
 }
 
-function MangaCard({
-  manga,
-  onSelect,
-}: {
-  manga: MdxManga;
-  onSelect: (m: MdxManga) => void;
-}) {
+function MangaCard({ manga }: { manga: MdxManga }) {
   const title = mdxMangaTitle(manga);
   const coverUrl = mdxCoverFromManga(manga);
   const genres = manga.attributes.tags
@@ -73,10 +63,12 @@ function MangaCard({
     .join(" · ");
 
   return (
-    <motion.div
+    <motion.a
+      href={`/browse/manga?id=${manga.id}`}
+      target="_blank"
+      rel="noopener noreferrer"
       whileHover={{ y: -3, boxShadow: "5px 5px 0 var(--border)" }}
       transition={{ type: "spring", stiffness: 400, damping: 20 }}
-      onClick={() => onSelect(manga)}
       style={{
         background: "var(--panel)",
         border: "2px solid var(--border)",
@@ -86,6 +78,8 @@ function MangaCard({
         display: "flex",
         flexDirection: "column",
         boxShadow: "3px 3px 0 var(--border)",
+        textDecoration: "none",
+        color: "inherit",
       }}
     >
       {/* Cover */}
@@ -143,380 +137,7 @@ function MangaCard({
           {manga.attributes.lastChapter && ` · ${manga.attributes.lastChapter} ch`}
         </div>
       </div>
-    </motion.div>
-  );
-}
-
-// ── Chapter panel ─────────────────────────────────────────────────────────────
-
-function ChapterPanel({
-  manga,
-  onClose,
-}: {
-  manga: MdxManga;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const [chapters, setChapters] = useState<MdxChapter[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [selected, setSelected] = useState("");
-  const [langFilter, setLangFilter] = useState("");
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setLoading(true);
-    setError("");
-    mdxChapters(manga.id)
-      .then((res) => {
-        setChapters(res.data);
-        // Prefer Vietnamese, then English, otherwise the first language available.
-        const langs = Array.from(
-          new Set(res.data.map((c) => c.attributes.translatedLanguage ?? "")),
-        ).filter(Boolean);
-        const initial = langs.includes("vi") ? "vi" : langs.includes("en") ? "en" : (langs[0] ?? "");
-        setLangFilter(initial);
-      })
-      .catch((e) => setError(e.message || "Lỗi tải chương"))
-      .finally(() => setLoading(false));
-  }, [manga.id]);
-
-  // Languages present in this manga, sorted by chapter count desc.
-  const availableLangs = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const c of chapters) {
-      const l = c.attributes.translatedLanguage ?? "";
-      if (!l) continue;
-      counts.set(l, (counts.get(l) ?? 0) + 1);
-    }
-    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [chapters]);
-
-  const filteredChapters = useMemo(
-    () =>
-      langFilter
-        ? chapters.filter((c) => c.attributes.translatedLanguage === langFilter)
-        : chapters,
-    [chapters, langFilter],
-  );
-
-  // Whenever filter changes, default-select the latest chapter in that language.
-  useEffect(() => {
-    if (!filteredChapters.length) {
-      setSelected("");
-      return;
-    }
-    if (!filteredChapters.find((c) => c.id === selected)) {
-      setSelected(filteredChapters[filteredChapters.length - 1].id);
-    }
-  }, [filteredChapters, selected]);
-
-  useEffect(() => {
-    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
-
-  const goRead = (mode: "scroll" | "page") => {
-    if (!selected) return;
-    const ch = chapters.find((c) => c.id === selected);
-    const label = ch ? `Chương ${ch.attributes.chapter ?? "?"}` : "";
-    router.push(
-      `/browse/read?chapterId=${selected}&mangaId=${manga.id}&mangaTitle=${encodeURIComponent(mdxMangaTitle(manga))}&chapterLabel=${encodeURIComponent(label)}&mode=${mode}`,
-    );
-  };
-
-  const title = mdxMangaTitle(manga);
-
-  return (
-    <motion.div
-      ref={panelRef}
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 8 }}
-      style={{
-        marginTop: 24,
-        border: "2px solid var(--border)",
-        borderRadius: "var(--radius)",
-        background: "var(--panel)",
-        boxShadow: "4px 4px 0 var(--border)",
-        overflow: "hidden",
-      }}
-    >
-      {/* Panel header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "14px 20px",
-          borderBottom: "1.5px solid var(--border-soft)",
-          background: "var(--bg-2)",
-          gap: 12,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <Icon name="book" size={16} />
-          <span
-            style={{
-              fontWeight: 700,
-              fontSize: 14,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {title}
-          </span>
-        </div>
-        <button
-          className="btn btn-sm btn-ghost"
-          onClick={onClose}
-          style={{ flexShrink: 0 }}
-        >
-          <Icon name="x" size={14} /> Đóng
-        </button>
-      </div>
-
-      <div style={{ padding: "16px 20px" }}>
-        {loading && (
-          <div style={{ textAlign: "center", padding: "24px 0", color: "var(--muted)" }}>
-            <Icon name="refresh" size={20} />
-            <div style={{ marginTop: 8, fontSize: 13 }}>Đang tải danh sách chương...</div>
-          </div>
-        )}
-
-        {error && (
-          <div style={{ textAlign: "center", padding: "24px 0", color: "var(--accent)" }}>
-            <Icon name="alert" size={20} />
-            <div style={{ marginTop: 8, fontSize: 13 }}>{error}</div>
-          </div>
-        )}
-
-        {!loading && !error && chapters.length === 0 && (
-          <div style={{ textAlign: "center", padding: "24px 0", color: "var(--muted)" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>😔</div>
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-              Chưa có chương nào
-            </div>
-            <div style={{ fontSize: 11 }}>
-              Truyện này chưa được upload chương nào trên MangaDex.
-            </div>
-          </div>
-        )}
-
-        {!loading && chapters.length > 0 && (
-          <>
-            {/* Language filter chips */}
-            {availableLangs.length > 1 && (
-              <div style={{ marginBottom: 14 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "var(--muted)",
-                    marginBottom: 6,
-                  }}
-                >
-                  Ngôn ngữ ({availableLangs.length})
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <button
-                    onClick={() => setLangFilter("")}
-                    style={{
-                      padding: "5px 10px",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      border: "1.5px solid",
-                      borderColor: !langFilter ? "var(--accent)" : "var(--border)",
-                      background: !langFilter ? "var(--accent)" : "var(--panel)",
-                      color: !langFilter ? "var(--accent-fg, #fff)" : "var(--text)",
-                      borderRadius: 99,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Tất cả ({chapters.length})
-                  </button>
-                  {availableLangs.map(([code, count]) => {
-                    const active = code === langFilter;
-                    return (
-                      <button
-                        key={code}
-                        onClick={() => setLangFilter(code)}
-                        style={{
-                          padding: "5px 10px",
-                          fontSize: 11,
-                          fontWeight: 700,
-                          border: "1.5px solid",
-                          borderColor: active ? "var(--accent)" : "var(--border)",
-                          background: active ? "var(--accent)" : "var(--panel)",
-                          color: active ? "var(--accent-fg, #fff)" : "var(--text)",
-                          borderRadius: 99,
-                          cursor: "pointer",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 5,
-                        }}
-                      >
-                        <span style={{ fontSize: 13 }}>{mdxLanguageFlag(code)}</span>
-                        {code.toUpperCase()} ({count})
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Chapter selector + read button */}
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "flex-end",
-                marginBottom: 16,
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "var(--muted)",
-                    marginBottom: 6,
-                  }}
-                >
-                  Chọn chương ({filteredChapters.length})
-                </label>
-                <select
-                  className="form-select"
-                  value={selected}
-                  onChange={(e) => setSelected(e.target.value)}
-                  disabled={!filteredChapters.length}
-                  style={{ width: "100%" }}
-                >
-                  {filteredChapters.map((ch) => {
-                    const num = ch.attributes.chapter ?? "?";
-                    const lbl = ch.attributes.title
-                      ? `Chương ${num} — ${ch.attributes.title}`
-                      : `Chương ${num}`;
-                    return (
-                      <option key={ch.id} value={ch.id}>
-                        {lbl}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => goRead("scroll")}
-                  disabled={!selected}
-                  style={{ whiteSpace: "nowrap" }}
-                  title="Cuộn dọc"
-                >
-                  <Icon name="layers" size={14} /> Đọc (Cuộn)
-                </button>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => goRead("page")}
-                  disabled={!selected}
-                  style={{ whiteSpace: "nowrap" }}
-                  title="Lật từng trang"
-                >
-                  <Icon name="book" size={14} /> Đọc (Trang)
-                </button>
-              </div>
-            </div>
-
-            {/* Chapter list */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-                maxHeight: 360,
-                overflowY: "auto",
-              }}
-            >
-              {filteredChapters.length === 0 && (
-                <div style={{ padding: "20px 0", textAlign: "center", color: "var(--muted)", fontSize: 12 }}>
-                  Không có chương nào trong ngôn ngữ đã chọn.
-                </div>
-              )}
-              {filteredChapters.map((ch) => {
-                const num = ch.attributes.chapter ?? "?";
-                const chTitle = ch.attributes.title ? ` — ${ch.attributes.title}` : "";
-                const group =
-                  ch.relationships.find((r) => r.type === "scanlation_group")?.attributes
-                    ?.name || "Không rõ nhóm dịch";
-                const lang = ch.attributes.translatedLanguage ?? "";
-                const flag = mdxLanguageFlag(lang);
-                const isSelected = ch.id === selected;
-                return (
-                  <div
-                    key={ch.id}
-                    onClick={() => setSelected(ch.id)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 14px",
-                      borderRadius: "var(--radius-sm)",
-                      background: isSelected ? "rgba(200,16,46,0.07)" : "var(--bg-2)",
-                      border: isSelected ? "1.5px solid var(--accent)" : "1.5px solid transparent",
-                      cursor: "pointer",
-                      gap: 12,
-                      transition: "background 0.12s",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-                      <span
-                        style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}
-                        title={lang || "unknown"}
-                      >
-                        <span style={{ fontSize: 16 }}>{flag}</span>
-                        {lang && (
-                          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--muted)" }}>
-                            {lang}
-                          </span>
-                        )}
-                      </span>
-                      <div style={{ minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: 13,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          Chương {num}{chTitle}
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>
-                          {group}
-                          {ch.attributes.pages ? ` · ${ch.attributes.pages} trang` : ""}
-                        </div>
-                      </div>
-                    </div>
-                    {isSelected && (
-                      <span style={{ color: "var(--accent)" }}>
-                        <Icon name="check" size={14} />
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-    </motion.div>
+    </motion.a>
   );
 }
 
@@ -529,12 +150,10 @@ export default function BrowsePage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [genreId, setGenreId] = useState("");
-  const [selectedManga, setSelectedManga] = useState<MdxManga | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadMangas = useCallback(async (q: string, tagId: string) => {
     setLoading(true);
-    setSelectedManga(null);
     try {
       const title = q.trim();
       const tags = tagId ? [tagId] : undefined;
@@ -587,7 +206,7 @@ export default function BrowsePage() {
                 fontWeight: 500,
               }}
             >
-              Dữ liệu thực từ MangaDex · Mọi ngôn ngữ · Nhấn vào truyện để chọn chương
+              Dữ liệu thực từ MangaDex · Mọi ngôn ngữ · Nhấn vào truyện để mở tab mới
             </div>
           </div>
 
@@ -718,30 +337,12 @@ export default function BrowsePage() {
               >
                 {mangas.map((m) => (
                   <StaggerItem key={m.id}>
-                    <MangaCard
-                      manga={m}
-                      onSelect={(manga) =>
-                        setSelectedManga((prev) =>
-                          prev?.id === manga.id ? null : manga,
-                        )
-                      }
-                    />
+                    <MangaCard manga={m} />
                   </StaggerItem>
                 ))}
               </div>
             </StaggerContainer>
           )}
-
-          {/* Chapter panel */}
-          <AnimatePresence>
-            {selectedManga && (
-              <ChapterPanel
-                key={selectedManga.id}
-                manga={selectedManga}
-                onClose={() => setSelectedManga(null)}
-              />
-            )}
-          </AnimatePresence>
         </FadeIn>
       </main>
     </div>
