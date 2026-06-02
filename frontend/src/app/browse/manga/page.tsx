@@ -142,8 +142,11 @@ function ChapterSelector({ manga }: { manga: MdxManga }) {
     return (
       <div style={{ textAlign: "center", padding: "24px 0", color: "var(--muted)" }}>
         <div style={{ fontSize: 28, marginBottom: 8 }}>😔</div>
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Chưa có chương nào</div>
-        <div style={{ fontSize: 11 }}>Truyện này chưa được upload chương nào trên MangaDex.</div>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>Không có chương đọc được</div>
+        <div style={{ fontSize: 11 }}>
+          Truyện này không có chương nào đọc được trên MangaDex — có thể đã được mua bản quyền
+          và chỉ còn liên kết tới nguồn chính thức.
+        </div>
       </div>
     );
   }

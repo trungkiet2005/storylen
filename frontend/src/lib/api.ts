@@ -370,6 +370,8 @@ export interface MdxChapter {
     pages: number;
     publishAt: string;
     translatedLanguage?: string;
+    /** Set when the chapter is hosted off-site (licensed titles). Not readable here. */
+    externalUrl?: string | null;
   };
   relationships: Array<{ type: string; attributes?: { name?: string } }>;
 }
@@ -523,9 +525,17 @@ export async function mdxChapters(
   limit = 100,
   offset = 0,
 ): Promise<MdxChapterList> {
-  return request<MdxChapterList>(
+  const res = await request<MdxChapterList>(
     `/mdx/manga/${mangaId}/chapters?limit=${limit}&offset=${offset}`,
   );
+  // MangaDex serves many "external" chapters for licensed titles: pages === 0
+  // plus an externalUrl pointing off-site. Those can't be read through our
+  // image proxy, so drop them here — otherwise the reader defaults to one and
+  // shows "Chương này không có trang nào".
+  const data = res.data.filter(
+    (c) => (c.attributes.pages ?? 0) > 0 && !c.attributes.externalUrl,
+  );
+  return { ...res, data };
 }
 
 export async function mdxChapterPages(chapterId: string): Promise<MdxAtHomeServer> {
