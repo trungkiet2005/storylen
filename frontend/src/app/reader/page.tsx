@@ -1594,22 +1594,6 @@ function ReaderContent() {
               {/* Info tab */}
               {contextTab === "info" ? (
                 <div className="scroll" style={{ flex: 1, overflowY: "auto", padding: "0 20px 20px" }}>
-                  {/* Bubble stats */}
-                  <div className="stroke-ink" style={{ background: "var(--panel)", padding: 12, marginBottom: 16 }}>
-                    <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 6 }}>Thống kê trang</div>
-                    {[
-                      ["Bubbles detected", pageData ? String(pageData.processed_data.length) : "—"],
-                      ["OCR confidence", pageData ? `${Math.round((pageData.processed_data.reduce((a, b) => a + b.confidence, 0) / Math.max(1, pageData.processed_data.length)) * 100)}%` : "—"],
-                      ["Translation", pageData ? "ai_module" : "—"],
-                      ["Chunks indexed", pageData ? String(pageData.processed_data.length) : "—"],
-                    ].map(([k, v]) => (
-                      <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, padding: "3px 0" }}>
-                        <span style={{ color: "var(--muted)" }}>{k}</span>
-                        <span className="mono" style={{ fontWeight: 700 }}>{v}</span>
-                      </div>
-                    ))}
-                  </div>
-
                   {/* Translation edits */}
                   <div>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 6, flexWrap: "wrap" }}>

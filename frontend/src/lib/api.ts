@@ -509,6 +509,15 @@ export async function mdxSearch(opts: {
   return request<MdxMangaList>(`/mdx/manga?${params}`);
 }
 
+export interface MdxMangaDetail {
+  data: MdxManga;
+}
+
+/** Fetch a single manga (with cover art + author) by ID. */
+export async function mdxManga(mangaId: string): Promise<MdxMangaDetail> {
+  return request<MdxMangaDetail>(`/mdx/manga/${mangaId}`);
+}
+
 export async function mdxChapters(
   mangaId: string,
   limit = 100,
