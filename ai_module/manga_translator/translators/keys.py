@@ -37,6 +37,15 @@ GEMINI_API_KEYS = _split_api_keys(os.getenv('GEMINI_API_KEYS', '')) or _split_ap
 GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else ''
 GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
 
+# Optional client-side throttle for Gemini requests (requests/minute, global
+# across the translator instance). <= 0 disables it. Useful when the whole key
+# pool keeps hitting 429 -- cap the aggregate request rate below the sum of the
+# per-key free-tier RPM limits.
+try:
+    GEMINI_MAX_REQUESTS_PER_MINUTE = int(os.getenv('GEMINI_MAX_REQUESTS_PER_MINUTE', '-1'))
+except (TypeError, ValueError):
+    GEMINI_MAX_REQUESTS_PER_MINUTE = -1
+
 # deepseek
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
 DEEPSEEK_API_BASE  = os.getenv('DEEPSEEK_API_BASE', 'https://api.deepseek.com')

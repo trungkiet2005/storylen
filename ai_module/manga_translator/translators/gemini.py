@@ -6,7 +6,7 @@ import asyncio
 import time
 from typing import List
 from .common import MissingAPIKeyException, InvalidServerResponse
-from .keys import GEMINI_API_KEYS, GEMINI_MODEL
+from .keys import GEMINI_API_KEYS, GEMINI_MODEL, GEMINI_MAX_REQUESTS_PER_MINUTE
 from .common_gpt import CommonGPTTranslator, _CommonGPTTranslator_JSON
 
 
@@ -164,7 +164,7 @@ class _GeminiClientPool:
 
 class GeminiTranslator(CommonGPTTranslator):
     _INVALID_REPEAT_COUNT = 0  # 现在这个参数没意义了
-    _MAX_REQUESTS_PER_MINUTE = 9999  # 无RPM限制
+    _MAX_REQUESTS_PER_MINUTE = GEMINI_MAX_REQUESTS_PER_MINUTE  # env GEMINI_MAX_REQUESTS_PER_MINUTE; <=0 disables client-side throttle
     _TIMEOUT = 40  # 在重试之前等待服务器响应的时间（秒）
     _RETRY_ATTEMPTS = 3  # 在放弃之前重试错误请求的次数
     _TIMEOUT_RETRY_ATTEMPTS = 3  # 在放弃之前重试超时请求的次数
@@ -523,87 +523,116 @@ class GeminiTranslator(CommonGPTTranslator):
             # Assemble prompt for the current batch  
             prompt, query_size = self._assemble_prompts(from_lang, to_lang, prompt_queries).__next__()
 
-            for attempt in range(RETRY_ATTEMPTS):  
-                try:  
-                    # Get the response (synchronously)
-                    response = await self._request_translation(to_lang, prompt)  
-                    try:
-                        new_translations = self._parse_response(response, prompt_queries)
-                    except Warning as w:
-                        self.logger.warning(w)
-                        self.logger.warning(f"Retrying...(Attempt {attempt + 1})")
-                        continue
-                    except Exception as e:
-                        self.logger.error(e)
-                        self.logger.error(f"Retrying...(Attempt {attempt + 1})")
-                        continue
-
-                    if len(new_translations) < query_size:  
-                        # Try splitting by newlines instead  
-                        new_translations = re.split(r'\n', response)  
-
-                    if len(new_translations) < query_size:  
-                        remaining_attempts = RETRY_ATTEMPTS - attempt - 1  
-                        self.logger.warning(f'Incomplete response, remaining {remaining_attempts} time(s) before splitting the translation.')  
-                        continue  
-                    
-                    # Trim excess translations and pad if necessary  
-                    new_translations = new_translations[:query_size] + [''] * (query_size - len(new_translations))  
-                    # Clean translations by keeping only the content before the first newline  
-                    new_translations = [t.split('\n')[0].strip() for t in new_translations]  
-                    # Remove any potential prefix markers  
-                    new_translations = [re.sub(r'^\s*<\|\d+\|>\s*', '', t) for t in new_translations]  
-                    # Check if any translations are empty  
-                    if any(not t.strip() for t in new_translations):  
-                        self.logger.warning(f'Empty translations detected. Resplitting the batch.') 
-                        break  # Exit retry loop and trigger split logic below 
-
-                    # Store the translations in the correct indices  
-                    for idx, translation in zip(prompt_query_indices, new_translations):  
-                        translations[idx] = translation  
-
-                    # Log progress  
-                    self.logger.info(f'Batch translated: {len([t for t in translations if t])}/{len(queries)} completed.')  
-                    self.logger.debug(f'Completed translations: {[t if t else queries[i] for i, t in enumerate(translations)]}')        
-                    return True  # Successfully translated this batch  
-                    
+            # Two independent retry budgets. A transient rate-limit (429) must never be
+            # treated like a malformed response: splitting the batch only helps when the
+            # model actually returned a bad/incomplete answer. Splitting on a 429 just
+            # fires MORE requests at an already-exhausted key pool -- the feedback loop
+            # that left most bubbles blank. So: content problems -> split; rate-limit /
+            # API errors -> rotate key, back off (handled in switch_after_error), retry
+            # the SAME batch without consuming the content budget or splitting.
+            content_attempt = 0
+            ratelimit_attempt = 0
+            while content_attempt < RETRY_ATTEMPTS:
+                # 1) Send the request. Isolate retryable API/rate-limit errors here so
+                #    they neither consume the content budget nor trigger a split.
+                try:
+                    response = await self._request_translation(to_lang, prompt)
                 except genai.errors.APIError as genai_err:
                     if await self.client_pool.switch_after_error(genai_err):
                         self.client = self.client_pool.current_client
                         self._clear_context_cache()
-                        self.logger.warning(f'Retrying Gemini request with API key #{self.client_pool.current_key_number}.')
+                        ratelimit_attempt += 1
+                        if ratelimit_attempt > self._RATELIMIT_RETRY_ATTEMPTS:
+                            self.logger.error(
+                                f'Gemini rate limit persisted through {self._RATELIMIT_RETRY_ATTEMPTS} '
+                                f'key failovers for a batch of {len(prompt_queries)} line(s); leaving it '
+                                f'untranslated instead of splitting (splitting would only add load).'
+                            )
+                            return False
+                        self.logger.warning(
+                            f'Retrying Gemini request with API key #{self.client_pool.current_key_number}.'
+                        )
                         continue
                     self.logger.error(
                         'Gemini encountered an API error and no alternate key is available for failover.')
                     raise
-                except Exception as e:  
-                    self.logger.error(f'Error during translation attempt: {e}')  
-                    if attempt == RETRY_ATTEMPTS - 1:  
-                        raise  
-                    await asyncio.sleep(1)  
+                except Exception as e:
+                    self.logger.error(f'Error during translation attempt: {e}')
+                    content_attempt += 1
+                    if content_attempt >= RETRY_ATTEMPTS:
+                        raise
+                    await asyncio.sleep(1)
+                    continue
 
-            # If retries exhausted and still not successful, proceed to split if allowed  
-            if split_level < MAX_SPLIT_ATTEMPTS:  
-                if split_level == 0:  
-                    self.logger.warning('Retry limit reached. Starting to split the translation batch.')  
-                else:  
-                    self.logger.warning('Further splitting the translation batch due to persistent errors.')  
-                mid_index = len(prompt_queries) // 2  
-                futures = []  
-                # Split the batch into two halves  
-                for sub_queries, sub_indices in [   
-                    (prompt_queries[:mid_index], prompt_query_indices[:mid_index]),  
-                    (prompt_queries[mid_index:], prompt_query_indices[mid_index:]),  
-                ]:  
-                    if sub_queries:  
-                        futures.append(translate_batch(sub_queries, sub_indices, split_level + 1))  
-                results = await asyncio.gather(*futures)  
-                return all(results)  
-            else:  
-                self.logger.error('Maximum split attempts reached. Unable to translate the following queries:')  
-                for idx in prompt_query_indices:  
-                    self.logger.error(f'Query: {queries[idx]}')  
-                return False  # Indicate failure for this batch   
+                # 2) Parse and validate. Failures from here on are content problems.
+                try:
+                    new_translations = self._parse_response(response, prompt_queries)
+                except Warning as w:
+                    self.logger.warning(w)
+                    content_attempt += 1
+                    self.logger.warning(f"Retrying...(Attempt {content_attempt})")
+                    continue
+                except Exception as e:
+                    self.logger.error(e)
+                    content_attempt += 1
+                    self.logger.error(f"Retrying...(Attempt {content_attempt})")
+                    continue
+
+                if len(new_translations) < query_size:
+                    # Try splitting by newlines instead
+                    new_translations = re.split(r'\n', response)
+
+                if len(new_translations) < query_size:
+                    content_attempt += 1
+                    remaining_attempts = RETRY_ATTEMPTS - content_attempt
+                    self.logger.warning(f'Incomplete response, remaining {remaining_attempts} time(s) before splitting the translation.')
+                    continue
+
+                # Trim excess translations and pad if necessary
+                new_translations = new_translations[:query_size] + [''] * (query_size - len(new_translations))
+                # Clean translations by keeping only the content before the first newline
+                new_translations = [t.split('\n')[0].strip() for t in new_translations]
+                # Remove any potential prefix markers
+                new_translations = [re.sub(r'^\s*<\|\d+\|>\s*', '', t) for t in new_translations]
+                # Check if any translations are empty
+                if any(not t.strip() for t in new_translations):
+                    self.logger.warning('Empty translations detected. Resplitting the batch.')
+                    content_attempt += 1
+                    break  # Exit retry loop and trigger split logic below
+
+                # Store the translations in the correct indices
+                for idx, translation in zip(prompt_query_indices, new_translations):
+                    translations[idx] = translation
+
+                # Log progress
+                self.logger.info(f'Batch translated: {len([t for t in translations if t])}/{len(queries)} completed.')
+                self.logger.debug(f'Completed translations: {[t if t else queries[i] for i, t in enumerate(translations)]}')
+                return True  # Successfully translated this batch
+
+            # Retries exhausted on a CONTENT problem => split, but only when there is
+            # more than one line (a single failing line cannot be halved -- recursing
+            # to MAX_SPLIT_ATTEMPTS on it just wastes requests).
+            if split_level < MAX_SPLIT_ATTEMPTS and len(prompt_queries) > 1:
+                if split_level == 0:
+                    self.logger.warning('Retry limit reached. Starting to split the translation batch.')
+                else:
+                    self.logger.warning('Further splitting the translation batch due to persistent errors.')
+                mid_index = len(prompt_queries) // 2
+                futures = []
+                # Split the batch into two halves
+                for sub_queries, sub_indices in [
+                    (prompt_queries[:mid_index], prompt_query_indices[:mid_index]),
+                    (prompt_queries[mid_index:], prompt_query_indices[mid_index:]),
+                ]:
+                    if sub_queries:
+                        futures.append(translate_batch(sub_queries, sub_indices, split_level + 1))
+                results = await asyncio.gather(*futures)
+                return all(results)
+            else:
+                self.logger.error('Maximum split attempts reached. Unable to translate the following queries:')
+                for idx in prompt_query_indices:
+                    self.logger.error(f'Query: {queries[idx]}')
+                return False  # Indicate failure for this batch
 
         # Begin translation process  
         prompt_queries = queries  
@@ -621,6 +650,7 @@ class GeminiTranslator(CommonGPTTranslator):
                             )
 
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
+        await self._ratelimit_sleep()
         config_kwargs = {
                             'safety_settings': self.safety_settings,
                             'top_p': self.top_p,
@@ -727,6 +757,7 @@ class _GeminiTranslator_json (_CommonGPTTranslator_JSON):
                                                                     )
 
     async def _request_translation(self, to_lang: str, prompt: str) -> str:
+        await self.translator._ratelimit_sleep()
         config_kwargs = {
                             'safety_settings': self.translator.safety_settings,
                             'response_mime_type': 'application/json',
