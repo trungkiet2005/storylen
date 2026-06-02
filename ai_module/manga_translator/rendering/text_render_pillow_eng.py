@@ -114,7 +114,8 @@ def render_textblock_list_eng(
     downscale_constraint: float = 0.7,
     original_img: np.ndarray = None,
     max_font_size: int = 300,
-    bounds_padding: int = 3
+    bounds_padding: int = 3,
+    min_font_size_ratio: float = 0.7,
 ) -> np.ndarray:
     """Render text blocks onto image"""
 
@@ -142,59 +143,71 @@ def render_textblock_list_eng(
     bboxes, rotated_text_layers, sws = [], [], []
     x, y = img.shape[1], img.shape[0]
 
-    for region in text_regions:
-        font_size = min(region.font_size, max_font_size)
+    # ---- Pass 1: fit each region's font to its YOLO bbox (binary search) ----
+    # JA/CN → VI containment: for each region, binary-search the largest font size
+    # whose wrapped translation body fits strictly inside the YOLO bbox dimensions.
+    # `merge_seg_eng` is called with size_ratio=1.0 (no 20% overflow allowance).
+    # The font may drop all the way to `min_font_size` (4px) to keep the text inside
+    # the bbox — even very long VI translations fit small bubbles, the text just
+    # becomes very small. Pass 1b below lifts those unreadably-small cases back up.
+    min_font_size = 4
+
+    def _measure_fit(fs, translation, yolo_w):
+        f = ImageFont.truetype(font_path, fs)
+        wrapped = merge_seg_eng(translation, f, yolo_w, size_ratio=1.0)
+        if not wrapped:
+            return 0, 0, []
+        _tmp = Image.new('RGBA', (1, 1))
+        _drw = ImageDraw.Draw(_tmp)
+        bb = _drw.multiline_textbbox(
+            (0, 0), '\n'.join(wrapped), font=f,
+            spacing=int(fs * 0.01), align="center",
+        )
+        return bb[2] - bb[0], bb[3] - bb[1], wrapped
+
+    def _fit_font_size(region):
+        yolo_w = max(1, int(region.xywh[2]))
+        yolo_h = max(1, int(region.xywh[3]))
+        lo, hi = min_font_size, max(min_font_size, min(region.font_size, max_font_size))
+        fit_fs = min_font_size
+        while lo <= hi:
+            mid = (lo + hi) // 2
+            tw, th, wrapped = _measure_fit(mid, region.translation, yolo_w)
+            if wrapped and tw <= yolo_w and th <= yolo_h:
+                fit_fs = mid
+                lo = mid + 1
+            else:
+                hi = mid - 1
+        return fit_fs
+
+    fitted_sizes = [_fit_font_size(r) for r in text_regions]
+
+    # ---- Pass 1b: lift unreadably-small fonts up to the page mean ----
+    # The per-bubble fit can drive a font down to a few px when a VI line is much
+    # longer than its bubble — too small to read. Compute the mean font size across
+    # readable bubbles, then lift any region whose fitted font is far below that
+    # mean (< min_font_size_ratio * mean) up to the mean. This trades strict bubble
+    # containment for legibility: the bumped text may slightly overflow its bubble,
+    # which is preferable to text that's unreadably small.
+    _readable = [fs for fs in fitted_sizes if fs > min_font_size]
+    mean_font_size = int(round(sum(_readable) / len(_readable))) if _readable else 0
+    target_sizes = [
+        mean_font_size if (mean_font_size and fs < min_font_size_ratio * mean_font_size) else fs
+        for fs in fitted_sizes
+    ]
+
+    for idx, region in enumerate(text_regions):
         ballon_mask, xyxy = extract_ballon_region(original_img, region.xywh, enlarge_ratio=getattr(region, 'enlarge_ratio', 1))
         if isinstance(xyxy, tuple):
             xyxy = list(xyxy)
 
-        # JA/CN → VI containment: binary-search the largest font size whose
-        # wrapped translation body fits strictly inside the YOLO bbox dimensions.
-        # `merge_seg_eng` is called with size_ratio=1.0 (no 20% overflow allowance).
-        # The original downscale_constraint=0.95 path only allowed ~5% shrink,
-        # which is far less than the 2–3× length expansion of VI vs JA, so VI text
-        # spilled out of the bubble. Binary search lets the font drop all the way
-        # to `min_font_size` to keep the text inside YOLO bbox.
+        # Final font size from Pass 1: fitted to the YOLO bbox, then possibly lifted
+        # to the page mean for readability. Re-wrap the translation at that size.
         yolo_w = max(1, int(region.xywh[2]))
         yolo_h = max(1, int(region.xywh[3]))
-        # Floor at 4px so the binary search can keep shrinking VI text whenever
-        # it overflows. At this floor, even very long VI translations will fit
-        # inside small bubbles — the text just becomes very small (and may be
-        # hard to read). This is intentional: tiny-but-whole text over text
-        # that spills outside the YOLO bbox. No pixel-level cropping; the font
-        # simply shrinks until the wrapped layout fits.
-        min_font_size = 4
-
-        def _measure_fit(fs: int):
-            f = ImageFont.truetype(font_path, fs)
-            wrapped = merge_seg_eng(region.translation, f, yolo_w, size_ratio=1.0)
-            if not wrapped:
-                return 0, 0, f, []
-            _tmp = Image.new('RGBA', (1, 1))
-            _drw = ImageDraw.Draw(_tmp)
-            bb = _drw.multiline_textbbox(
-                (0, 0), '\n'.join(wrapped), font=f,
-                spacing=int(fs * 0.01), align="center",
-            )
-            return bb[2] - bb[0], bb[3] - bb[1], f, wrapped
-
-        _lo, _hi = min_font_size, max(min_font_size, font_size)
-        _fit_fs, _fit_font, _fit_words = min_font_size, None, None
-        while _lo <= _hi:
-            _mid = (_lo + _hi) // 2
-            _tw, _th, _mf, _mw = _measure_fit(_mid)
-            if _mw and _tw <= yolo_w and _th <= yolo_h:
-                _fit_fs, _fit_font, _fit_words = _mid, _mf, _mw
-                _lo = _mid + 1
-            else:
-                _hi = _mid - 1
-        if _fit_font is None:
-            _, _, _fit_font, _fit_words = _measure_fit(min_font_size)
-            _fit_fs = min_font_size
-
-        font_size = _fit_fs
-        font = _fit_font
-        words = _fit_words
+        font_size = target_sizes[idx]
+        font = ImageFont.truetype(font_path, font_size)
+        words = merge_seg_eng(region.translation, font, yolo_w, size_ratio=1.0)
         if not words:
             continue
 

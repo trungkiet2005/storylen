@@ -1302,9 +1302,9 @@ function UploadPageInner() {
               {/* Settings Pane */}
               <FadeIn direction="up" distance={15} delay={0.25}>
                 <div className="stroke-ink" style={{ background: "var(--panel)", padding: 20 }}>
-                  <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 10 }}>Cấu hình AI Module</div>
+                  <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 10 }}>Ngôn ngữ dịch</div>
                   <div style={{ display: "grid", gap: 12 }}>
-                    {aiOptionFields.map(field => (
+                    {aiOptionFields.filter(field => field.key === "target_lang").map(field => (
                       <label key={field.key} style={{ display: "grid", gap: 6 }}>
                         <span className="caps-xs" style={{ color: "var(--muted)", fontSize: 10 }}>{field.label}</span>
                         <select

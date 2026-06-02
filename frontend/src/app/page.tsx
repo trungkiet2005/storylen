@@ -441,9 +441,9 @@ export default function Home() {
 
               <FadeIn delay={0.3} direction="up" distance={30}>
                 <h1 className="display" style={{ fontSize: "clamp(36px, 8vw, 62px)", margin: "18px 0 0", lineHeight: 1.15, letterSpacing: "0.02em", color: "var(--paper)", textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>
-                  <span style={{ whiteSpace: 'nowrap' }}>ĐỌC TRUYỆN,</span><br/>
-                  <span style={{ whiteSpace: 'nowrap' }}>KHÔNG CÒN</span><br/>
-                  <span style={{ color: "var(--accent)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>rào cản.</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>ĐỌC THẾ GIỚI,</span><br/>
+                  <span style={{ whiteSpace: 'nowrap' }}>BẰNG NGÔN NGỮ</span><br/>
+                  <span style={{ color: "var(--accent)", fontStyle: "italic", fontFamily: "var(--font-serif)" }}>của bạn.</span>
                 </h1>
               </FadeIn>
 

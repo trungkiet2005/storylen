@@ -89,9 +89,9 @@ const VI: Dict = {
 
   // ── Hero / landing ──────────────────────────────────────────────────
   "hero.tagline": "XÓA NHÒA RÀO CẢN NGÔN NGỮ · STORYLENS VOL. 1",
-  "hero.title.line1": "ĐỌC TRUYỆN,",
-  "hero.title.line2": "KHÔNG CÒN",
-  "hero.title.line3": "rào cản.",
+  "hero.title.line1": "ĐỌC THẾ GIỚI,",
+  "hero.title.line2": "BẰNG NGÔN NGỮ",
+  "hero.title.line3": "của bạn.",
   "hero.subtitle":
     "Bản dịch giữ nguyên nhịp điệu, ngữ khí nhân vật, và giọng văn gốc — nhờ ngữ cảnh được AI học từ toàn bộ chương truyện.",
   "hero.cta_start": "Bắt đầu ngay",
@@ -199,9 +199,9 @@ const EN: Dict = {
 
   // Hero
   "hero.tagline": "BREAKING LANGUAGE BARRIERS · STORYLENS VOL. 1",
-  "hero.title.line1": "READ MANGA,",
-  "hero.title.line2": "WITHOUT",
-  "hero.title.line3": "barriers.",
+  "hero.title.line1": "READ THE WORLD,",
+  "hero.title.line2": "IN YOUR",
+  "hero.title.line3": "language.",
   "hero.subtitle":
     "Translations preserve pacing, character voice, and authorial tone — context-aware AI trained on the entire chapter.",
   "hero.cta_start": "Get started",

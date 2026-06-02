@@ -8,7 +8,7 @@ test.describe("Home page", () => {
 
   test("renders hero + CTA buttons", async ({ page }) => {
     await gotoApp(page, "/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(/đọc truyện/i);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(/đọc thế giới/i);
     // Hero CTAs
     await expect(page.getByRole("button", { name: /bắt đầu ngay/i }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /trải nghiệm q.a/i }).first()).toBeVisible();
