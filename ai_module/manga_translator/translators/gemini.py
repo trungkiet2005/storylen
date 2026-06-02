@@ -157,8 +157,12 @@ class _GeminiClientPool:
             else:
                 self._current_index = available_indices[0]
 
+            err_summary = self._error_text(error).strip()
+            if len(err_summary) > 200:
+                err_summary = err_summary[:200] + '…'
             self._logger.warning(
-                f'Switching Gemini API key #{failed_index + 1} -> #{self._current_index + 1} after a retryable API error.'
+                f'Switching Gemini API key #{failed_index + 1} -> #{self._current_index + 1} '
+                f'(cooldown {cooldown:.0f}s) after API error: {err_summary}'
             )
             return True
 
@@ -515,6 +519,7 @@ class GeminiTranslator(CommonGPTTranslator):
         self.logger.debug(f'Temperature: {self.temperature}, TopP: {self.top_p}')  
         MAX_SPLIT_ATTEMPTS = 5  # Default max split attempts  
         RETRY_ATTEMPTS = self._RETRY_ATTEMPTS  
+        RATELIMIT_FAILOVERS = max(self._RATELIMIT_RETRY_ATTEMPTS, len(GEMINI_API_KEYS))  # try every key once before giving up (no exponential split)
 
         async def translate_batch(prompt_queries, prompt_query_indices, split_level=0):  
             nonlocal MAX_SPLIT_ATTEMPTS
@@ -542,11 +547,12 @@ class GeminiTranslator(CommonGPTTranslator):
                         self.client = self.client_pool.current_client
                         self._clear_context_cache()
                         ratelimit_attempt += 1
-                        if ratelimit_attempt > self._RATELIMIT_RETRY_ATTEMPTS:
+                        if ratelimit_attempt >= RATELIMIT_FAILOVERS:
                             self.logger.error(
-                                f'Gemini rate limit persisted through {self._RATELIMIT_RETRY_ATTEMPTS} '
-                                f'key failovers for a batch of {len(prompt_queries)} line(s); leaving it '
-                                f'untranslated instead of splitting (splitting would only add load).'
+                                f'Gemini request failed after {ratelimit_attempt} key failover(s) across a '
+                                f'pool of {len(GEMINI_API_KEYS)} key(s) for a batch of {len(prompt_queries)} '
+                                f'line(s) -- every key is rate-limited / erroring (see the per-key API-error '
+                                f'warnings above for the exact code). Leaving this batch untranslated.'
                             )
                             return False
                         self.logger.warning(
