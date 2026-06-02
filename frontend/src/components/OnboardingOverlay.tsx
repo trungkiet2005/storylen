@@ -20,7 +20,7 @@ type Step = {
 const STEPS: Step[] = [
   {
     title: "Chào mừng đến StoryLens 👋",
-    body: "Nền tảng dịch truyện tranh bằng AI. Bạn có thể tải truyện lên, đọc bản dịch, hỏi đáp về nội dung và theo dõi tiến độ đọc.",
+    body: "Nền tảng dịch truyện tranh bằng AI. Bạn có thể tải truyện lên, đọc bản dịch và theo dõi tiến độ đọc.",
   },
   {
     title: "Xem AI dịch truyện trong 3 giây ✨",
@@ -31,11 +31,6 @@ const STEPS: Step[] = [
     title: "Tải truyện lên là xong",
     body: "Kéo-thả ảnh trang truyện vào trang Upload. AI sẽ tự phát hiện bóng thoại, dịch và hiển thị bản tiếng Việt.",
     cta: { href: "/upload", label: "Thử tải lên →" },
-  },
-  {
-    title: "Hỏi đáp về truyện",
-    body: "Đã đọc xong và có thắc mắc? Vào trang Hỏi đáp để hỏi AI bất cứ điều gì về truyện bạn đã dịch.",
-    cta: { href: "/qa", label: "Thử hỏi đáp →" },
   },
   {
     title: "Credits & gói cước",

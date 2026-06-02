@@ -700,7 +700,7 @@ function ReaderContent() {
   const [showOverlay, setShowOverlay] = useState(true);
   const [zoom, setZoom] = useState(1.0);
   const [showContext, setShowContext] = useState(true);
-  const [contextTab, setContextTab] = useState<"info" | "chat">("chat");
+  const [contextTab, setContextTab] = useState<"info" | "chat">("info");
   const mainRef = useRef<HTMLDivElement>(null);
   const sessionStartRef = useRef<number>(Date.now());
 
@@ -1558,7 +1558,6 @@ function ReaderContent() {
                 <div style={{ display: "flex", border: "1.5px solid var(--border)", marginBottom: 14 }}>
                   {([
                     { id: "info", label: "Ngữ cảnh", icon: null },
-                    { id: "chat", label: "Hỏi AI", icon: "sparkle" },
                   ] as { id: "info" | "chat"; label: string; icon: string | null }[]).map((tab, i) => (
                     <button
                       key={tab.id}
@@ -2067,7 +2066,6 @@ function ReaderContent() {
                 { key: "+ / −", desc: "Phóng to / thu nhỏ" },
                 { key: "?",     desc: "Hiện/ẩn bảng phím tắt" },
                 { key: "Esc",   desc: "Đóng cửa sổ" },
-                { key: "Ctrl+Enter", desc: "Gửi câu hỏi cho AI" },
               ].map(s => (
                 <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 0" }}>
                   <kbd

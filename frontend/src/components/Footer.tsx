@@ -9,7 +9,6 @@ const FOOTER_LINKS = [
     links: [
       { label: "Tải lên truyện", href: "/upload" },
       { label: "Đọc truyện tranh", href: "/reader" },
-      { label: "Hỏi đáp Q&A", href: "/qa" },
     ],
   },
   {

@@ -113,7 +113,7 @@ class Settings(BaseSettings):
     AI_MODULE_INPAINTER: str = "lama_large"
     AI_MODULE_RENDERER: str = "manga2eng_pillow"
 
-    AI_MODULE_DETECTOR_BOX_THRESHOLD: float = 0.4
+    AI_MODULE_DETECTOR_BOX_THRESHOLD: float = 0.3
     AI_MODULE_DETECTOR_TEXT_THRESHOLD: float = 0.3
     AI_MODULE_DETECTOR_UNCLIP_RATIO: float = 2.6
     AI_MODULE_DETECTION_SIZE: int = 1536

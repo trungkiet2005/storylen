@@ -33,13 +33,6 @@ const STEPS = [
     href: "/reader",
     icon: "layers",
   },
-  {
-    n: "03",
-    title: "Hỏi đáp thông minh",
-    desc: "RAG Q&A dựa trên toàn bộ nội dung đã index — không bịa thông tin.",
-    href: "/qa",
-    icon: "sparkle",
-  },
 ];
 
 function SearchParamsHandler() {
@@ -465,11 +458,6 @@ export default function Home() {
                   <Link href="/upload">
                     <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn btn-primary" style={{ padding: "16px 28px", fontSize: 15 }}>
                       Bắt đầu ngay <Icon name="arrow-right" size={16}/>
-                    </motion.button>
-                  </Link>
-                  <Link href="/qa">
-                    <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn" style={{ padding: "16px 28px", fontSize: 15 }}>
-                      <Icon name="sparkle" size={16}/> Trải nghiệm Q&A
                     </motion.button>
                   </Link>
                 </div>
