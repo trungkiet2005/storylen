@@ -1,4 +1,5 @@
 import json
+import os
 import pickle
 from typing import Mapping, Optional, Callable
 
@@ -9,6 +10,32 @@ from fastapi import HTTPException
 from manga_translator import Config
 
 NotifyType = Optional[Callable[[int, Optional[bytes]], None]]
+
+
+def _internal_timeout() -> aiohttp.ClientTimeout:
+    """Timeout for the internal queue->executor request.
+
+    This single call covers the WHOLE per-page pipeline on the executor
+    (detect + OCR + inpaint + translate + render). Heavy pages (many text
+    regions) or Gemini key failovers can legitimately run for minutes -- far
+    longer than aiohttp's default 5-minute total, which would otherwise abort
+    the request mid-processing and throw away all the work already done (the
+    `TimeoutError` seen during the OCR phase). Use a generous, configurable
+    overall cap (AI_MODULE_INTERNAL_TIMEOUT seconds; 0 = unlimited) but keep a
+    short connect timeout so a genuinely unreachable executor still fails fast.
+    """
+    try:
+        total = float(os.getenv("AI_MODULE_INTERNAL_TIMEOUT", "900"))
+    except (TypeError, ValueError):
+        total = 900.0
+    try:
+        connect = float(os.getenv("AI_MODULE_INTERNAL_CONNECT_TIMEOUT", "30"))
+    except (TypeError, ValueError):
+        connect = 30.0
+    return aiohttp.ClientTimeout(
+        total=None if total <= 0 else total,
+        sock_connect=connect,
+    )
 
 
 def _decode_error_body(body: bytes) -> str:
@@ -34,7 +61,7 @@ async def fetch_data_stream(url, image: Image, config: Config, sender: NotifyTyp
     attributes = {"image": image, "config": config}
     data = pickle.dumps(attributes)
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=_internal_timeout()) as session:
         async with session.post(url, data=data, headers=headers) as response:
             if response.status == 200:
                 await process_stream(response, sender)
@@ -45,7 +72,7 @@ async def fetch_data(url, image: Image, config: Config, headers: Mapping[str, st
     attributes = {"image": image, "config": config}
     data = pickle.dumps(attributes)
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=_internal_timeout()) as session:
         async with session.post(url, data=data, headers=headers) as response:
             body = await response.read()
             if response.status == 200:
