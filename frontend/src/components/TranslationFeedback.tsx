@@ -26,15 +26,20 @@ export function TranslationFeedback({ pageId }: { pageId: string }) {
   const [showCommentInput, setShowCommentInput] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  // Once the user has given feedback on this page, hide the widget so it
+  // doesn't keep nagging. A persisted prior vote keeps it hidden on reload.
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
+    setDismissed(false);
     getTranslationFeedback(pageId)
       .then(res => {
         if (cancelled) return;
         if (res && (res.vote === "up" || res.vote === "down")) {
           setVote(res.vote);
+          setDismissed(true);  // already voted earlier → stay hidden
         } else {
           setVote(null);
         }
@@ -60,6 +65,8 @@ export function TranslationFeedback({ pageId }: { pageId: string }) {
       } else {
         toast("Cảm ơn — bạn có muốn ghi rõ điểm chưa ổn không?", "info");
       }
+      // 👍 needs nothing more → hide. 👎 stays open for an optional comment.
+      if (v === "up") setDismissed(true);
     } catch (err) {
       setVote(prevVote);
       const msg = err instanceof APIError ? err.message : "Không lưu được phản hồi.";
@@ -77,6 +84,7 @@ export function TranslationFeedback({ pageId }: { pageId: string }) {
       toast("Cảm ơn phản hồi chi tiết!", "success");
       setShowCommentInput(false);
       setComment("");
+      setDismissed(true);  // feedback complete → hide
     } catch (err) {
       const msg = err instanceof APIError ? err.message : "Không lưu được nhận xét.";
       toast(msg, "error");
@@ -85,7 +93,7 @@ export function TranslationFeedback({ pageId }: { pageId: string }) {
     }
   };
 
-  if (!loaded) return null;
+  if (!loaded || dismissed) return null;
 
   return (
     <div
@@ -177,6 +185,14 @@ export function TranslationFeedback({ pageId }: { pageId: string }) {
                 style={{ fontSize: 11 }}
               >
                 Gửi
+              </button>
+              <button
+                onClick={() => setDismissed(true)}
+                disabled={submitting}
+                className="btn btn-sm btn-ghost"
+                style={{ fontSize: 11 }}
+              >
+                Bỏ qua
               </button>
             </div>
           </motion.div>

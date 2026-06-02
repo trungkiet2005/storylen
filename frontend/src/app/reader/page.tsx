@@ -699,7 +699,7 @@ function ReaderContent() {
   const [selected, setSelected] = useState<number | null>(null);
   const [showOverlay, setShowOverlay] = useState(true);
   const [zoom, setZoom] = useState(1.0);
-  const [showContext, setShowContext] = useState(true);
+  const [showContext, setShowContext] = useState(false);
   const [contextTab, setContextTab] = useState<"info" | "chat">("info");
   const mainRef = useRef<HTMLDivElement>(null);
   const sessionStartRef = useRef<number>(Date.now());
@@ -1300,10 +1300,6 @@ function ReaderContent() {
                 <Icon name="pdf" size={14}/>
               </motion.button>
             )}
-
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="btn btn-sm btn-ghost" onClick={() => setShowContext(v => !v)} aria-label="Bật/tắt panel ngữ cảnh">
-              <Icon name="info" size={14}/>
-            </motion.button>
 
             {/* Fullscreen toggle */}
             <motion.button
