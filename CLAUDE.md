@@ -434,6 +434,28 @@ hash as key when authenticated, IP otherwise.
 X-Frame-Options=DENY, Referrer-Policy, Permissions-Policy, HSTS, and a tight
 CSP on every response — including FastAPI /docs.
 
+### Bot protection (Turnstile)
+
+`services/captcha.py` verifies Cloudflare Turnstile tokens on bot-prone
+endpoints (register, forgot-password). Verification is **skipped** when
+`TURNSTILE_SECRET_KEY` is unset, so local dev and free-tier deploys aren't
+blocked behind an unconfigured captcha.
+
+### Upload validation
+
+`services/image_validation.py` re-decodes uploaded bytes with Pillow's
+`verify()` to reject MIME-spoofed payloads (e.g. a script renamed to `.jpg`).
+Only real JPEG/PNG/WebP pass. `services/scraper.py` enforces a domain
+allowlist to prevent SSRF on the import path.
+
+### AI module source override
+
+`services/ai_module_client.py` calls the AI module at a URL resolved by
+`services/ai_module_source.py`. The default comes from `AI_MODULE_URL`
+(HuggingFace Space), but admins can override it at runtime via `app_settings`
+to point at an ad-hoc Kaggle/Cloudflare tunnel (URL changes each session). A
+TTL cache keeps the DB out of every translate call; admin writes invalidate it.
+
 ### Error handling
 
 Structured JSON errors via FastAPI `HTTPException`. **Never** expose tracebacks
