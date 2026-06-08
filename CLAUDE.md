@@ -273,6 +273,8 @@ Key tables:
 | `share_links`             | Public share URLs (v2 migration)                        |
 | `app_settings`            | Admin feature flags                                     |
 | `audit_logs`              | Admin audit trail                                       |
+| `chapter_comments`        | Comments on published chapters (v4 migration)           |
+| `forum_threads`/`forum_posts`/`forum_votes` | Community forum (v5 migration)        |
 
 Migrations (run in order):
 
@@ -285,7 +287,14 @@ backend/supabase_migration_wibu.sql
 backend/supabase_migration_admin.sql
 backend/supabase_migration_v2_features.sql   # notifications, share_links, stripe_customer_id, pg_trgm
 backend/supabase_migration_v3_features.sql   # manga_chapters.published_at
+backend/supabase_migration_v4_features.sql   # chapter_comments (public library comments)
+backend/supabase_migration_v4_security.sql   # security hardening (captcha, validation)
+backend/supabase_migration_v5_forum.sql      # forum_threads/posts/votes + hot-score triggers
+backend/supabase_migration_v6_forum_attachments.sql  # forum post image/video attachments
 ```
+
+Patches: `backend/supabase_patch.sql` holds out-of-band fixes applied after a
+migration shipped — review before re-running a full migration set.
 
 Storage buckets: `manga-originals` (private), `manga-thumbnails` (private),
 `avatars` (public read).
