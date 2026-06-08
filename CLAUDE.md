@@ -25,10 +25,13 @@ system. Users can also publish their translated chapters to a public library.
 storylen/
 ├── frontend/                  # Next.js web app
 │   ├── src/
-│   │   ├── app/               # App Router pages (login, upload, reader, qa,
-│   │   │                      #   library, review/[pageId], share/[shareId],
-│   │   │                      #   forgot-password, reset-password,
-│   │   │                      #   notifications, profile/security, admin/…)
+│   │   ├── app/               # App Router pages (login, register, upload,
+│   │   │                      #   reader, qa, library, browse, series, studio,
+│   │   │                      #   forum, history, bookmarks, stats, search,
+│   │   │                      #   review/[pageId], share/[shareId], u/[handle],
+│   │   │                      #   forgot/reset-password, notifications, plans,
+│   │   │                      #   settings, profile/security, offline,
+│   │   │                      #   terms/privacy/copyright, admin/…)
 │   │   ├── components/        # AnimatedBackground, NotificationBell,
 │   │   │                      #   LanguageSwitcher, OnboardingOverlay,
 │   │   │                      #   ResumeReading, TopBar, …
@@ -46,13 +49,15 @@ storylen/
 │       ├── config.py          # Pydantic Settings — all env vars live here
 │       ├── database.py        # Supabase client singleton
 │       ├── middleware.py      # RequestID, BodySizeLimit, SecurityHeaders
-│       ├── routers/           # auth, upload, pages, status, qa, history,
-│       │                      #   series, credits, ai_module, wibu,
-│       │                      #   notifications, share, search, payments,
-│       │                      #   library, admin/
+│       ├── routers/           # auth, upload, scrape, mangadex, pages, status,
+│       │                      #   qa, history, series, credits, ai_module,
+│       │                      #   wibu, notifications, share, search, payments,
+│       │                      #   library, comments, forum, ws, admin/
 │       ├── services/          # ai_pipeline, rag, credit_service, hf_client,
-│       │                      #   pipeline_control (cancel + event bus),
-│       │                      #   achievements, idempotency
+│       │                      #   ai_module_client, ai_module_source, scraper,
+│       │                      #   captcha, dictionary, image_validation,
+│       │                      #   forum_service, pipeline_control (cancel +
+│       │                      #   event bus), achievements, idempotency
 │       ├── models/schemas.py  # Pydantic request/response models
 │       └── storage/supabase_storage.py
 ├── ai_module/                 # Standalone ML service (heavy: ~4GB Docker image)
