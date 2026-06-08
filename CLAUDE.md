@@ -165,6 +165,8 @@ STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_BASIC=
 STRIPE_PRICE_PRO=
 STRIPE_PRICE_PREMIUM=
+# Bot protection (optional — leave blank to disable captcha in dev/free tier)
+TURNSTILE_SECRET_KEY=
 ```
 
 ### Frontend (`.env.local`)
@@ -352,12 +354,15 @@ Storage buckets: `manga-originals` (private), `manga-thumbnails` (private),
     malformed JSON, share expired (410), 404
   - `mobile.spec.ts` — mobile viewport: hamburger reveals drawer, language
     switcher hidden in header, credit-badge plan hidden, username hidden, CTAs reachable
+  - `forum.spec.ts` — forum list, category filter, sort, new-thread gating,
+    login-required prompt for anonymous users
 - API mocking: `frontend/e2e/fixtures.ts` (`withMockedApi`, `clearStorage`,
   `gotoApp`). Default 200 fallback so unmocked endpoints don't break UI.
 
 ### Backend
 
-- Pytest at `backend/tests/`. Uses `respx` to mock Supabase + Gemini HTTP.
+- Pytest at `backend/tests/` (`test_forum.py`, `test_scraper.py`,
+  `test_idempotency.py`). Uses `respx` to mock Supabase + Gemini HTTP.
 
 ### CI
 
