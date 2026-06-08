@@ -15,6 +15,13 @@
 - **RAG-powered Q&A** — ask anything about a chapter; vector search over
   every translated bubble + Gemini answers grounded in source.
 - **Public library** — owners publish chapters to a read-only anonymous library.
+- **Community forum** — categories, nested replies, voting, @mentions, and
+  image/video attachments, with admin pin/lock.
+- **Chapter comments** — lightweight discussion on published library chapters.
+- **Import from source** — fetch chapters from supported sites (allowlisted,
+  SSRF-safe) or browse via the MangaDex proxy, then run the same pipeline.
+- **Bubble dictionary** — per-bubble word breakdown, romanization, and
+  alternative translations powered by Gemini.
 - **Account self-service** — password reset, change email, GDPR data export,
   account deletion.
 - **In-app notifications + auto-unlocked achievements + reading-session resume.**
