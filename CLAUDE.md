@@ -251,6 +251,43 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 - `POST /v1/share` (owner) issues an opaque `share_id` with optional TTL.
 - `GET /v1/share/{share_id}` is public; renders at `/share/[shareId]`.
 
+### Community Forum
+
+- Site-wide discussion forum (`routers/forum.py` + `services/forum_service.py`),
+  surfaced at `/forum`. Categories (discussion / Q&A / recommend / feedback /
+  announcement), nested replies (1 level deep), up/down voting, and
+  hot/top/new sorting. Image/video attachments per post (v6 migration).
+- Anonymous users read; authenticated users post, reply, vote. Admins can
+  pin / lock threads.
+- `@username` mentions are parsed server-side and emit notifications.
+- Denormalized score / reply_count / hot_score are maintained by Postgres
+  triggers (see `supabase_migration_v5_forum.sql`), not application code.
+- Graceful degradation: if forum tables are missing, reads return empty lists
+  and writes return 503 — no crashes.
+
+### Chapter Comments
+
+- Lightweight comments on published library chapters (`routers/comments.py`,
+  `chapter_comments` table). Anonymous read; authenticated post / soft-delete
+  own comments. Degrades to empty reads + 503 writes if the table is absent.
+
+### Import from External Sources (scrape / MangaDex)
+
+- `routers/scrape.py`: `POST /v1/scrape/preview` fetches a chapter URL and
+  returns its image list (no download); `POST /v1/scrape` downloads all images
+  and starts the normal translation pipeline. Backed by `services/scraper.py`.
+- **SSRF mitigation:** `scraper.py` only accepts URLs from an explicit domain
+  allowlist (`SUPPORTED_DOMAINS`) — Madara-theme WordPress sites.
+- `routers/mangadex.py` (`/v1/mdx/*`): server-side proxy to the MangaDex API
+  to avoid browser CORS and hotlink blocking, with light retry on 429/5xx.
+
+### Bubble Dictionary
+
+- `services/dictionary.py`: given a bubble's raw OCR text + current VN
+  translation, asks Gemini for a word-by-word breakdown, romanization,
+  alternative translations, and a cultural note for a structured popup in the
+  reader. LRU-cached in-process.
+
 ---
 
 ## Database (Supabase PostgreSQL + pgvector + pg_trgm)
