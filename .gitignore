@@ -145,3 +145,6 @@ temp/
 *.swp
 *~.nib
 local_settings.py
+
+docs/slides/
+docs/slides_markdown/
