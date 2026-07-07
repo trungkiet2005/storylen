@@ -87,15 +87,20 @@ export interface PageData {
 }
 
 export interface QASource {
-  ch: number;
-  p: number;
-  score: number;
+  page_id: string;
+  bubble_id: string | null;
+  original: string | null;
+  translated: string;
+  similarity: number | null;
+  page_number: number | null;
+  reader_url: string;
 }
 
 export interface QAResponse {
   question: string;
   answer: string;
   source_chunks: string[];
+  sources?: QASource[];
 }
 
 export interface HistoryItem {

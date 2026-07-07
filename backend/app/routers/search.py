@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.config import get_settings
 from app.database import get_supabase
 from app.routers.auth import AuthUser, get_current_user
-from app.services.hf_client import call_embed
+from app.services.embedding import embed_query
 
 router = APIRouter(prefix="/search", tags=["search"])
 logger = logging.getLogger(__name__)
@@ -203,7 +203,7 @@ def search_semantic(
     sb = get_supabase()
 
     try:
-        q_vector = call_embed(needle)
+        q_vector = embed_query(needle)
     except Exception as exc:
         logger.warning("semantic embed failed: %s", exc)
         return SearchResponse(query=needle, total=0, hits=[], mode="semantic")
@@ -211,9 +211,12 @@ def search_semantic(
     if not q_vector:
         return SearchResponse(query=needle, total=0, hits=[], mode="semantic")
 
+    # Owner-scoped (same Gemini embedding model as the stored chunks). No
+    # min_similarity floor here — search favors recall over precision.
     rpc_params: dict = {
         "query_embedding": q_vector,
         "match_count": min(limit * 3, 80),
+        "filter_user_id": user.id,
     }
     if series_id:
         rpc_params["filter_series_id"] = series_id

@@ -168,6 +168,7 @@ def process_page(
         db_bubble_rows: list[dict] = []
         db_translation_rows: list[dict] = []
         db_embedding_rows: list[dict] = []
+        embed_targets: list[tuple[str, str]] = []  # (bubble_id, translated_text)
 
         for b in raw_bubbles:
             bubble_id = b.get("bubble_id") or str(uuid.uuid4())
@@ -196,20 +197,37 @@ def process_page(
                     "llm_model_used": f"ai_module:{translator_name}",
                 })
 
-            embedding = b.get("embedding")
-            if (
-                embedding
-                and isinstance(embedding, list)
-                and len(embedding) > 0
-                and translated_text
-            ):
-                db_embedding_rows.append({
-                    "id": str(uuid.uuid4()),
-                    "page_id": page_id,
-                    "bubble_id": bubble_id,
-                    "content": translated_text,
-                    "embedding": embedding,
-                })
+            if translated_text.strip():
+                embed_targets.append((bubble_id, translated_text))
+
+        # ── Embed translated bubbles for RAG (best-effort, one batch per page) ──
+        # The ai_module does not return embeddings; we generate them here via the
+        # Gemini embedding API so the pgvector Q&A actually has data to search.
+        if embed_targets:
+            try:
+                from app.services.embedding import embed_documents
+
+                vectors = embed_documents([text for _, text in embed_targets])
+                if len(vectors) == len(embed_targets):
+                    for (b_id, text), vec in zip(embed_targets, vectors):
+                        db_embedding_rows.append({
+                            # id has a DB default; omit so re-translation UPDATES
+                            # the existing row (unique on bubble_id) instead of
+                            # inserting a duplicate vector.
+                            "page_id": page_id,
+                            "bubble_id": b_id,
+                            "content": text,
+                            "embedding": vec,
+                        })
+                else:
+                    logger.warning(
+                        "Embedding count mismatch for page %s (%d vectors vs %d texts); "
+                        "skipping embeddings for this page.",
+                        page_id, len(vectors), len(embed_targets),
+                    )
+            except Exception as exc:
+                # Never fail the translation just because embedding was unavailable.
+                logger.warning("Embedding generation skipped for page %s: %s", page_id, exc)
 
         if db_bubble_rows:
             try:
@@ -230,7 +248,7 @@ def process_page(
         if db_embedding_rows:
             try:
                 supabase.table("embeddings").upsert(
-                    db_embedding_rows, on_conflict="id"
+                    db_embedding_rows, on_conflict="bubble_id"
                 ).execute()
             except Exception as exc:
                 logger.error(

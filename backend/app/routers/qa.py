@@ -48,6 +48,7 @@ def ask_question(request: Request, payload: QARequest, user: AuthUser = Depends(
 
     qa_result = answer_question(
         question=question,
+        user_id=user.id,
         page_id=payload.page_id,
         series_id=payload.series_id,
     )

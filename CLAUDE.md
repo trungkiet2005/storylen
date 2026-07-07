@@ -189,7 +189,7 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 3. AI Module: YOLOv8 detects bubbles → manga-ocr reads text → lama_large inpaints → Gemini translates
 4. Result (translated PNG) stored in `manga-thumbnails`, metadata in
    `manga_pages` + `bubble_data`
-5. Sentence embeddings → `embeddings` (pgvector)
+5. Gemini embeddings of translated bubbles → `embeddings` (pgvector, 768-dim)
 6. Frontend receives progress via WebSocket (`/v1/ws/batch/{batch_id}`) with
    polling fallback. Event bus replays missed events on reconnect.
 
@@ -198,10 +198,22 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 ### RAG Q&A
 
-1. User question → `POST /v1/qa` → vector embedding via Gemini embedding model
-2. pgvector cosine search in `embeddings` table → top-k bubble texts
-3. Context + question → Gemini (round-robin across multiple API keys)
-4. 1 credit deducted per successful answer
+- Embeddings are generated **in the backend** by `services/embedding.py` calling
+  the Gemini embedding API (`gemini-embedding-001`, 768-dim, L2-normalized,
+  `task_type` RETRIEVAL_DOCUMENT/QUERY). No local ML model (respects "no ML on
+  Render"). The ai_module does **not** return embeddings.
+- Written at translate time in `ai_pipeline` (one batch per page, best-effort) and
+  backfilled for older pages via `python -m app.scripts.backfill_embeddings`.
+
+Query flow:
+1. User question → `POST /v1/qa` → `embed_query()` (same model as the chunks).
+2. `match_embeddings` RPC: pgvector cosine search, **owner-scoped**
+   (`filter_user_id` → also closes the IDOR), with a `min_similarity`
+   (`RAG_MIN_SIMILARITY`) floor; optional page/series scope.
+3. Hits are enriched into `QASource` citations (original + translated +
+   page_number + `/reader?page=` link); context + question → Gemini answer.
+4. Falls back to the owner's own page text if no vector hits; honest "not found"
+   message otherwise. 1 credit deducted per successful answer.
 
 ### Auth Flow
 
@@ -303,7 +315,7 @@ Key tables:
 | `manga_chapters`          | Chapters (`published_at` flag for public library)       |
 | `manga_pages`             | Individual pages, status, translated image URL          |
 | `bubble_data`             | OCR bounding boxes, text, confidence, `review_status`   |
-| `embeddings`              | pgvector (1536-dim) — RAG search                        |
+| `embeddings`              | pgvector (768-dim, Gemini) — RAG search                 |
 | `qa_history`              | Q&A logs                                                |
 | `credit_transactions`     | Credit movements                                        |
 | `subscription_plans`      | Plan tier definitions                                   |
@@ -330,6 +342,7 @@ backend/supabase_migration_v4_features.sql   # chapter_comments (public library 
 backend/supabase_migration_v4_security.sql   # security hardening (captcha, validation)
 backend/supabase_migration_v5_forum.sql      # forum_threads/posts/votes + hot-score triggers
 backend/supabase_migration_v6_forum_attachments.sql  # forum post image/video attachments
+backend/supabase_migration_v7_rag.sql        # embeddings→768-dim (Gemini) + owner-scoped match_embeddings
 ```
 
 Patches: `backend/supabase_patch.sql` holds out-of-band fixes applied after a

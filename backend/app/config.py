@@ -229,6 +229,14 @@ class Settings(BaseSettings):
 
     # ─── RAG ──────────────────────────────────────────────────────────────────
     RAG_TOP_K: int = 5
+    # Gemini embedding model used for both document + query embeddings.
+    # gemini-embedding-001 supports output_dimensionality; keep it in sync with
+    # the `vector(EMBED_DIM)` column created by supabase_migration_v7_rag.sql.
+    GEMINI_EMBED_MODEL: str = "gemini-embedding-001"
+    EMBED_DIM: int = 768
+    # Cosine-similarity floor for vector search. Chunks below this are dropped
+    # so off-topic bubbles never reach the answer prompt.
+    RAG_MIN_SIMILARITY: float = 0.55
 
     # ─── Account & email flows ────────────────────────────────────────────────
     # URL Supabase Auth redirects to after the user clicks the password-reset

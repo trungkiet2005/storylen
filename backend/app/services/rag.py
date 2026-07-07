@@ -16,8 +16,8 @@ from google import genai
 
 from app.config import get_settings
 from app.database import get_supabase
-from app.models.schemas import QAResponse
-from app.services.hf_client import call_embed
+from app.models.schemas import QAResponse, QASource
+from app.services.embedding import embed_query
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -132,10 +132,43 @@ def _latest_translation(translations: list[dict]) -> str:
     return str(translations[0].get("translated_text_vi") or "")
 
 
-def _page_context_from_db(supabase, page_id: str) -> tuple[str, list[str]]:
+def _reader_url(page_id: str) -> str:
+    return f"/reader?page={page_id}"
+
+
+def _owned_page_number(supabase, page_id: str, user_id: str) -> tuple[bool, int | None]:
+    """Return (is_owned, page_number). is_owned is False when the page does not
+    belong to `user_id` — the caller must then refuse to read its content."""
+    try:
+        res = (
+            supabase.table("manga_pages")
+            .select("page_id, page_number")
+            .eq("page_id", page_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("Ownership check failed for page %s: %s", page_id, exc)
+        return False, None
+    rows = res.data or []
+    if not rows:
+        return False, None
+    return True, rows[0].get("page_number")
+
+
+def _page_context_from_db(
+    supabase, page_id: str, user_id: str
+) -> tuple[str, list[QASource]]:
     """
-    Fallback context for pages that have extracted text but no vector chunks yet.
+    Ownership-scoped fallback for a page that has extracted text but no vector
+    chunks yet. Returns ("", []) if the page is not owned by `user_id`.
     """
+    owned, page_number = _owned_page_number(supabase, page_id, user_id)
+    if not owned:
+        logger.warning("Q&A denied: page %s not owned by user %s", page_id, user_id)
+        return "", []
+
     try:
         result = (
             supabase.table("bubble_data")
@@ -157,7 +190,7 @@ def _page_context_from_db(supabase, page_id: str) -> tuple[str, list[str]]:
         pass
 
     context_parts: list[str] = []
-    source_ids: list[str] = []
+    sources: list[QASource] = []
     for index, row in enumerate(rows, start=1):
         if not isinstance(row, dict):
             continue
@@ -167,13 +200,87 @@ def _page_context_from_db(supabase, page_id: str) -> tuple[str, list[str]]:
             continue
 
         bubble_id = str(row.get("bubble_id") or index)
-        source_ids.append(f"page:{page_id}:bubble:{bubble_id}")
+        sources.append(
+            QASource(
+                page_id=page_id,
+                bubble_id=bubble_id,
+                original=original_text or None,
+                translated=translated_text,
+                similarity=None,  # extractive fallback, not a vector match
+                page_number=page_number,
+                reader_url=_reader_url(page_id),
+            )
+        )
         context_parts.append(
             f"[{index}] Gốc: {original_text or '(không có)'}\n"
             f"[{index}] Dịch: {translated_text or '(không có)'}"
         )
 
-    return "\n\n".join(context_parts), source_ids
+    return "\n\n".join(context_parts), sources
+
+
+def _enrich_sources(supabase, chunks: list[dict]) -> tuple[str, list[QASource]]:
+    """Turn raw match_embeddings rows into a context string + rich QASource list.
+    Looks up each bubble's original OCR text and its page number for citations."""
+    valid = [c for c in chunks if isinstance(c, dict) and c.get("content")]
+    if not valid:
+        return "", []
+
+    bubble_ids = [str(c["bubble_id"]) for c in valid if c.get("bubble_id")]
+    page_ids = [str(c["page_id"]) for c in valid if c.get("page_id")]
+
+    originals: dict[str, str] = {}
+    if bubble_ids:
+        try:
+            res = (
+                supabase.table("bubble_data")
+                .select("bubble_id, original_text_jp")
+                .in_("bubble_id", bubble_ids)
+                .execute()
+            )
+            for r in res.data or []:
+                if isinstance(r, dict) and r.get("bubble_id"):
+                    originals[str(r["bubble_id"])] = str(r.get("original_text_jp") or "")
+        except Exception as exc:
+            logger.warning("Source original-text lookup failed: %s", exc)
+
+    page_numbers: dict[str, int | None] = {}
+    if page_ids:
+        try:
+            res = (
+                supabase.table("manga_pages")
+                .select("page_id, page_number")
+                .in_("page_id", page_ids)
+                .execute()
+            )
+            for r in res.data or []:
+                if isinstance(r, dict) and r.get("page_id"):
+                    page_numbers[str(r["page_id"])] = r.get("page_number")
+        except Exception as exc:
+            logger.warning("Source page-number lookup failed: %s", exc)
+
+    context_parts: list[str] = []
+    sources: list[QASource] = []
+    for index, c in enumerate(valid, start=1):
+        page_id = str(c.get("page_id") or "")
+        bubble_id = str(c["bubble_id"]) if c.get("bubble_id") else None
+        translated = str(c.get("content") or "")
+        original = originals.get(bubble_id or "", "").strip() or None
+        similarity = c.get("similarity")
+        sources.append(
+            QASource(
+                page_id=page_id,
+                bubble_id=bubble_id,
+                original=original,
+                translated=translated,
+                similarity=float(similarity) if similarity is not None else None,
+                page_number=page_numbers.get(page_id),
+                reader_url=_reader_url(page_id),
+            )
+        )
+        context_parts.append(f"[{index}] {translated}")
+
+    return "\n\n".join(context_parts), sources
 
 
 def _translation_lines_from_context(context: str) -> list[str]:
@@ -252,100 +359,95 @@ def _generate_answer(question: str, context: str) -> str:
     return _context_fallback_answer(context)
 
 
+_NO_CONTEXT_ANSWER = (
+    "Mình chưa tìm thấy nội dung liên quan trong truyện của bạn. "
+    "Hãy chắc chắn truyện đã được dịch xong, hoặc thử diễn đạt câu hỏi khác."
+)
+
+
+def _response(question: str, context: str, sources: list[QASource]) -> QAResponse:
+    """Generate an answer from the given context and attach citations."""
+    return QAResponse(
+        question=question,
+        answer=_generate_answer(question, context),
+        source_chunks=[
+            f"page:{s.page_id}:bubble:{s.bubble_id}" if s.bubble_id else f"page:{s.page_id}"
+            for s in sources
+        ],
+        sources=sources,
+    )
+
+
 def answer_question(
     question: str,
+    user_id: str,
     page_id: str | None = None,
     series_id: str | None = None,
 ) -> QAResponse:
     """
-    1. Embed question via HF Space when available.
-    2. Vector search in Supabase pgvector.
-    3. Fall back to extracted page context when no vector chunks exist.
-    4. Generate answer with Gemini, or return extractive page context if Gemini fails.
+    Ownership-scoped RAG:
+    1. Embed the question with Gemini (same model as the stored chunks).
+    2. Vector search in pgvector, filtered by owner (+ optional page/series),
+       with a cosine-similarity floor.
+    3. Fall back to the page's extracted text ONLY for the owner's own page.
+    4. Generate the answer with Gemini; degrade honestly if unavailable.
     """
     supabase = get_supabase()
 
+    # ── Step 1: embed the question ────────────────────────────────────────────
     q_vector: list[float] = []
     try:
-        q_vector = call_embed(question)
+        q_vector = embed_query(question)
     except Exception as exc:
+        logger.warning("Question embedding failed: %s", exc)
+        # Without a vector we can only serve the owner's own page (extractive).
         if page_id:
-            logger.warning("Embedding failed; falling back to page context: %s", exc)
-        else:
-            logger.error("Embedding failed: %s", exc)
-        if not page_id:
-            return QAResponse(
-                question=question,
-                answer="Không thể tạo embedding cho câu hỏi. Vui lòng thử lại sau.",
-            )
-
-    if not q_vector and not page_id:
+            page_context, page_sources = _page_context_from_db(supabase, page_id, user_id)
+            if page_context:
+                return _response(question, page_context, page_sources)
         return QAResponse(
             question=question,
-            answer="HF Space trả về embedding rỗng. Vui lòng thử lại.",
+            answer="Hiện chưa tạo được embedding cho câu hỏi. Vui lòng thử lại sau.",
         )
 
-    chunks = []
-    if q_vector:
-        rpc_params: dict = {
-            "query_embedding": q_vector,
-            "match_count": settings.RAG_TOP_K,
-        }
-        if page_id:
-            rpc_params["filter_page_id"] = page_id
-        if series_id:
-            rpc_params["filter_series_id"] = series_id
+    # ── Step 2: vector search (owner-scoped, thresholded) ─────────────────────
+    chunks: list[dict] = []
+    rpc_params: dict = {
+        "query_embedding": q_vector,
+        "match_count": settings.RAG_TOP_K,
+        "min_similarity": settings.RAG_MIN_SIMILARITY,
+        "filter_user_id": user_id,
+    }
+    if page_id:
+        rpc_params["filter_page_id"] = page_id
+    if series_id:
+        rpc_params["filter_series_id"] = series_id
+    search_failed = False
+    try:
+        result = supabase.rpc("match_embeddings", rpc_params).execute()
+        chunks = result.data or []
+    except Exception as exc:
+        # Distinguish "search broke" from "search found nothing" so a mis-deploy
+        # (missing v7 migration, dim mismatch, renamed RPC arg) surfaces as an
+        # error instead of masquerading as an empty library.
+        logger.error("Vector search failed: %s", exc)
+        search_failed = True
 
-        try:
-            result = supabase.rpc("match_embeddings", rpc_params).execute()
-            chunks = result.data or []
-        except Exception as exc:
-            logger.error("Vector search failed: %s", exc)
+    context, sources = _enrich_sources(supabase, chunks)
+    if context:
+        return _response(question, context, sources)
 
-    if not chunks:
-        if page_id:
-            page_context, page_sources = _page_context_from_db(supabase, page_id)
-            if page_context:
-                return QAResponse(
-                    question=question,
-                    answer=_generate_answer(question, page_context),
-                    source_chunks=page_sources,
-                )
+    # ── Step 3: fallback to the owner's own page text ─────────────────────────
+    if page_id:
+        page_context, page_sources = _page_context_from_db(supabase, page_id, user_id)
+        if page_context:
+            return _response(question, page_context, page_sources)
+
+    if search_failed:
         return QAResponse(
             question=question,
-            answer="Xin lỗi, tôi không tìm thấy thông tin liên quan trong nội dung truyện.",
+            answer="Hệ thống tìm kiếm đang tạm gặp sự cố. Vui lòng thử lại sau.",
             source_chunks=[],
+            sources=[],
         )
-
-    context_parts: list[str] = []
-    source_ids: list[str] = []
-    for chunk in chunks:
-        if not isinstance(chunk, dict):
-            continue
-        content = chunk.get("content")
-        if content:
-            context_parts.append(str(content))
-        chunk_id = chunk.get("id")
-        if chunk_id:
-            source_ids.append(str(chunk_id))
-
-    if not context_parts:
-        if page_id:
-            page_context, page_sources = _page_context_from_db(supabase, page_id)
-            if page_context:
-                return QAResponse(
-                    question=question,
-                    answer=_generate_answer(question, page_context),
-                    source_chunks=page_sources,
-                )
-        return QAResponse(
-            question=question,
-            answer="Xin lỗi, không trích xuất được nội dung từ kết quả tìm kiếm.",
-            source_chunks=source_ids,
-        )
-
-    return QAResponse(
-        question=question,
-        answer=_generate_answer(question, "\n\n".join(context_parts)),
-        source_chunks=source_ids,
-    )
+    return QAResponse(question=question, answer=_NO_CONTEXT_ANSWER, source_chunks=[], sources=[])

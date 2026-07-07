@@ -7,8 +7,9 @@ pydantic-settings>=2.3.0
 # ─── Supabase ─────────────────────────────────────────────────────────────────
 supabase>=2.4.0,<2.20.0
 
-# ─── Google Gemini (Q&A answer generation — lightweight HTTP) ─────────────────
-google-genai>=0.1.0
+# ─── Google Gemini (Q&A answer generation + RAG embeddings — lightweight HTTP)
+# Needs >=1.0.0 for embed_content batch + EmbedContentConfig(output_dimensionality).
+google-genai>=1.0.0
 
 # ─── Image processing (thumbnail generation only — no heavy ML) ───────────────
 Pillow>=10.3.0

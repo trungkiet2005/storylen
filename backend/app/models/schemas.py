@@ -156,10 +156,22 @@ class QARequest(BaseModel):
     series_id: Optional[str] = None
 
 
+class QASource(BaseModel):
+    """A citation backing a Q&A answer — the bubble/page the context came from."""
+    page_id: str
+    bubble_id: Optional[str] = None
+    original: Optional[str] = None      # OCR'd source text (JP/CN)
+    translated: str                     # the Vietnamese chunk used as context
+    similarity: Optional[float] = None  # cosine score (None for DB fallback)
+    page_number: Optional[int] = None
+    reader_url: str                     # e.g. /reader?page=<page_id>
+
+
 class QAResponse(BaseModel):
     question: str
     answer: str
-    source_chunks: list[str] = []
+    source_chunks: list[str] = []       # kept for backward compatibility
+    sources: list[QASource] = []        # rich, clickable citations
     confidence: Optional[float] = None
 
 
