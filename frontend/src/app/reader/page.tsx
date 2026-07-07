@@ -899,6 +899,7 @@ function ReaderContent() {
       }
       switch (e.key) {
         case "o": setShowOverlay(v => !v); break;
+        case "c": case "C": setShowContext(v => !v); break;
         case "f": case "F": toggleFullscreen(); break;
         case "+": case "=": setZoom(z => Math.min(z + 0.1, 2.0)); break;
         case "-": setZoom(z => Math.max(z - 0.1, 0.5)); break;
@@ -1228,6 +1229,24 @@ function ReaderContent() {
                 </button>
               ))}
             </div>
+
+            {/* Context / edit panel toggle — bubble editing, QC, history, overlay style */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="btn btn-sm"
+              onClick={() => setShowContext(v => !v)}
+              aria-label="Ngữ cảnh & chỉnh sửa bản dịch"
+              title="Ngữ cảnh · sửa bản dịch, QC, lịch sử (C)"
+              aria-pressed={showContext}
+              style={{
+                gap: 5, fontWeight: 700, whiteSpace: "nowrap",
+                color: showContext ? "#fff" : undefined,
+                background: showContext ? "var(--accent)" : undefined,
+              }}
+            >
+              📝 Ngữ cảnh
+            </motion.button>
 
             {/* Overlay toggle */}
             {mode !== "sidebyside" && (
