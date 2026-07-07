@@ -14,17 +14,32 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ─── Re-dimension the embedding column to 768 (Gemini) ────────────────────────
--- Guard: refuse to drop the column if it somehow already has rows, so we never
--- silently destroy real vectors.
+-- Fully idempotent: only re-dimension when the column is NOT already vector(768).
+-- If it needs changing AND the table holds real vectors, abort instead of
+-- silently dropping them. Re-running on an already-migrated DB is a no-op, so
+-- this is safe under apply_migrations (the destructive ALTER lives inside the
+-- guard, not as an independent statement).
 DO $$
+DECLARE
+    cur_type text;
 BEGIN
-    IF EXISTS (SELECT 1 FROM public.embeddings LIMIT 1) THEN
-        RAISE EXCEPTION 'embeddings table is not empty — re-embed & TRUNCATE before changing vector dimension';
+    SELECT format_type(a.atttypid, a.atttypmod) INTO cur_type
+    FROM pg_attribute a
+    JOIN pg_class c ON a.attrelid = c.oid
+    WHERE c.relname = 'embeddings'
+      AND a.attname = 'embedding'
+      AND a.attnum > 0 AND NOT a.attisdropped;
+
+    IF cur_type IS DISTINCT FROM 'vector(768)' THEN
+        IF EXISTS (SELECT 1 FROM public.embeddings LIMIT 1) THEN
+            RAISE EXCEPTION
+                'embeddings.embedding is % (need vector(768)) but table is not empty — re-embed & TRUNCATE first',
+                COALESCE(cur_type, 'missing');
+        END IF;
+        ALTER TABLE public.embeddings DROP COLUMN IF EXISTS embedding;
+        ALTER TABLE public.embeddings ADD COLUMN embedding vector(768) NOT NULL;
     END IF;
 END $$;
-
-ALTER TABLE public.embeddings DROP COLUMN IF EXISTS embedding;
-ALTER TABLE public.embeddings ADD  COLUMN embedding vector(768) NOT NULL;
 
 -- One embedding per bubble so re-translating a page UPSERTs (on_conflict=bubble_id)
 -- instead of appending duplicate vectors that pollute retrieval.
