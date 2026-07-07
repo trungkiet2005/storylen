@@ -93,6 +93,7 @@ export interface QASource {
   translated: string;
   similarity: number | null;
   page_number: number | null;
+  bbox: number[] | null; // [x, y, width, height] in image pixels
   reader_url: string;
 }
 

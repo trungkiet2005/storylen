@@ -136,6 +136,14 @@ def _reader_url(page_id: str) -> str:
     return f"/reader?page={page_id}"
 
 
+def _bbox_from(row: dict) -> list[float] | None:
+    """Extract [x, y, width, height] pixel bbox from a bubble_data row, or None."""
+    try:
+        return [float(row["x"]), float(row["y"]), float(row["width"]), float(row["height"])]
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def _owned_page_number(supabase, page_id: str, user_id: str) -> tuple[bool, int | None]:
     """Return (is_owned, page_number). is_owned is False when the page does not
     belong to `user_id` — the caller must then refuse to read its content."""
@@ -173,7 +181,7 @@ def _page_context_from_db(
         result = (
             supabase.table("bubble_data")
             .select(
-                "bubble_id, x, y, original_text_jp, "
+                "bubble_id, x, y, width, height, original_text_jp, "
                 "translation_history(translated_text_vi, translated_at)"
             )
             .eq("page_id", page_id)
@@ -208,6 +216,7 @@ def _page_context_from_db(
                 translated=translated_text,
                 similarity=None,  # extractive fallback, not a vector match
                 page_number=page_number,
+                bbox=_bbox_from(row),
                 reader_url=_reader_url(page_id),
             )
         )
@@ -229,20 +238,20 @@ def _enrich_sources(supabase, chunks: list[dict]) -> tuple[str, list[QASource]]:
     bubble_ids = [str(c["bubble_id"]) for c in valid if c.get("bubble_id")]
     page_ids = [str(c["page_id"]) for c in valid if c.get("page_id")]
 
-    originals: dict[str, str] = {}
+    bubble_meta: dict[str, dict] = {}
     if bubble_ids:
         try:
             res = (
                 supabase.table("bubble_data")
-                .select("bubble_id, original_text_jp")
+                .select("bubble_id, original_text_jp, x, y, width, height")
                 .in_("bubble_id", bubble_ids)
                 .execute()
             )
             for r in res.data or []:
                 if isinstance(r, dict) and r.get("bubble_id"):
-                    originals[str(r["bubble_id"])] = str(r.get("original_text_jp") or "")
+                    bubble_meta[str(r["bubble_id"])] = r
         except Exception as exc:
-            logger.warning("Source original-text lookup failed: %s", exc)
+            logger.warning("Source bubble lookup failed: %s", exc)
 
     page_numbers: dict[str, int | None] = {}
     if page_ids:
@@ -265,7 +274,8 @@ def _enrich_sources(supabase, chunks: list[dict]) -> tuple[str, list[QASource]]:
         page_id = str(c.get("page_id") or "")
         bubble_id = str(c["bubble_id"]) if c.get("bubble_id") else None
         translated = str(c.get("content") or "")
-        original = originals.get(bubble_id or "", "").strip() or None
+        meta = bubble_meta.get(bubble_id or "", {})
+        original = str(meta.get("original_text_jp") or "").strip() or None
         similarity = c.get("similarity")
         sources.append(
             QASource(
@@ -275,6 +285,7 @@ def _enrich_sources(supabase, chunks: list[dict]) -> tuple[str, list[QASource]]:
                 translated=translated,
                 similarity=float(similarity) if similarity is not None else None,
                 page_number=page_numbers.get(page_id),
+                bbox=_bbox_from(meta),
                 reader_url=_reader_url(page_id),
             )
         )

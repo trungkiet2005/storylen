@@ -65,6 +65,9 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
   const [mode, setMode] = useState<ReadMode>("pageflip");
   const [immersive, setImmersive] = useState(false);
   const [showQA, setShowQA] = useState(false);
+  // Citation highlight: which bubble (pixel bbox) on which page to spotlight.
+  const [highlight, setHighlight] = useState<{ pageId: string; bbox: number[] } | null>(null);
+  const [imgDims, setImgDims] = useState<Record<string, { w: number; h: number }>>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -144,18 +147,62 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
     if (hasNext) setIndex(i => i + 1);
   }, [hasNext]);
 
-  // Jump to a cited page IN PLACE (keeps the Q&A panel + conversation mounted);
-  // falls back to the standalone reader if the page isn't in this series.
-  const openSource = useCallback((pid: string) => {
+  // Jump to a cited page IN PLACE (keeps the Q&A panel + conversation mounted)
+  // and spotlight the cited bubble; falls back to the standalone reader if the
+  // page isn't in this series.
+  const openSource = useCallback((pid: string, bbox?: number[] | null) => {
     const idx = flatPages.findIndex(p => p.page_id === pid);
     if (idx >= 0) {
       setIndex(idx);
+      setHighlight(bbox && bbox.length === 4 ? { pageId: pid, bbox } : null);
       const el = pageRefs.current[flatPages[idx].page_id];
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
     } else {
       router.push(`/reader?page=${pid}`);
     }
   }, [flatPages, router]);
+
+  // Auto-fade the spotlight after a few seconds.
+  useEffect(() => {
+    if (!highlight) return;
+    const t = setTimeout(() => setHighlight(null), 4500);
+    return () => clearTimeout(t);
+  }, [highlight]);
+
+  // Overlay a spotlight box on `pid`'s image, positioned by the cited bubble's
+  // pixel bbox scaled to the image's natural size (so it tracks any zoom/mode).
+  const renderHighlight = (pid: string) => {
+    if (!highlight || highlight.pageId !== pid) return null;
+    const dim = imgDims[pid];
+    if (!dim || !dim.w || !dim.h) return null;
+    const [bx, by, bw, bh] = highlight.bbox;
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 1.25 }}
+        animate={{ opacity: [0, 1, 0.65, 1, 0.7], scale: [1.25, 1, 1.05, 1, 1] }}
+        transition={{ duration: 1.8, times: [0, 0.18, 0.45, 0.72, 1] }}
+        style={{
+          position: "absolute",
+          left: `${(bx / dim.w) * 100}%`,
+          top: `${(by / dim.h) * 100}%`,
+          width: `${(bw / dim.w) * 100}%`,
+          height: `${(bh / dim.h) * 100}%`,
+          border: "3px solid var(--accent)",
+          background: "rgba(200,16,46,0.14)",
+          boxShadow: "0 0 0 3px rgba(255,255,255,0.65), 0 0 20px 5px rgba(200,16,46,0.5)",
+          borderRadius: 2,
+          pointerEvents: "none",
+          zIndex: 5,
+        }}
+      />
+    );
+  };
+
+  const captureDims = (pid: string) => (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const t = e.currentTarget;
+    if (!t.naturalWidth) return;
+    setImgDims(d => (d[pid]?.w === t.naturalWidth ? d : { ...d, [pid]: { w: t.naturalWidth, h: t.naturalHeight } }));
+  };
 
   // Keyboard navigation
   useEffect(() => {
@@ -438,20 +485,24 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
                     transition={{ duration: 0.25 }}
                     style={{ width: "100%", display: "flex", justifyContent: "center" }}
                   >
-                    {isReady && imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={imageUrl}
-                        alt={`Trang ${current.page_number ?? index + 1}`}
-                        draggable={false}
-                        style={{
-                          maxWidth: "100%",
-                          height: "auto",
-                          display: "block",
-                          userSelect: "none",
-                          pointerEvents: "none",
-                        }}
-                      />
+                    {isReady && imageUrl && current ? (
+                      <div style={{ position: "relative", display: "inline-block", maxWidth: "100%" }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imageUrl}
+                          alt={`Trang ${current.page_number ?? index + 1}`}
+                          draggable={false}
+                          onLoad={captureDims(current.page_id)}
+                          style={{
+                            maxWidth: "100%",
+                            height: "auto",
+                            display: "block",
+                            userSelect: "none",
+                            pointerEvents: "none",
+                          }}
+                        />
+                        {renderHighlight(current.page_id)}
+                      </div>
                     ) : (
                       <div style={{ padding: 60, textAlign: "center", color: "var(--muted)" }}>
                         <Icon name="alert" size={28} />
@@ -578,18 +629,22 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
                       }}
                     >
                       {ready && url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={url}
-                          alt={`Trang ${p.page_number ?? i + 1}`}
-                          loading="lazy"
-                          decoding="async"
-                          style={{
-                            maxWidth: "100%",
-                            height: "auto",
-                            display: "block",
-                          }}
-                        />
+                        <div style={{ position: "relative", display: "inline-block", maxWidth: "100%" }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={url}
+                            alt={`Trang ${p.page_number ?? i + 1}`}
+                            loading="lazy"
+                            decoding="async"
+                            onLoad={captureDims(p.page_id)}
+                            style={{
+                              maxWidth: "100%",
+                              height: "auto",
+                              display: "block",
+                            }}
+                          />
+                          {renderHighlight(p.page_id)}
+                        </div>
                       ) : (
                         <div style={{ padding: 30, textAlign: "center", color: "var(--muted)", fontSize: 12 }}>
                           <Icon name="alert" size={20} />

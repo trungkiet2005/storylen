@@ -164,6 +164,7 @@ class QASource(BaseModel):
     translated: str                     # the Vietnamese chunk used as context
     similarity: Optional[float] = None  # cosine score (None for DB fallback)
     page_number: Optional[int] = None
+    bbox: Optional[list[float]] = None  # [x, y, width, height] in image pixels
     reader_url: str                     # e.g. /reader?page=<page_id>
 
 

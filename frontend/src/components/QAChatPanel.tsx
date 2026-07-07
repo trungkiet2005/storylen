@@ -34,7 +34,7 @@ export function QAChatPanel({
   seriesId?: string;
   pageId?: string;
   onClose?: () => void;
-  onOpenSource?: (pageId: string) => void;
+  onOpenSource?: (pageId: string, bbox?: number[] | null) => void;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -189,7 +189,7 @@ export function QAChatPanel({
                   );
                   const key = s.bubble_id ?? `${s.page_id}-${j}`;
                   return onOpenSource ? (
-                    <button key={key} type="button" style={cardStyle} onClick={() => onOpenSource(s.page_id)}>
+                    <button key={key} type="button" style={cardStyle} onClick={() => onOpenSource(s.page_id, s.bbox)}>
                       {inner}
                     </button>
                   ) : (
