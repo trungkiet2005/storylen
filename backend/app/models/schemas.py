@@ -176,6 +176,18 @@ class QAResponse(BaseModel):
     confidence: Optional[float] = None
 
 
+class QAMessage(BaseModel):
+    role: str                            # "user" | "assistant"
+    content: str
+
+
+class QAStreamRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    page_id: Optional[str] = None
+    series_id: Optional[str] = None
+    history: list[QAMessage] = Field(default_factory=list)
+
+
 # ─── History ───────────────────────────────────────────────────────────────────
 
 class HistoryItem(BaseModel):

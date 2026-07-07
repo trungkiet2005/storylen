@@ -374,6 +374,51 @@ _NO_CONTEXT_ANSWER = (
     "Mình chưa tìm thấy nội dung liên quan trong truyện của bạn. "
     "Hãy chắc chắn truyện đã được dịch xong, hoặc thử diễn đạt câu hỏi khác."
 )
+_EMBED_ERROR_MSG = "Hiện chưa tạo được embedding cho câu hỏi. Vui lòng thử lại sau."
+_SEARCH_ERROR_MSG = "Hệ thống tìm kiếm đang tạm gặp sự cố. Vui lòng thử lại sau."
+
+
+def _search(
+    supabase, q_vector: list[float], user_id: str,
+    page_id: str | None = None, series_id: str | None = None,
+) -> tuple[list[dict], bool]:
+    """Owner-scoped, thresholded pgvector search. Returns (chunks, search_failed).
+    Shared by the blocking and streaming answer paths."""
+    params: dict = {
+        "query_embedding": q_vector,
+        "match_count": settings.RAG_TOP_K,
+        "min_similarity": settings.RAG_MIN_SIMILARITY,
+        "filter_user_id": user_id,
+    }
+    if page_id:
+        params["filter_page_id"] = page_id
+    if series_id:
+        params["filter_series_id"] = series_id
+    try:
+        result = supabase.rpc("match_embeddings", params).execute()
+        return (result.data or []), False
+    except Exception as exc:
+        logger.error("Vector search failed: %s", exc)
+        return [], True
+
+
+def _msg_field(msg, field: str) -> str:
+    """Read role/content from a dict or a QAMessage-like object."""
+    if isinstance(msg, dict):
+        return str(msg.get(field) or "")
+    return str(getattr(msg, field, "") or "")
+
+
+def _retrieval_query(question: str, history: list | None) -> str:
+    """Fold the previous user turn into the retrieval query so pronoun-y
+    follow-ups ('còn nhân vật kia thì sao?') still retrieve well — no extra call."""
+    prev = ""
+    for msg in reversed(history or []):
+        if _msg_field(msg, "role") == "user":
+            prev = _msg_field(msg, "content").strip()
+            break
+    combined = f"{prev} {question}".strip() if prev else question
+    return combined[:1500]
 
 
 def _response(question: str, context: str, sources: list[QASource]) -> QAResponse:
@@ -416,33 +461,11 @@ def answer_question(
             page_context, page_sources = _page_context_from_db(supabase, page_id, user_id)
             if page_context:
                 return _response(question, page_context, page_sources)
-        return QAResponse(
-            question=question,
-            answer="Hiện chưa tạo được embedding cho câu hỏi. Vui lòng thử lại sau.",
-        )
+        return QAResponse(question=question, answer=_EMBED_ERROR_MSG)
 
     # ── Step 2: vector search (owner-scoped, thresholded) ─────────────────────
-    chunks: list[dict] = []
-    rpc_params: dict = {
-        "query_embedding": q_vector,
-        "match_count": settings.RAG_TOP_K,
-        "min_similarity": settings.RAG_MIN_SIMILARITY,
-        "filter_user_id": user_id,
-    }
-    if page_id:
-        rpc_params["filter_page_id"] = page_id
-    if series_id:
-        rpc_params["filter_series_id"] = series_id
-    search_failed = False
-    try:
-        result = supabase.rpc("match_embeddings", rpc_params).execute()
-        chunks = result.data or []
-    except Exception as exc:
-        # Distinguish "search broke" from "search found nothing" so a mis-deploy
-        # (missing v7 migration, dim mismatch, renamed RPC arg) surfaces as an
-        # error instead of masquerading as an empty library.
-        logger.error("Vector search failed: %s", exc)
-        search_failed = True
+    # search_failed distinguishes "search broke" (mis-deploy) from "found nothing".
+    chunks, search_failed = _search(supabase, q_vector, user_id, page_id, series_id)
 
     context, sources = _enrich_sources(supabase, chunks)
     if context:
@@ -455,10 +478,120 @@ def answer_question(
             return _response(question, page_context, page_sources)
 
     if search_failed:
-        return QAResponse(
-            question=question,
-            answer="Hệ thống tìm kiếm đang tạm gặp sự cố. Vui lòng thử lại sau.",
-            source_chunks=[],
-            sources=[],
-        )
+        return QAResponse(question=question, answer=_SEARCH_ERROR_MSG, source_chunks=[], sources=[])
     return QAResponse(question=question, answer=_NO_CONTEXT_ANSWER, source_chunks=[], sources=[])
+
+
+# ─── Streaming (conversational assistant) ─────────────────────────────────────
+
+_STREAM_PROMPT = """Bạn là trợ lý hỏi đáp cho độc giả manga. Chỉ trả lời dựa trên các đoạn trích được ĐÁNH SỐ dưới đây.
+Khi dùng thông tin từ đoạn nào, hãy chèn số nguồn trong ngoặc vuông ngay sau ý đó — ví dụ [1] hoặc [2][3].
+Nếu không đủ thông tin trong đoạn trích, hãy nói rõ là bạn không biết, tuyệt đối không bịa.
+Trả lời bằng tiếng Việt, ngắn gọn, tự nhiên như đang trò chuyện.
+
+--- NỘI DUNG TRUYỆN (đã đánh số nguồn) ---
+{context}
+------------------------------------------
+{history_block}Câu hỏi hiện tại: {question}
+Trả lời:"""
+
+
+def _history_block(history: list | None, max_turns: int = 6) -> str:
+    """Format the most recent turns for the answer prompt (multi-turn context)."""
+    msgs = [m for m in (history or []) if _msg_field(m, "content").strip()]
+    if not msgs:
+        return ""
+    lines = []
+    for m in msgs[-max_turns:]:
+        who = "Người đọc" if _msg_field(m, "role") == "user" else "Trợ lý"
+        lines.append(f"{who}: {_msg_field(m, 'content').strip()}")
+    return "--- HỘI THOẠI TRƯỚC ĐÓ ---\n" + "\n".join(lines) + "\n---------------------------\n"
+
+
+def _stream_answer(question: str, context: str, history: list | None) -> Iterator[dict]:
+    """Yield {'type':'token','text':...} from Gemini streaming. Rotates keys only
+    BEFORE the first token — rotating mid-stream would duplicate the answer."""
+    if not _pool.available:
+        yield {"type": "token", "text": _context_fallback_answer(context)}
+        return
+
+    prompt = _STREAM_PROMPT.format(
+        context=context, question=question, history_block=_history_block(history)
+    )
+    last_error: Exception | None = None
+    for _ in range(_pool.client_count()):
+        client = _pool.next_client()
+        if client is None:
+            break
+        produced = False
+        try:
+            stream = client.models.generate_content_stream(
+                model=settings.GEMINI_MODEL, contents=prompt
+            )
+            for chunk in stream:
+                text = getattr(chunk, "text", None)
+                if text:
+                    produced = True
+                    yield {"type": "token", "text": text}
+            if produced:
+                return
+            yield {"type": "token", "text": _context_fallback_answer(context)}
+            return
+        except Exception as exc:  # noqa: BLE001
+            if produced:
+                logger.warning("Gemini stream failed mid-answer: %s", exc)
+                return
+            last_error = exc
+            if _is_retryable_gemini_key_error(exc):
+                logger.warning("Gemini stream key failed, rotating. Error: %s", exc)
+                continue
+            logger.error("Unexpected Gemini stream failure: %s", exc)
+            break
+
+    logger.error("Gemini streaming failed for all keys: %s", last_error)
+    yield {"type": "token", "text": _context_fallback_answer(context)}
+
+
+def answer_question_stream(
+    question: str,
+    user_id: str,
+    history: list | None = None,
+    page_id: str | None = None,
+    series_id: str | None = None,
+) -> Iterator[dict]:
+    """Streaming, multi-turn variant of answer_question. Yields event dicts:
+    {'type':'sources','sources':[...]} → {'type':'token','text':...}* → {'type':'done'}
+    (or a single honest error/no-context token before done)."""
+    supabase = get_supabase()
+
+    # Embed the retrieval query — current question folded with the last user turn.
+    try:
+        q_vector = embed_query(_retrieval_query(question, history))
+    except Exception as exc:
+        logger.warning("Question embedding failed (stream): %s", exc)
+        if page_id:
+            page_context, page_sources = _page_context_from_db(supabase, page_id, user_id)
+            if page_context:
+                yield {"type": "sources", "sources": [s.model_dump() for s in page_sources]}
+                yield from _stream_answer(question, page_context, history)
+                yield {"type": "done"}
+                return
+        yield {"type": "sources", "sources": []}
+        yield {"type": "token", "text": _EMBED_ERROR_MSG}
+        yield {"type": "done"}
+        return
+
+    chunks, search_failed = _search(supabase, q_vector, user_id, page_id, series_id)
+    context, sources = _enrich_sources(supabase, chunks)
+    if not context and page_id:
+        context, sources = _page_context_from_db(supabase, page_id, user_id)
+
+    yield {"type": "sources", "sources": [s.model_dump() for s in sources]}
+
+    if not context:
+        yield {"type": "token", "text": _SEARCH_ERROR_MSG if search_failed else _NO_CONTEXT_ANSWER}
+        yield {"type": "done"}
+        return
+
+    yield from _stream_answer(question, context, history)
+    yield {"type": "done"}

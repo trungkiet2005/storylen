@@ -215,6 +215,82 @@ def test_page_fallback_denied_for_non_owner(monkeypatch):
     assert resp.sources == []
 
 
+# ─── Streaming assistant (answer_question_stream) ─────────────────────────────
+
+def test_retrieval_query_folds_last_user_turn():
+    hist = [
+        {"role": "user", "content": "nhân vật chính là ai"},
+        {"role": "assistant", "content": "là Luffy"},
+    ]
+    q = rag._retrieval_query("còn nhân vật kia?", hist)
+    assert "nhân vật chính là ai" in q and "còn nhân vật kia?" in q
+
+
+def test_retrieval_query_no_history_is_verbatim():
+    assert rag._retrieval_query("hỏi gì đó", []) == "hỏi gì đó"
+
+
+def test_history_block_formats_recent_turns():
+    block = rag._history_block([
+        {"role": "user", "content": "a"},
+        {"role": "assistant", "content": "b"},
+    ])
+    assert "Người đọc: a" in block and "Trợ lý: b" in block
+
+
+def test_stream_emits_sources_then_tokens_then_done(monkeypatch):
+    chunks = [{"id": "e1", "page_id": "p1", "bubble_id": "b1", "content": "Xin chào", "similarity": 0.9}]
+    fake = FakeSupabase(
+        rpc_data=chunks,
+        table_data={
+            "bubble_data": [{"bubble_id": "b1", "original_text_jp": "こんにちは", "x": 1, "y": 2, "width": 3, "height": 4}],
+            "manga_pages": [{"page_id": "p1", "page_number": 5}],
+        },
+    )
+    monkeypatch.setattr(rag, "get_supabase", lambda: fake)
+    monkeypatch.setattr(rag, "embed_query", lambda q: [0.1])
+    monkeypatch.setattr(rag, "_stream_answer", lambda q, ctx, hist: iter([
+        {"type": "token", "text": "Đáp "}, {"type": "token", "text": "[1]"},
+    ]))
+
+    events = list(rag.answer_question_stream("hỏi", user_id="u1", series_id="s1"))
+
+    assert [e["type"] for e in events] == ["sources", "token", "token", "done"]
+    src = events[0]["sources"]
+    assert len(src) == 1
+    assert src[0]["bbox"] == [1.0, 2.0, 3.0, 4.0]   # bbox flows to streamed citations
+    assert src[0]["page_number"] == 5
+    _, params = fake.rpc_calls[0]
+    assert params["filter_user_id"] == "u1"
+    assert params["filter_series_id"] == "s1"
+    assert params["min_similarity"] == rag.settings.RAG_MIN_SIMILARITY
+
+
+def test_stream_no_context_is_honest_and_skips_generation(monkeypatch):
+    fake = FakeSupabase(rpc_data=[])
+    monkeypatch.setattr(rag, "get_supabase", lambda: fake)
+    monkeypatch.setattr(rag, "embed_query", lambda q: [0.1])
+    monkeypatch.setattr(rag, "_stream_answer", lambda q, ctx, hist: iter([{"type": "token", "text": "SHOULD-NOT-RUN"}]))
+
+    events = list(rag.answer_question_stream("hỏi", user_id="u1"))
+
+    assert [e["type"] for e in events] == ["sources", "token", "done"]
+    assert events[0]["sources"] == []
+    assert events[1]["text"] == rag._NO_CONTEXT_ANSWER  # generation not invoked
+
+
+def test_stream_embed_failure_no_page(monkeypatch):
+    fake = FakeSupabase()
+    monkeypatch.setattr(rag, "get_supabase", lambda: fake)
+    monkeypatch.setattr(rag, "embed_query", _raise)
+
+    events = list(rag.answer_question_stream("hỏi", user_id="u1"))
+
+    assert [e["type"] for e in events] == ["sources", "token", "done"]
+    assert "embedding" in events[1]["text"].lower()
+    assert fake.rpc_calls == []  # vector search never reached
+
+
 def test_rpc_error_is_distinguished_from_empty(monkeypatch):
     """A broken RPC (mis-deploy) must NOT masquerade as an empty library."""
     fake = FakeSupabase(rpc_error=True)

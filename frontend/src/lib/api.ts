@@ -865,6 +865,111 @@ export async function askQuestion(payload: {
   });
 }
 
+export type QAChatTurn = { role: "user" | "assistant"; content: string };
+
+export type QAStreamCallbacks = {
+  onSources?: (sources: QASource[]) => void;
+  onToken?: (text: string) => void;
+  onDone?: () => void;
+  onError?: (message: string) => void;
+};
+
+type QAStreamEvent = {
+  type?: string;
+  sources?: QASource[];
+  text?: string;
+  message?: string;
+};
+
+/**
+ * Streaming, multi-turn Q&A. Reads the backend's NDJSON stream and invokes
+ * callbacks as events arrive: onSources (once, first) → onToken (many) → onDone.
+ * Pass an AbortSignal to cancel mid-stream. Does not throw — errors go to onError.
+ */
+export async function askQuestionStream(
+  payload: {
+    question: string;
+    page_id?: string;
+    series_id?: string;
+    history?: QAChatTurn[];
+  },
+  cb: QAStreamCallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  const dispatch = (ev: QAStreamEvent) => {
+    if (ev.type === "sources") cb.onSources?.(ev.sources ?? []);
+    else if (ev.type === "token") cb.onToken?.(ev.text ?? "");
+    else if (ev.type === "done") cb.onDone?.();
+    else if (ev.type === "error") cb.onError?.(ev.message ?? "Có lỗi xảy ra.");
+  };
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}/qa/stream`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal,
+    });
+  } catch (err) {
+    cb.onError?.(err instanceof Error ? err.message : "Không kết nối được máy chủ.");
+    return;
+  }
+
+  if (!res.ok || !res.body) {
+    let msg = `Lỗi ${res.status}`;
+    try {
+      const data = (await res.json()) as { detail?: string; message?: string };
+      msg = data?.detail ?? data?.message ?? msg;
+    } catch {
+      /* non-JSON error body — keep the status message */
+    }
+    cb.onError?.(msg);
+    return;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const drain = (flush: boolean) => {
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (line) {
+        try {
+          dispatch(JSON.parse(line) as QAStreamEvent);
+        } catch {
+          /* skip malformed line */
+        }
+      }
+    }
+    if (flush && buffer.trim()) {
+      try {
+        dispatch(JSON.parse(buffer.trim()) as QAStreamEvent);
+      } catch {
+        /* ignore trailing junk */
+      }
+      buffer = "";
+    }
+  };
+
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      drain(false);
+    }
+    drain(true);
+  } catch (err) {
+    if (!(err instanceof DOMException && err.name === "AbortError")) {
+      cb.onError?.(err instanceof Error ? err.message : "Lỗi khi đọc dữ liệu.");
+    }
+  }
+}
+
 // ─── History ─────────────────────────────────────────────────────────────────
 
 export async function getHistory(params?: {
