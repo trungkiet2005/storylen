@@ -8,6 +8,7 @@ import { TopBar } from "@/components/TopBar";
 import { Icon } from "@/components/Icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedPage } from "@/components/Animations";
+import { QAChatPanel } from "@/components/QAChatPanel";
 import {
   APIError,
   getSeriesFull,
@@ -63,6 +64,7 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
   const [index, setIndex] = useState(0);
   const [mode, setMode] = useState<ReadMode>("pageflip");
   const [immersive, setImmersive] = useState(false);
+  const [showQA, setShowQA] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -141,6 +143,19 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
   const goNext = useCallback(() => {
     if (hasNext) setIndex(i => i + 1);
   }, [hasNext]);
+
+  // Jump to a cited page IN PLACE (keeps the Q&A panel + conversation mounted);
+  // falls back to the standalone reader if the page isn't in this series.
+  const openSource = useCallback((pid: string) => {
+    const idx = flatPages.findIndex(p => p.page_id === pid);
+    if (idx >= 0) {
+      setIndex(idx);
+      const el = pageRefs.current[flatPages[idx].page_id];
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      router.push(`/reader?page=${pid}`);
+    }
+  }, [flatPages, router]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -654,6 +669,27 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
           )}
         </div>
       </div>
+
+      {/* Floating RAG Q&A — reachable in every mode, including immersive */}
+      {isAuthenticated && flatPages.length > 0 && !showQA && (
+        <button
+          onClick={() => setShowQA(true)}
+          aria-label="Hỏi AI về truyện"
+          title="Hỏi AI về truyện (RAG semantic)"
+          style={{
+            position: "fixed", bottom: 20, right: 20, zIndex: 999,
+            padding: "10px 16px", background: "var(--accent)", color: "#fff",
+            border: "2px solid var(--border)", boxShadow: "3px 3px 0 var(--border)",
+            fontSize: 14, fontWeight: 700, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 6,
+          }}
+        >
+          💬 Hỏi AI
+        </button>
+      )}
+      {showQA && (
+        <QAChatPanel seriesId={id} onClose={() => setShowQA(false)} onOpenSource={openSource} />
+      )}
     </AnimatedPage>
   );
 }
