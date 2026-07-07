@@ -59,10 +59,11 @@ export function QAChatPanel({
     setLoading(true);
 
     const history: QAChatTurn[] = messages.map((m) => ({ role: m.role, content: m.content }));
-    const assistantId = nid() + 1000; // keep well clear of the user id below
+    const userId = nid();
+    const assistantId = nid();
     setMessages((m) => [
       ...m,
-      { id: nid(), role: "user", content: q },
+      { id: userId, role: "user", content: q },
       { id: assistantId, role: "assistant", content: "", sources: [] },
     ]);
 
