@@ -1,15 +1,22 @@
 "use client";
 
 /**
- * ListenMode — "Nghe truyện" (audio narration).
+ * ListenMode — "Nghe truyện" (audio narration) + chapter recap video.
  *
- * A VLM (vision LLM) looks at the current page, weaves the translated dialogue
- * into a short Vietnamese storytelling script, then a local/Microsoft TTS voice
- * reads it aloud. Users pick the engine (edge / offline / XTTS) and voice.
+ * Two tabs share one drawer:
+ *  - "Trang này": a VLM looks at the current page, weaves the translated
+ *    dialogue into a short Vietnamese storytelling script, then a
+ *    local/Microsoft TTS voice reads it aloud.
+ *  - "Cả chương" (only shown when a chapterId is supplied): renders a
+ *    narrated recap video (.mp4) for the whole chapter — one still image per
+ *    page over its narration audio, concatenated. Synchronous on the
+ *    backend (no job/polling), so this can take a while for long chapters;
+ *    the UI shows a spinner + a "may take a few minutes" note instead of a
+ *    progress bar.
  *
  * Self-contained: renders its own trigger button + drawer, so wiring into the
- * reader is a single <ListenMode pageId=… /> mount. Talks to the backend only
- * through src/lib/api.ts.
+ * reader is a single <ListenMode pageId=… chapterId=… /> mount. Talks to the
+ * backend only through src/lib/api.ts.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -17,31 +24,44 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Icon } from "@/components/Icons";
 import {
   APIError,
+  getChapterRecapVideo,
   listVoices,
   narratePage,
   type NarrationResponse,
+  type RecapVideoResponse,
   type TTSEngineInfo,
 } from "@/lib/api";
 
 interface Props {
   pageId: string | null;
+  /** When provided, a second "Cả chương" tab offers a recap video for this chapter. */
+  chapterId?: string;
+  /** Page count of `chapterId`, used to show the credit cost before generating. */
+  chapterPageCount?: number;
   /** Optional label override for the trigger button. */
   compact?: boolean;
 }
 
-export function ListenMode({ pageId, compact = false }: Props) {
+type Tab = "page" | "chapter";
+
+export function ListenMode({ pageId, chapterId, chapterPageCount, compact = false }: Props) {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>(!pageId && chapterId ? "chapter" : "page");
   const [engines, setEngines] = useState<TTSEngineInfo[]>([]);
   const [voicesLoaded, setVoicesLoaded] = useState(false);
   const [engine, setEngine] = useState<string>("");
   const [voice, setVoice] = useState<string>("");
+  const [costPerPage, setCostPerPage] = useState<number | null>(null);
+  const [maxChapterPages, setMaxChapterPages] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
   const [narration, setNarration] = useState<NarrationResponse | null>(null);
+  const [recapVideo, setRecapVideo] = useState<RecapVideoResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const availableEngines = engines.filter(e => e.available);
   const currentEngine = engines.find(e => e.engine === engine);
+  const overPageLimit = maxChapterPages != null && (chapterPageCount ?? 0) > maxChapterPages;
 
   // Load voices the first time the drawer opens.
   useEffect(() => {
@@ -49,6 +69,8 @@ export function ListenMode({ pageId, compact = false }: Props) {
     listVoices()
       .then(res => {
         setEngines(res.engines);
+        setCostPerPage(res.credit_cost_per_page);
+        setMaxChapterPages(res.max_chapter_pages);
         const firstAvail = res.engines.find(e => e.available);
         const pick = res.engines.find(e => e.engine === res.default_engine && e.available) || firstAvail;
         if (pick) {
@@ -71,7 +93,12 @@ export function ListenMode({ pageId, compact = false }: Props) {
     }
   }, [engine]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleGenerate = useCallback(async () => {
+  // Clear stale errors when switching tabs.
+  useEffect(() => {
+    setError(null);
+  }, [tab]);
+
+  const handleGeneratePage = useCallback(async () => {
     if (!pageId) return;
     setGenerating(true);
     setError(null);
@@ -91,24 +118,43 @@ export function ListenMode({ pageId, compact = false }: Props) {
     }
   }, [pageId, engine, voice]);
 
-  // Reset the rendered narration when the page changes.
+  const handleGenerateRecap = useCallback(async () => {
+    if (!chapterId) return;
+    setGenerating(true);
+    setError(null);
+    setRecapVideo(null);
+    try {
+      const result = await getChapterRecapVideo(chapterId, { engine: engine || undefined, voice: voice || undefined });
+      setRecapVideo(result);
+    } catch (err) {
+      setError(err instanceof APIError ? err.message : "Không tạo được video recap.");
+    } finally {
+      setGenerating(false);
+    }
+  }, [chapterId, engine, voice]);
+
+  // Reset the rendered narration/recap when the underlying page/chapter changes.
   useEffect(() => {
     setNarration(null);
     setError(null);
   }, [pageId]);
+
+  useEffect(() => {
+    setRecapVideo(null);
+  }, [chapterId]);
 
   return (
     <>
       <button
         onClick={() => setOpen(o => !o)}
         className="btn btn-sm"
-        title="Nghe truyện — AI kể chuyện bằng giọng nói"
-        aria-label="Nghe truyện"
+        title={pageId ? "Nghe truyện — AI kể chuyện bằng giọng nói" : "Video recap chương trước — AI kể chuyện bằng giọng nói"}
+        aria-label={pageId ? "Nghe truyện" : "Video recap"}
         data-testid="listen-mode-trigger"
         style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
       >
         <Icon name="sparkle" size={12} />
-        {!compact && "Nghe"}
+        {!compact && (pageId ? "Nghe" : "Video Recap")}
       </button>
 
       <AnimatePresence>
@@ -148,7 +194,44 @@ export function ListenMode({ pageId, compact = false }: Props) {
               </button>
             </div>
 
-            {/* Engine + voice pickers */}
+            {/* Tab switcher — only shown when both a page and a chapter are in
+                scope (e.g. the series reader could offer both); the series
+                reader currently only passes chapterId, so readers there go
+                straight to the chapter recap view with no page-narration tab. */}
+            {chapterId && pageId && (
+              <div style={{ display: "flex", border: "1.5px solid var(--border)", marginBottom: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setTab("page")}
+                  data-testid="listen-tab-page"
+                  aria-pressed={tab === "page"}
+                  style={{
+                    flex: 1, padding: "6px 8px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                    background: tab === "page" ? "var(--accent)" : "transparent",
+                    color: tab === "page" ? "#fff" : "var(--fg)",
+                    border: "none", borderRight: "1.5px solid var(--border)",
+                  }}
+                >
+                  Trang này
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTab("chapter")}
+                  data-testid="listen-tab-chapter"
+                  aria-pressed={tab === "chapter"}
+                  style={{
+                    flex: 1, padding: "6px 8px", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                    background: tab === "chapter" ? "var(--accent)" : "transparent",
+                    color: tab === "chapter" ? "#fff" : "var(--fg)",
+                    border: "none",
+                  }}
+                >
+                  Cả chương
+                </button>
+              </div>
+            )}
+
+            {/* Engine + voice pickers (shared by both tabs) */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
               <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <span className="caps-xs" style={{ color: "var(--muted)" }}>Engine</span>
@@ -183,56 +266,118 @@ export function ListenMode({ pageId, compact = false }: Props) {
               </label>
             </div>
 
-            {/* Generate button */}
-            <button
-              onClick={handleGenerate}
-              disabled={!pageId || generating || availableEngines.length === 0}
-              className="btn"
-              data-testid="listen-generate"
-              style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 12 }}
-            >
-              {generating ? (
-                <>
-                  <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }} style={{ display: "inline-flex" }}>
-                    <Icon name="refresh" size={14} />
-                  </motion.span>
-                  Đang tạo lời kể…
-                </>
-              ) : (
-                <><Icon name="sparkle" size={14} /> Tạo &amp; nghe trang này</>
-              )}
-            </button>
-
-            {error && (
-              <div style={{ padding: "8px 10px", background: "var(--bg-2)", border: "1.5px solid var(--accent)", color: "var(--accent)", fontSize: 12, marginBottom: 10 }} data-testid="listen-error">
-                {error}
-              </div>
-            )}
-
-            {/* Result */}
-            {narration && (
-              <div data-testid="listen-result">
-                {narration.audio_url && (
-                  <audio
-                    ref={audioRef}
-                    controls
-                    src={narration.audio_url}
-                    data-testid="listen-audio"
-                    style={{ width: "100%", marginBottom: 10 }}
-                  />
-                )}
-                <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 4 }}>
-                  Lời kể
-                  {narration.source === "dialogue_fallback" && (
-                    <span title="VLM không phản hồi — đang đọc thẳng lời thoại" style={{ marginLeft: 6, color: "var(--accent)" }}>
-                      · đọc thoại
-                    </span>
+            {tab === "page" ? (
+              <>
+                {/* Generate button — this page */}
+                <button
+                  onClick={handleGeneratePage}
+                  disabled={!pageId || generating || availableEngines.length === 0}
+                  className="btn"
+                  data-testid="listen-generate"
+                  style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 12 }}
+                >
+                  {generating ? (
+                    <>
+                      <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }} style={{ display: "inline-flex" }}>
+                        <Icon name="refresh" size={14} />
+                      </motion.span>
+                      Đang tạo lời kể…
+                    </>
+                  ) : (
+                    <><Icon name="sparkle" size={14} /> Tạo &amp; nghe trang này</>
                   )}
-                </div>
-                <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--fg)", background: "var(--bg-2)", border: "1.5px solid var(--border-soft)", padding: "8px 10px", maxHeight: 160, overflowY: "auto" }}>
-                  {narration.script}
-                </div>
-              </div>
+                </button>
+
+                {error && (
+                  <div style={{ padding: "8px 10px", background: "var(--bg-2)", border: "1.5px solid var(--accent)", color: "var(--accent)", fontSize: 12, marginBottom: 10 }} data-testid="listen-error">
+                    {error}
+                  </div>
+                )}
+
+                {narration && (
+                  <div data-testid="listen-result">
+                    {narration.audio_url && (
+                      <audio
+                        ref={audioRef}
+                        controls
+                        src={narration.audio_url}
+                        data-testid="listen-audio"
+                        style={{ width: "100%", marginBottom: 10 }}
+                      />
+                    )}
+                    <div className="caps-xs" style={{ color: "var(--muted)", marginBottom: 4 }}>
+                      Lời kể
+                      {narration.source === "dialogue_fallback" && (
+                        <span title="VLM không phản hồi — đang đọc thẳng lời thoại" style={{ marginLeft: 6, color: "var(--accent)" }}>
+                          · đọc thoại
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--fg)", background: "var(--bg-2)", border: "1.5px solid var(--border-soft)", padding: "8px 10px", maxHeight: 160, overflowY: "auto" }}>
+                      {narration.script}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Cost + limit info — chapter recap */}
+                {chapterPageCount != null && costPerPage != null && (
+                  <div className="caps-xs" data-testid="listen-recap-cost" style={{ color: "var(--muted)", marginBottom: 8 }}>
+                    Sẽ tốn {chapterPageCount * costPerPage} credit cho {chapterPageCount} trang
+                  </div>
+                )}
+                {overPageLimit && (
+                  <div style={{ padding: "8px 10px", background: "var(--bg-2)", border: "1.5px solid var(--accent)", color: "var(--accent)", fontSize: 12, marginBottom: 10 }}>
+                    Chương có {chapterPageCount} trang, vượt giới hạn {maxChapterPages} trang mỗi lần xuất recap.
+                  </div>
+                )}
+
+                <button
+                  onClick={handleGenerateRecap}
+                  disabled={!chapterId || generating || availableEngines.length === 0 || overPageLimit}
+                  className="btn"
+                  data-testid="listen-recap-generate"
+                  style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 12 }}
+                >
+                  {generating ? (
+                    <>
+                      <motion.span animate={{ rotate: 360 }} transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }} style={{ display: "inline-flex" }}>
+                        <Icon name="refresh" size={14} />
+                      </motion.span>
+                      Đang tạo video… (có thể mất vài phút với chương dài)
+                    </>
+                  ) : (
+                    <><Icon name="sparkle" size={14} /> Tạo video recap</>
+                  )}
+                </button>
+
+                {error && (
+                  <div style={{ padding: "8px 10px", background: "var(--bg-2)", border: "1.5px solid var(--accent)", color: "var(--accent)", fontSize: 12, marginBottom: 10 }} data-testid="listen-error">
+                    {error}
+                  </div>
+                )}
+
+                {recapVideo && (
+                  <div data-testid="listen-recap-result">
+                    <video
+                      controls
+                      src={recapVideo.video_url}
+                      data-testid="listen-recap-video"
+                      style={{ width: "100%", marginBottom: 8, background: "#000" }}
+                    />
+                    <a
+                      href={recapVideo.video_url}
+                      download
+                      data-testid="listen-recap-download"
+                      className="btn btn-sm btn-ghost"
+                      style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, textDecoration: "none" }}
+                    >
+                      <Icon name="download" size={12} /> Tải video
+                    </a>
+                  </div>
+                )}
+              </>
             )}
           </motion.div>
         )}

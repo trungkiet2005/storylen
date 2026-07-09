@@ -53,6 +53,14 @@ def test_voices_lists_engines(client):
     assert {"edge", "pyttsx3", "coqui"} <= engines
 
 
+def test_voices_includes_credit_and_page_limit(client):
+    resp = client.get("/v1/narrate/voices")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["credit_cost_per_page"] == narration_router.get_settings().NARRATION_CREDIT_COST
+    assert body["max_chapter_pages"] == narration_router.get_settings().NARRATION_MAX_CHAPTER_PAGES
+
+
 def test_voices_requires_auth():
     # No dependency override → real get_current_user rejects (401/403).
     with TestClient(app) as c:
@@ -161,3 +169,71 @@ def test_chapter_status_missing_returns_404(client, monkeypatch):
     monkeypatch.setattr(narration_service, "get_job", lambda jid: None)
     resp = client.get("/v1/narrate/chapter/status/nope")
     assert resp.status_code == 404
+
+
+# ─── /recap ──────────────────────────────────────────────────────────────────
+
+def test_recap_chapter_success(client, monkeypatch):
+    monkeypatch.setattr(
+        narration_service, "list_chapter_pages",
+        lambda supabase, cid, uid: [{"page_id": "p1"}, {"page_id": "p2"}],
+    )
+    from app.services import recap_video
+
+    monkeypatch.setattr(recap_video, "ffmpeg_available", lambda: True)
+    monkeypatch.setattr(narration_router.recap_video, "ffmpeg_available", lambda: True, raising=False)
+    monkeypatch.setattr(
+        recap_video, "build_chapter_recap",
+        lambda *a, **k: "https://storage/manga-audio/c1-recap.mp4",
+    )
+    resp = client.post("/v1/narrate/recap/c1", json={"engine": "edge"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {"chapter_id": "c1", "video_url": "https://storage/manga-audio/c1-recap.mp4"}
+
+
+def test_recap_chapter_no_ffmpeg_returns_503(client, monkeypatch):
+    monkeypatch.setattr(
+        narration_service, "list_chapter_pages",
+        lambda supabase, cid, uid: [{"page_id": "p1"}],
+    )
+    from app.services import recap_video
+
+    monkeypatch.setattr(recap_video, "ffmpeg_available", lambda: False)
+    resp = client.post("/v1/narrate/recap/c1", json={})
+    assert resp.status_code == 503
+
+
+def test_recap_chapter_empty_returns_404(client, monkeypatch):
+    monkeypatch.setattr(narration_service, "list_chapter_pages", lambda *a, **k: [])
+    resp = client.post("/v1/narrate/recap/c1", json={})
+    assert resp.status_code == 404
+
+
+def test_recap_chapter_too_many_pages_returns_400(client, monkeypatch):
+    monkeypatch.setattr(
+        narration_service, "list_chapter_pages",
+        lambda supabase, cid, uid: [{"page_id": f"p{i}"} for i in range(100)],
+    )
+    from app.services import recap_video
+
+    monkeypatch.setattr(recap_video, "ffmpeg_available", lambda: True)
+    resp = client.post("/v1/narrate/recap/c1", json={})
+    assert resp.status_code == 400
+
+
+def test_recap_chapter_render_error_maps_to_502(client, monkeypatch):
+    monkeypatch.setattr(
+        narration_service, "list_chapter_pages",
+        lambda supabase, cid, uid: [{"page_id": "p1"}],
+    )
+    from app.services import recap_video
+
+    monkeypatch.setattr(recap_video, "ffmpeg_available", lambda: True)
+
+    def boom(*a, **k):
+        raise recap_video.RecapError("ffmpeg exploded")
+
+    monkeypatch.setattr(recap_video, "build_chapter_recap", boom)
+    resp = client.post("/v1/narrate/recap/c1", json={})
+    assert resp.status_code == 502
