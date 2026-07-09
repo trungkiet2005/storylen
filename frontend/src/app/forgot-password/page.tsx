@@ -1,6 +1,6 @@
 "use client";
 
-import React, { type FormEvent, useState } from "react";
+import React, { type FormEvent, useCallback, useState } from "react";
 import Link from "next/link";
 import { TopBar } from "@/components/TopBar";
 import { Footer } from "@/components/Footer";
@@ -16,6 +16,7 @@ export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captchaRequired = isTurnstileEnabled();
+  const handleCaptchaExpired = useCallback(() => setCaptchaToken(null), []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -73,7 +74,7 @@ export default function ForgotPasswordPage() {
                 />
               </div>
               {captchaRequired && (
-                <TurnstileWidget onSuccess={setCaptchaToken} onExpired={() => setCaptchaToken(null)} />
+                <TurnstileWidget onSuccess={setCaptchaToken} onExpired={handleCaptchaExpired} />
               )}
               <button type="submit" className="btn btn-primary" disabled={loading || !email || (captchaRequired && !captchaToken)} style={{ width: "100%", justifyContent: "center", padding: 14 }}>
                 {loading ? "Đang gửi..." : "Gửi liên kết đặt lại"}

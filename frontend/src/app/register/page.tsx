@@ -1,6 +1,6 @@
 "use client";
 
-import React, { type FormEvent, useMemo, useState } from "react";
+import React, { type FormEvent, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icons";
@@ -40,6 +40,7 @@ export default function RegisterPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const captchaRequired = isTurnstileEnabled();
+  const handleCaptchaExpired = useCallback(() => setCaptchaToken(null), []);
 
   const strength = useMemo(() => getPasswordScore(password), [password]);
   const strengthLabels = ["", "Yếu", "Trung bình", "Khá", "Mạnh"];
@@ -482,7 +483,7 @@ export default function RegisterPage() {
 
               {captchaRequired && (
                 <FadeIn direction="up" distance={10} delay={0.42}>
-                  <TurnstileWidget onSuccess={setCaptchaToken} onExpired={() => setCaptchaToken(null)} />
+                  <TurnstileWidget onSuccess={setCaptchaToken} onExpired={handleCaptchaExpired} />
                 </FadeIn>
               )}
 
