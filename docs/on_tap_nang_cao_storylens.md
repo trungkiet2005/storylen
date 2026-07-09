@@ -11,6 +11,7 @@
 4. [Chủ đề 4: Phân tích Tĩnh bảo vệ Codebase (Linter & Typecheck)](#chủ-đề-4-phân-tích-tĩnh-bảo-vệ-codebase-linter--typecheck)
 5. [Chủ đề 5: Observability & DevOps Monitor Loop (Sentry, OTel, Audit Log)](#chủ-đề-5-observability--devops-monitor-loop-sentry-otel-audit-log)
 6. [Chủ đề 6: Đạo đức AI nâng cao — 11 vấn đề & StoryLens (AI Ethics — LN12)](#chủ-đề-6-đạo-đức-ai-nâng-cao--11-vấn-đề--storylens-ai-ethics--ln12)
+7. [Chủ đề 7: Giám sát Hạ tầng vs Giám sát Mô hình AI — Thực trạng & Hướng phát triển](#chủ-đề-7-giám-sát-hạ-tầng-vs-giám-sát-mô-hình-ai--thực-trạng--hướng-phát-triển)
 
 
 ---
@@ -164,6 +165,84 @@
     | "Chúng tôi minh bạch về AI Bias" | **Ghi nhận bias trong docs**, trang sản phẩm liệt kê rõ giới hạn của mô hình |
 
   * **Kết luận:** Điểm mạnh của StoryLens về đạo đức AI không nằm ở việc "hứa hẹn" mà nằm ở hệ thống **kỹ thuật phòng ngừa nhiều tầng** — RLS, middleware, Sentry config — mà developer khác không thể bypass dù vô tình.
+
+---
+
+## Chủ đề 7: Giám sát Hạ tầng vs Giám sát Mô hình AI — Thực trạng & Hướng phát triển
+
+> *Đây là một trong những câu hỏi phản biện "bẫy" nhất của Hội đồng: "Hệ thống của bạn có theo dõi chất lượng model AI sau khi deploy không?" Cần trả lời trung thực, tự tin và có định hướng.*
+
+### 💬 Câu 13: StoryLens có hệ thống monitoring (giám sát) nào để kiểm tra trạng thái hoạt động của hệ thống? Liệt kê đầy đủ.
+* **Trả lời — StoryLens có đủ 4 tầng giám sát hạ tầng:**
+
+  | Tầng | Công cụ | Giám sát cái gì | Xem ở đâu |
+  |---|---|---|---|
+  | 1 | **Sentry** | Lỗi runtime JS/Python, crash app của người dùng | Cloud dashboard tại `sentry.io` |
+  | 2 | **OpenTelemetry (OTel)** | Tốc độ API, latency từng bước pipeline, bottleneck | Jaeger UI `localhost:16686` (local) hoặc Grafana Cloud |
+  | 3 | **Admin Health Dashboard** | Trạng thái UP/DOWN + latency ms của Supabase, AI Module, HF Space | Trang web `/admin/health` trong StoryLens — tự refresh mỗi 30 giây |
+  | 4 | **Structured Logging + Request ID** | Mọi HTTP request với UUID trace end-to-end | Terminal log của uvicorn backend |
+
+  * **Thực tế chạy:** Khi backend khởi động, log ghi rõ:
+    ```
+    Sentry: enabled (env=development, traces=0.10)
+    OpenTelemetry: exporting traces to http://localhost:4318
+    ```
+  * **Deep Health Check API** công khai tại `GET /health/deep` trả về JSON chi tiết:
+    ```json
+    { "status": "healthy", "checks": {
+        "supabase": { "status": "ok", "latency_ms": 289 },
+        "gemini":   { "status": "ok", "key_count": 23 },
+        "ai_module":{ "status": "ok", "latency_ms": 623 }
+    }}
+    ```
+
+### 💬 Câu 14: Sentry và OpenTelemetry xem dashboard ở đâu? Có cần cài thêm gì không?
+* **Trả lời:**
+  * **Sentry Dashboard (Cloud, không cần cài gì thêm):**
+    * Đăng ký tài khoản miễn phí tại [sentry.io](https://sentry.io), lấy `SENTRY_DSN` và điền vào `backend/.env` + `frontend/.env.local`.
+    * Truy cập `https://sentry.io/<tên-tổ-chức>/<tên-dự-án>/` để xem dashboard đầy đủ:
+      * **Issues:** Danh sách lỗi được gom nhóm theo loại, tần suất và số người dùng bị ảnh hưởng.
+      * **Performance:** Biểu đồ tốc độ P50/P95 latency của từng trang web.
+      * **Breadcrumbs:** Sơ đồ timeline các thao tác người dùng trước khi crash.
+  * **OpenTelemetry / Jaeger (local, cần Docker):**
+    * Chạy lệnh: `docker run -d -p 16686:16686 -p 4318:4318 jaegertracing/all-in-one:latest`
+    * Mở trình duyệt tại `http://localhost:16686`.
+    * Khi người dùng thao tác trên StoryLens, trace data tự động đổ về:
+      * **Trace Timeline:** Biểu đồ Gantt hình thanh ngang hiển thị từng span (Backend → AI Module → Supabase).
+      * **Dependency Graph:** Sơ đồ quan hệ giữa các dịch vụ.
+      * **Latency heatmap:** Phân bố thời gian phản hồi của từng API endpoint.
+  * **Admin Health Dashboard (có sẵn trong app, không cần cài gì):**
+    * Đăng nhập Admin → vào menu **System Health** hoặc truy cập `/admin/health`.
+    * Trang tự động ping kiểm tra sức khỏe của Supabase, AI Module và HuggingFace Space **mỗi 30 giây** và hiển thị màu xanh/đỏ + milliseconds latency ngay trên giao diện web.
+
+### 💬 Câu 15: Hệ thống StoryLens có theo dõi chất lượng mô hình AI sau khi deploy không? (Model Monitoring / MLOps)
+* **Trả lời trung thực + chuyên nghiệp:**
+  * **Điểm mạnh đã có:** StoryLens có đầy đủ **giám sát hạ tầng** (Infrastructure Monitoring) theo chuẩn DevOps doanh nghiệp — Sentry bắt lỗi, OTel theo dõi latency, Admin Dashboard kiểm tra sức khỏe tất cả services theo thời gian thực.
+  * **Điểm còn thiếu — Model Monitoring chuyên nghiệp (MLOps):** Hệ thống hiện chưa tích hợp công cụ theo dõi **chất lượng dự đoán của mô hình AI theo thời gian**, cụ thể:
+
+    | Tính năng MLOps chuyên nghiệp | StoryLens hiện tại | Hướng phát triển |
+    |---|---|---|
+    | Theo dõi mAP/Precision của YOLOv8 theo thời gian (concept drift) | ❌ Chưa có | Tích hợp **Weights & Biases (W&B)** |
+    | Theo dõi CER của manga-ocr trên dữ liệu thực | ❌ Chưa có | Logging prediction samples vào W&B |
+    | Dashboard so sánh các phiên bản model (Model Registry) | ❌ Chưa có | **MLflow** Model Registry |
+    | Alert khi model bị degradation (accuracy giảm) | ❌ Chưa có | W&B Alerts hoặc Evidently AI |
+    | A/B testing giữa 2 phiên bản model | ❌ Chưa có | Feature flag + Shadow deployment |
+
+  * **Lý do nhóm chưa triển khai:** Dự án ở giai đoạn MVP (Minimum Viable Product). Mô hình AI (YOLOv8, manga-ocr) đang chạy phiên bản tĩnh — không retrain tự động mà cần update thủ công qua pipeline training riêng. Model Monitoring chuyên nghiệp sẽ có ý nghĩa lớn hơn khi hệ thống đạt quy mô sản xuất (production scale) với lượng người dùng đủ lớn để phát hiện concept drift có ý nghĩa thống kê.
+  * **Câu trả lời hoàn chỉnh cho Hội đồng:** *"Nhóm đã triển khai đầy đủ giám sát hạ tầng theo chuẩn DevOps. Về Model Monitoring theo chuẩn MLOps, đây là hướng phát triển tiếp theo mà nhóm đề xuất: tích hợp W&B để theo dõi mAP và CER theo thời gian thực, từ đó phát hiện concept drift sớm và trigger pipeline retrain tự động khi cần thiết."*
+
+### 💬 Câu 16: Cụ thể CI/CD của StoryLens kiểm soát chất lượng Deploy như thế nào? (End-to-end deploy gate)
+* **Trả lời — 3 chốt chặn tự động trước khi code đến tay người dùng:**
+  1. **Chốt GitHub Actions (Pre-deploy gate):** Mỗi `git push` hoặc Pull Request kích hoạt 5 job song song:
+     * `typecheck`: `npx tsc --noEmit` quét lỗi kiểu TypeScript.
+     * `lint`: `eslint` quét cú pháp và chuẩn định dạng.
+     * `build`: `npm run build` kiểm tra Next.js có build thành công không.
+     * `test`: `vitest` chạy 143 unit test frontend.
+     * `backend`: `pytest` chạy toàn bộ test case API.
+     * `e2e`: `playwright` chạy test E2E mô phỏng trình duyệt.
+     * ⛔ **Nếu bất kỳ job nào đỏ, toàn bộ luồng deploy bị chặn.**
+  2. **Chốt Render Readiness Probe (During deploy):** Render tự động ping `/health` của container mới. Nếu container không khỏe $\to$ Render giữ nguyên bản cũ (**Zero-downtime rollback**).
+  3. **Chốt Production Alerting (Post-deploy):** Sentry theo dõi 24/7. Nếu người dùng thực gặp lỗi sau deploy $\to$ Alert gửi ngay về email nhóm phát triển trong vòng vài giây.
 
 ---
 
