@@ -148,13 +148,13 @@ export function ListenMode({ pageId, chapterId, chapterPageCount, compact = fals
       <button
         onClick={() => setOpen(o => !o)}
         className="btn btn-sm"
-        title="Nghe truyện — AI kể chuyện bằng giọng nói"
-        aria-label="Nghe truyện"
+        title={pageId ? "Nghe truyện — AI kể chuyện bằng giọng nói" : "Video recap chương trước — AI kể chuyện bằng giọng nói"}
+        aria-label={pageId ? "Nghe truyện" : "Video recap"}
         data-testid="listen-mode-trigger"
         style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
       >
         <Icon name="sparkle" size={12} />
-        {!compact && "Nghe"}
+        {!compact && (pageId ? "Nghe" : "Video Recap")}
       </button>
 
       <AnimatePresence>
@@ -194,8 +194,11 @@ export function ListenMode({ pageId, chapterId, chapterPageCount, compact = fals
               </button>
             </div>
 
-            {/* Tab switcher — only shown when a chapter is in scope */}
-            {chapterId && (
+            {/* Tab switcher — only shown when both a page and a chapter are in
+                scope (e.g. the series reader could offer both); the series
+                reader currently only passes chapterId, so readers there go
+                straight to the chapter recap view with no page-narration tab. */}
+            {chapterId && pageId && (
               <div style={{ display: "flex", border: "1.5px solid var(--border)", marginBottom: 12 }}>
                 <button
                   type="button"

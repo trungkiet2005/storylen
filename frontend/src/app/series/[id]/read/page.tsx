@@ -681,10 +681,9 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
 
               {current && (
                 <ListenMode
-                  pageId={current.page_id}
+                  pageId={null}
                   chapterId={current.chapter_id}
                   chapterPageCount={series?.chapters.find(c => c.chapter_id === current.chapter_id)?.page_count}
-                  compact
                 />
               )}
 
