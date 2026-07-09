@@ -36,6 +36,17 @@ def _run(cmd: list[str]) -> None:
         raise RecapError(f"ffmpeg failed: {proc.stderr[-500:]}")
 
 
+# Every segment is scaled+padded to this shared canvas before concatenation.
+# Manga pages vary in size/aspect ratio; concatenating segments with different
+# resolutions via `-c copy` produces a single video track with mid-stream
+# resolution changes, which most browsers' <video> element refuses to play
+# (shows a black frame, 0:00 duration, unresponsive controls) even though
+# ffmpeg/ffprobe/native players tolerate it. A fixed target size guarantees
+# every segment shares identical video parameters.
+_TARGET_W = 720
+_TARGET_H = 1024
+
+
 def _segment_for_page(assets: narration.PageAssets, workdir: str, index: int) -> str:
     """Render one page's still-image-over-audio segment; return the .mp4 path."""
     img_path = os.path.join(workdir, f"img_{index}.png")
@@ -47,14 +58,17 @@ def _segment_for_page(assets: narration.PageAssets, workdir: str, index: int) ->
     with open(audio_path, "wb") as fh:
         fh.write(assets.tts_result.audio)
 
-    # Loop the still image for exactly the audio's duration (-shortest), pad to
-    # even dimensions so H.264 accepts it.
+    # Loop the still image for exactly the audio's duration (-shortest), scaled
+    # to fit the shared canvas and letterboxed so every segment matches it
+    # exactly (see _TARGET_W/_TARGET_H above).
     _run([
         "ffmpeg", "-y",
         "-loop", "1", "-i", img_path,
         "-i", audio_path,
         "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p",
-        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "-vf",
+        f"scale={_TARGET_W}:{_TARGET_H}:force_original_aspect_ratio=decrease,"
+        f"pad={_TARGET_W}:{_TARGET_H}:(ow-iw)/2:(oh-ih)/2:color=black",
         "-c:a", "aac", "-b:a", "128k",
         "-shortest", seg_path,
     ])
@@ -99,7 +113,11 @@ def build_chapter_recap(
         out_path = os.path.join(workdir, "recap.mp4")
         _run([
             "ffmpeg", "-y", "-f", "concat", "-safe", "0",
-            "-i", concat_list, "-c", "copy", out_path,
+            "-i", concat_list, "-c", "copy",
+            # Move the moov atom to the front so browsers can start playback
+            # without waiting for/round-tripping to the end of the file.
+            "-movflags", "+faststart",
+            out_path,
         ])
 
         with open(out_path, "rb") as fh:
