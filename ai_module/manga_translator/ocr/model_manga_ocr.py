@@ -63,23 +63,41 @@ def _resolve_mocr_weights() -> str:
     except OSError as exc:
         # Read-only mount (Kaggle dataset symlink). Materialise a writable
         # mirror once, then rename inside that mirror.
+        #
+        # Multiple executor workers can cold-start concurrently (e.g. a
+        # 5-image batch dispatched to 5 free instances at once). If they all
+        # copy straight into the shared `cache_dir`, one worker can start
+        # reading `model.safetensors` while another is still mid-write,
+        # producing "Error while deserializing header: incomplete metadata,
+        # file not fully covered". To avoid that, build the mirror in a
+        # process-unique temp dir and publish it with an atomic rename so
+        # no worker ever observes a partially-written cache.
         cache_dir = os.environ.get(
             'MOCR_CACHE_DIR',
             os.path.join(ModelWrapper._MODEL_DIR, 'manga_ocr', 'weights_cache'),
         )
         mirror_legacy = os.path.join(cache_dir, 'preprocessor_config.json')
         if not os.path.isfile(mirror_legacy):
-            os.makedirs(cache_dir, exist_ok=True)
-            for name in os.listdir(target_dir):
-                src = os.path.join(target_dir, name)
-                dst = os.path.join(cache_dir, name)
-                if os.path.isfile(dst):
-                    continue
-                shutil.copyfile(src, dst)
-            shutil.copyfile(
-                os.path.join(cache_dir, 'processor_config.json'),
-                mirror_legacy,
-            )
+            tmp_dir = f'{cache_dir}.tmp-{os.getpid()}'
+            if os.path.isdir(tmp_dir):
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            os.makedirs(tmp_dir, exist_ok=True)
+            try:
+                for name in os.listdir(target_dir):
+                    shutil.copyfile(os.path.join(target_dir, name), os.path.join(tmp_dir, name))
+                shutil.copyfile(
+                    os.path.join(tmp_dir, 'processor_config.json'),
+                    os.path.join(tmp_dir, 'preprocessor_config.json'),
+                )
+                os.replace(tmp_dir, cache_dir)
+            except OSError:
+                # Either the temp build failed, or another worker already
+                # published `cache_dir` first (os.replace onto a non-empty
+                # directory raises). Either way, defer to whatever is
+                # already on disk if it looks complete; otherwise re-raise.
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                if not os.path.isfile(mirror_legacy):
+                    raise
         return cache_dir
 
 async def merge_bboxes(bboxes: List[Quadrilateral], width: int, height: int) -> Tuple[List[Quadrilateral], int]:
