@@ -2,7 +2,8 @@
 
 Slide báo cáo đồ án **StoryLens** (PA5 – bảo vệ cuối kỳ) cho môn **CSC10011 –
 Công nghệ phần mềm cho hệ thống Trí tuệ Nhân tạo**, HCMUS · GVHD: GS.TS Nguyễn
-Văn Vũ. Ngày báo cáo: **10/07/2026** · thời lượng **15 phút (gồm demo) + 10 phút Q&A**.
+Văn Vũ, ThS. Trương Phước Lộc, ThS. Ngô Ngọc Đăng Khoa. Ngày báo cáo:
+**10/07/2026** · thời lượng **15 phút (gồm demo) + 10 phút Q&A**.
 
 > **Bám theo PA5:** slide đã có đủ các phần bắt buộc — phát biểu vấn đề & định vị
 > (Vision), **quản lý dự án & phân công 6 thành viên** (slide 21), mô hình use case
