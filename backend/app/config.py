@@ -144,6 +144,63 @@ class Settings(BaseSettings):
             return v.strip()
         return v
 
+    # ─── Narration / Listen mode (VLM + TTS) ──────────────────────────────────
+    # The VLM (vision LLM) runs on a GPU pod behind an ollama-compatible endpoint.
+    # The pod's public tunnel URL changes each session, so — exactly like the
+    # ai_module — the default here can be overridden at runtime via app_settings
+    # (see services/narration_source.py). Local dev / CI point at localhost.
+    VLM_BASE_URL: str = "http://localhost:11434"
+    # Default to qwen2.5-vl: it answers directly (~10s/page) and reliably. qwen3-vl
+    # is a *thinking* model whose reasoning tokens (and this ollama build ignores
+    # think=false / "/no_think") can balloon on ambiguous art and starve the answer
+    # budget — it remains selectable for users who want it, with a larger budget.
+    VLM_MODEL: str = "qwen2.5vl:7b"
+    VLM_TOKEN: str = ""                       # Bearer token if the tunnel is protected
+    VLM_TIMEOUT_SECONDS: int = 180
+    VLM_MAX_TOKENS: int = 512                 # ample for a 2–4 sentence narration
+    VLM_TEMPERATURE: float = 0.6
+
+    # Narration behaviour
+    NARRATION_ENABLED: bool = True
+    NARRATION_BUCKET: str = "manga-audio"     # Supabase Storage bucket for rendered mp3/mp4
+    NARRATION_CREDIT_COST: int = 1            # credits per narrated page
+    NARRATION_MAX_CHAPTER_PAGES: int = 60     # guard against runaway chapter jobs
+
+    # Text-to-speech. TTS_DEFAULT_ENGINE ∈ {"edge", "pyttsx3", "coqui"}.
+    # edge-tts is the default (Microsoft neural voices, no API key). pyttsx3 is a
+    # fully-offline SAPI fallback. coqui/XTTS runs on the GPU pod (optional).
+    TTS_DEFAULT_ENGINE: str = "edge"
+    TTS_DEFAULT_VOICE: str = "vi-VN-HoaiMyNeural"
+    TTS_DEFAULT_RATE: str = "+0%"             # edge-tts prosody rate, e.g. "-10%".."+25%"
+    COQUI_TTS_URL: str = ""                   # e.g. https://<tunnel>.trycloudflare.com (empty → disabled)
+    COQUI_TTS_SPEAKER: str = "vi_female"
+
+    @field_validator(
+        "VLM_BASE_URL",
+        "VLM_MODEL",
+        "VLM_TOKEN",
+        "TTS_DEFAULT_ENGINE",
+        "TTS_DEFAULT_VOICE",
+        "TTS_DEFAULT_RATE",
+        "COQUI_TTS_URL",
+        "COQUI_TTS_SPEAKER",
+        "NARRATION_BUCKET",
+        mode="before",
+    )
+    @classmethod
+    def strip_narration_str(cls, v: Any) -> str:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+    @field_validator("TTS_DEFAULT_ENGINE", mode="before")
+    @classmethod
+    def normalize_tts_engine(cls, v: Any) -> str:
+        value = str(v or "edge").strip().lower()
+        if value not in {"edge", "pyttsx3", "coqui"}:
+            return "edge"
+        return value
+
     # ─── Observability ────────────────────────────────────────────────────────
     SENTRY_DSN: str = ""                # Empty → Sentry disabled.
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1
@@ -182,6 +239,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_FORUM_REPLY: str = "20/minute"
     RATE_LIMIT_FORUM_VOTE: str = "60/minute"
     RATE_LIMIT_FORUM_UPLOAD: str = "30/minute"
+    RATE_LIMIT_NARRATE: str = "20/minute"
 
     # ─── Forum attachments ────────────────────────────────────────────────────
     FORUM_BUCKET: str = "forum-attachments"

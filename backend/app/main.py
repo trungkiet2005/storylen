@@ -22,8 +22,8 @@ from app.middleware import (
 from app.observability import init_observability
 from app.rate_limit import limiter
 from app.routers import (
-    admin, ai_module, auth, comments, credits, forum, history, library, mangadex, notifications,
-    pages, payments, qa, scrape, search, series, share, status, upload, wibu, ws,
+    admin, ai_module, auth, comments, credits, forum, history, library, mangadex, narration,
+    notifications, pages, payments, qa, scrape, search, series, share, status, upload, wibu, ws,
 )
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
@@ -177,6 +177,7 @@ app.include_router(ai_module.router, prefix=API_PREFIX)
 app.include_router(status.router,  prefix=API_PREFIX)
 app.include_router(pages.router,   prefix=API_PREFIX)
 app.include_router(qa.router,      prefix=API_PREFIX)
+app.include_router(narration.router, prefix=API_PREFIX)
 app.include_router(history.router, prefix=API_PREFIX)
 app.include_router(series.router,  prefix=API_PREFIX)
 app.include_router(wibu.router,    prefix=API_PREFIX)

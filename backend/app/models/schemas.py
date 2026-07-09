@@ -322,3 +322,58 @@ class ReorderRequest(BaseModel):
 
 class AddPagesRequest(BaseModel):
     page_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
+# ─── Narration / Listen mode ──────────────────────────────────────────────────
+
+class NarrateRequest(BaseModel):
+    engine: Optional[str] = Field(default=None, description="TTS engine: edge | pyttsx3 | coqui")
+    voice: Optional[str] = Field(default=None, max_length=120)
+    rate: Optional[str] = Field(default=None, max_length=8, description='e.g. "+0%", "-10%"')
+
+
+class NarrationResponse(BaseModel):
+    page_id: str
+    script: str
+    audio_url: Optional[str] = None
+    mime: str
+    engine: str
+    voice: str
+    source: Literal["vlm", "dialogue_fallback"]
+    dialogue_lines: list[str] = []
+
+
+class TTSVoiceInfo(BaseModel):
+    id: str
+    label: str
+    locale: str
+    gender: str = "Unknown"
+
+
+class TTSEngineInfo(BaseModel):
+    engine: str
+    available: bool
+    is_default: bool = False
+    voices: list[TTSVoiceInfo] = []
+
+
+class VoicesResponse(BaseModel):
+    default_engine: str
+    engines: list[TTSEngineInfo] = []
+
+
+class ChapterNarrateResponse(BaseModel):
+    job_id: str
+    chapter_id: str
+    total: int
+    status: str
+
+
+class ChapterNarrationStatusResponse(BaseModel):
+    job_id: str
+    chapter_id: str
+    total: int
+    done: int
+    status: str
+    error: Optional[str] = None
+    segments: list[dict] = []
