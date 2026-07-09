@@ -13,6 +13,7 @@ import { QAChatPanel } from "@/components/QAChatPanel";
 import { ListenMode } from "@/components/ListenMode";
 import {
   APIError,
+  getChapterRecap,
   getPage,
   getSeriesFull,
   updateBubbleTranslation,
@@ -207,6 +208,10 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
   const [savingBubbleId, setSavingBubbleId] = useState<string | null>(null);
   // Citation highlight: which bubble (pixel bbox) on which page to spotlight.
   const [highlight, setHighlight] = useState<{ pageId: string; bbox: number[] } | null>(null);
+  // "Trước đó trong truyện...": recap of the PREVIOUS chapter, shown when
+  // landing on the first page of a new chapter (dismissible, remembered per
+  // current chapter in localStorage).
+  const [recap, setRecap] = useState<{ chapterId: string; text: string } | null>(null);
   const [imgDims, setImgDims] = useState<Record<string, { w: number; h: number }>>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -295,6 +300,41 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
     translatedImageUrl: currentTranslatedUrl,
   });
   const currentBubbles = currentDetail?.processed_data ?? [];
+
+  useEffect(() => {
+    setRecap(null);
+    if (!series || !current || current.chapter_number <= 1) return;
+
+    const isFirstPageOfChapter = flatPages[index - 1]?.chapter_id !== current.chapter_id;
+    if (!isFirstPageOfChapter) return;
+
+    const prevChapter = series.chapters.find(c => c.chapter_number === current.chapter_number - 1);
+    if (!prevChapter) return;
+
+    const dismissKey = `storylens.recap-dismissed.${current.chapter_id}`;
+    if (typeof window !== "undefined" && window.localStorage.getItem(dismissKey)) return;
+
+    let cancelled = false;
+    getChapterRecap(prevChapter.chapter_id)
+      .then(res => {
+        if (!cancelled && res.recap) {
+          setRecap({ chapterId: current.chapter_id, text: res.recap });
+        }
+      })
+      .catch(() => {
+        // Best-effort reading aid — silent failure, no toast.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [series, current, flatPages, index]);
+
+  const dismissRecap = useCallback(() => {
+    if (recap && typeof window !== "undefined") {
+      window.localStorage.setItem(`storylens.recap-dismissed.${recap.chapterId}`, "1");
+    }
+    setRecap(null);
+  }, [recap]);
 
   useEffect(() => {
     setSelectedBubble(null);
@@ -703,6 +743,37 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
               <span className="mono" style={{ fontSize: 10, color: "var(--muted)" }}>
                 Phím: <kbd>V</kbd> đổi chế độ · <kbd>F</kbd> toàn màn hình · <kbd>←</kbd><kbd>→</kbd> chuyển trang
               </span>
+            </div>
+          )}
+
+          {recap && recap.chapterId === current?.chapter_id && (
+            <div
+              className="stroke-ink"
+              style={{
+                background: "var(--panel)",
+                boxShadow: "4px 4px 0 0 var(--border)",
+                padding: "12px 14px",
+                marginBottom: 12,
+                display: "flex",
+                gap: 10,
+                alignItems: "flex-start",
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div className="caps-xs" style={{ color: "var(--accent)", marginBottom: 4 }}>
+                  Trước đó trong truyện…
+                </div>
+                <div style={{ fontSize: 13, lineHeight: 1.6, color: "var(--fg)" }}>{recap.text}</div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={dismissRecap}
+                aria-label="Đóng tóm tắt"
+                style={{ padding: 4, flexShrink: 0 }}
+              >
+                <Icon name="x" size={14} />
+              </button>
             </div>
           )}
 

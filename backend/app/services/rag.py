@@ -595,3 +595,168 @@ def answer_question_stream(
 
     yield from _stream_answer(question, context, history)
     yield {"type": "done"}
+
+
+# ─── Chapter recap ("Trước đó trong truyện...") ───────────────────────────────
+
+_RECAP_PROMPT = """Bạn tóm tắt lại một chương truyện manga đã dịch, để người đọc \
+nhớ lại nội dung trước khi đọc chương tiếp theo.
+Chỉ dựa trên nội dung dưới đây, viết 2-4 câu tiếng Việt, tự nhiên, không dùng \
+markdown, không thêm suy đoán ngoài nội dung.
+
+--- NỘI DUNG CHƯƠNG ---
+{context}
+-----------------------
+
+Tóm tắt:"""
+
+_RECAP_CONTEXT_MAX_CHARS = 8000
+
+
+def _chapter_translation_context(supabase, chapter_id: str) -> str | None:
+    """Ordered translated text for every page of a chapter (position order).
+
+    Returns None specifically when a DB fetch fails (transient — caller must
+    NOT cache), and "" only when the fetch succeeded cleanly but there is
+    genuinely no content (no pages, or no translated bubbles).
+    """
+    try:
+        pages_res = (
+            supabase.table("manga_pages")
+            .select("page_id, page_number")
+            .eq("chapter_id", chapter_id)
+            .order("page_number", desc=False)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("Recap: failed to list pages for chapter %s: %s", chapter_id, exc)
+        return None
+
+    page_ids = [p["page_id"] for p in (pages_res.data or []) if isinstance(p, dict) and p.get("page_id")]
+    if not page_ids:
+        return ""
+
+    try:
+        bubbles_res = (
+            supabase.table("bubble_data")
+            .select("page_id, x, y, translation_history(translated_text_vi, translated_at)")
+            .in_("page_id", page_ids)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("Recap: failed to load bubbles for chapter %s: %s", chapter_id, exc)
+        return None
+
+    page_order = {pid: i for i, pid in enumerate(page_ids)}
+    rows = [r for r in (bubbles_res.data or []) if isinstance(r, dict)]
+    try:
+        rows.sort(key=lambda r: (page_order.get(r.get("page_id"), 0), r.get("y") or 0, r.get("x") or 0))
+    except Exception:
+        pass
+
+    lines = [
+        _latest_translation(row.get("translation_history") or []).strip()
+        for row in rows
+    ]
+    context = "\n".join(line for line in lines if line)
+    return context[:_RECAP_CONTEXT_MAX_CHARS]
+
+
+def _all_pages_completed(supabase, chapter_id: str) -> bool:
+    try:
+        res = (
+            supabase.table("manga_pages")
+            .select("page_id, status")
+            .eq("chapter_id", chapter_id)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("Recap: failed to check page statuses for chapter %s: %s", chapter_id, exc)
+        return False
+    rows = res.data or []
+    if not rows:
+        return False
+    return all(isinstance(r, dict) and r.get("status") == "completed" for r in rows)
+
+
+def _generate_recap_text(context: str) -> str | None:
+    """Returns the recap text, or None if Gemini is unavailable/fails
+    (a transient condition — caller must NOT cache None)."""
+    if not _pool.available:
+        logger.warning("Recap generation skipped: Gemini pool unavailable.")
+        return None
+
+    last_error: Exception | None = None
+
+    for _ in range(_pool.client_count()):
+        client = _pool.next_client()
+        if client is None:
+            break
+        try:
+            response = client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=_RECAP_PROMPT.format(context=context),
+            )
+            text = (response.text or "").strip()
+            return text or None
+        except Exception as exc:
+            last_error = exc
+            if _is_retryable_gemini_key_error(exc):
+                logger.warning("Recap generation: Gemini key failed, rotating to next key. Error: %s", exc)
+                continue
+            logger.warning("Recap generation failed: %s", exc)
+            break
+
+    logger.error("Recap generation failed for all attempted keys: %s", last_error)
+    return None
+
+
+def _cache_recap(supabase, chapter_id: str, recap_vi: str) -> None:
+    try:
+        supabase.table("manga_chapters").update({"recap_vi": recap_vi}).eq("chapter_id", chapter_id).execute()
+    except Exception as exc:
+        logger.warning("Recap: failed to cache recap for chapter %s: %s", chapter_id, exc)
+
+
+def get_or_generate_chapter_recap(chapter_id: str) -> str | None:
+    """
+    Ownership must already be enforced by the caller (the router uses
+    `_require_chapter`). Returns the cached recap (None if cached as "" —
+    meaning 'nothing to summarize'), or generates + caches it on a miss.
+    Returns None on any failure without caching, so a later call can retry.
+    """
+    supabase = get_supabase()
+
+    try:
+        res = (
+            supabase.table("manga_chapters")
+            .select("recap_vi")
+            .eq("chapter_id", chapter_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("Recap: failed to read cache for chapter %s: %s", chapter_id, exc)
+        return None
+
+    row = res.data if res else None
+    cached = row.get("recap_vi") if row else None
+    if cached is not None:
+        return cached or None
+
+    if not _all_pages_completed(supabase, chapter_id):
+        return None
+
+    context = _chapter_translation_context(supabase, chapter_id)
+    if context is None:
+        return None  # transient DB failure while fetching content — do not cache, allow retry
+    if not context.strip():
+        _cache_recap(supabase, chapter_id, "")
+        return None
+
+    recap = _generate_recap_text(context)
+    if recap is None:
+        return None  # transient Gemini failure — do not cache, allow retry
+
+    _cache_recap(supabase, chapter_id, recap)
+    return recap
