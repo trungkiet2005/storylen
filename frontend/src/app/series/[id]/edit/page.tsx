@@ -24,6 +24,7 @@ import {
   type SeriesDetail,
   type SeriesStatus,
 } from "@/lib/api";
+import { buildSeriesReadPageHref } from "@/lib/seriesReader";
 
 const STATUS_OPTIONS: { value: SeriesStatus; label: string }[] = [
   { value: "ongoing", label: "Đang tiến hành" },
@@ -671,7 +672,7 @@ export default function SeriesEditPage({ params }: { params: Promise<{ id: strin
                                         {page.page_id.slice(0, 8)}…
                                       </span>
                                       <Link
-                                        href={`/reader?page=${page.page_id}`}
+                                        href={buildSeriesReadPageHref(id, page.page_id)}
                                         onClick={e => e.stopPropagation()}
                                         style={{ textDecoration: "none" }}
                                       >
