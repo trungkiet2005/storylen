@@ -25,6 +25,7 @@ import {
   type ChapterResponse,
   type SeriesDetail,
 } from "@/lib/api";
+import { buildSeriesReadPageHref } from "@/lib/seriesReader";
 
 const STATUS_META: Record<string, { label: string; color: string }> = {
   ongoing: { label: "Đang tiến hành", color: "var(--accent)" },
@@ -707,7 +708,7 @@ export default function SeriesDetailPage({ params }: { params: Promise<{ id: str
                                         {chapter.pages.map(p => (
                                           <Link
                                             key={p.page_id}
-                                            href={`/reader?page=${p.page_id}`}
+                                            href={buildSeriesReadPageHref(id, p.page_id)}
                                             style={{ textDecoration: "none" }}
                                           >
                                             <motion.div

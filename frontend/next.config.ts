@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import bundleAnalyzer from "@next/bundle-analyzer";
 
 // Where the browser is allowed to talk to. Backend API is configurable per-env;
 // MangaDex CDN is whitelisted because covers + chapter pages stream from there.
@@ -81,8 +82,7 @@ const nextConfig: NextConfig = {
 
 // Bundle analyzer wraps the config when `ANALYZE=true`. Reports land in
 // `.next/analyze/*.html` for inspection in the browser.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const withBundleAnalyzer = require("@next/bundle-analyzer")({
+const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
   openAnalyzer: false,
 });

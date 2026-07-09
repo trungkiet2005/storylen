@@ -1174,6 +1174,7 @@ function ReaderContent() {
           )}
 
           {/* Toolbar */}
+          {pageIdParam && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1230,14 +1231,14 @@ function ReaderContent() {
               ))}
             </div>
 
-            {/* Context / edit panel toggle — bubble editing, QC, history, overlay style */}
+            {/* Edit panel toggle — bubble editing, QC, history, overlay style */}
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               className="btn btn-sm"
               onClick={() => setShowContext(v => !v)}
-              aria-label="Ngữ cảnh & chỉnh sửa bản dịch"
-              title="Ngữ cảnh · sửa bản dịch, QC, lịch sử (C)"
+              aria-label="Chỉnh sửa bản dịch"
+              title="Chỉnh sửa · sửa bản dịch, QC, lịch sử (C)"
               aria-pressed={showContext}
               style={{
                 gap: 5, fontWeight: 700, whiteSpace: "nowrap",
@@ -1245,7 +1246,7 @@ function ReaderContent() {
                 background: showContext ? "var(--accent)" : undefined,
               }}
             >
-              📝 Ngữ cảnh
+              📝 Chỉnh sửa
             </motion.button>
 
             {/* Overlay toggle */}
@@ -1360,6 +1361,7 @@ function ReaderContent() {
               ?
             </motion.button>
           </motion.div>
+          )}
 
           {/* Empty state when no page selected */}
           <AnimatePresence mode="wait">
@@ -1563,8 +1565,8 @@ function ReaderContent() {
               {/* Panel header + tabs */}
               <div style={{ padding: "20px 20px 0", flexShrink: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <span className="caps-sm" style={{ color: "var(--accent)" }}>Ngữ cảnh · Context</span>
-                  <button className="btn btn-sm btn-ghost" style={{ padding: 4 }} onClick={() => setShowContext(false)} aria-label="Đóng panel ngữ cảnh">
+                  <span className="caps-sm" style={{ color: "var(--accent)" }}>Chỉnh sửa · Editor</span>
+                  <button className="btn btn-sm btn-ghost" style={{ padding: 4 }} onClick={() => setShowContext(false)} aria-label="Đóng panel chỉnh sửa">
                     <Icon name="x" size={13}/>
                   </button>
                 </div>
@@ -1572,7 +1574,7 @@ function ReaderContent() {
                 {/* Tab switcher */}
                 <div style={{ display: "flex", border: "1.5px solid var(--border)", marginBottom: 14 }}>
                   {([
-                    { id: "info", label: "Ngữ cảnh", icon: null },
+                    { id: "info", label: "Chỉnh sửa", icon: null },
                   ] as { id: "info" | "chat"; label: string; icon: string | null }[]).map((tab, i) => (
                     <button
                       key={tab.id}
