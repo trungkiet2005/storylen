@@ -15,17 +15,21 @@ vi.mock("@/lib/api", () => {
     APIError,
     listVoices: vi.fn(),
     narratePage: vi.fn(),
+    getChapterRecapVideo: vi.fn(),
   };
 });
 
 import { ListenMode } from "@/components/ListenMode";
-import { listVoices, narratePage, APIError } from "@/lib/api";
+import { listVoices, narratePage, getChapterRecapVideo, APIError } from "@/lib/api";
 
 const mockListVoices = vi.mocked(listVoices);
 const mockNarrate = vi.mocked(narratePage);
+const mockRecapVideo = vi.mocked(getChapterRecapVideo);
 
 const VOICES = {
   default_engine: "edge",
+  credit_cost_per_page: 1,
+  max_chapter_pages: 60,
   engines: [
     {
       engine: "edge",
@@ -60,6 +64,7 @@ beforeAll(() => {
 beforeEach(() => {
   mockListVoices.mockReset();
   mockNarrate.mockReset();
+  mockRecapVideo.mockReset();
   mockListVoices.mockResolvedValue(VOICES as never);
   mockNarrate.mockResolvedValue(NARRATION as never);
 });
@@ -135,5 +140,56 @@ describe("ListenMode", () => {
     render(<ListenMode pageId="p1" />);
     fireEvent.click(screen.getByTestId("listen-mode-trigger"));
     expect(await screen.findByTestId("listen-error")).toBeTruthy();
+  });
+});
+
+describe("ListenMode — chapter recap tab", () => {
+  it("does not show a chapter tab when chapterId is not provided", async () => {
+    render(<ListenMode pageId="p1" />);
+    fireEvent.click(screen.getByTestId("listen-mode-trigger"));
+    await screen.findByTestId("listen-mode-panel");
+    expect(screen.queryByTestId("listen-tab-chapter")).toBeNull();
+  });
+
+  it("shows both tabs when chapterId is provided, defaulting to the page tab", async () => {
+    render(<ListenMode pageId="p1" chapterId="c1" chapterPageCount={5} />);
+    fireEvent.click(screen.getByTestId("listen-mode-trigger"));
+    await screen.findByTestId("listen-tab-chapter");
+    expect(screen.getByTestId("listen-generate")).toBeTruthy();
+    expect(screen.queryByTestId("listen-recap-generate")).toBeNull();
+  });
+
+  it("shows the credit cost before generating and calls getChapterRecapVideo on click", async () => {
+    mockRecapVideo.mockResolvedValue({ chapter_id: "c1", video_url: "https://video.example.com/c1.mp4" } as never);
+    render(<ListenMode pageId="p1" chapterId="c1" chapterPageCount={5} />);
+    fireEvent.click(screen.getByTestId("listen-mode-trigger"));
+    fireEvent.click(await screen.findByTestId("listen-tab-chapter"));
+
+    const cost = await screen.findByTestId("listen-recap-cost");
+    expect(cost.textContent).toContain("5");
+
+    fireEvent.click(screen.getByTestId("listen-recap-generate"));
+    await waitFor(() => expect(mockRecapVideo).toHaveBeenCalledWith("c1", expect.objectContaining({ engine: "edge" })));
+    const video = (await screen.findByTestId("listen-recap-video")) as HTMLVideoElement;
+    expect(video.getAttribute("src")).toBe("https://video.example.com/c1.mp4");
+    expect(screen.getByTestId("listen-recap-download")).toBeTruthy();
+  });
+
+  it("disables the recap button and warns when the chapter exceeds the page limit", async () => {
+    render(<ListenMode pageId="p1" chapterId="c1" chapterPageCount={999} />);
+    fireEvent.click(screen.getByTestId("listen-mode-trigger"));
+    fireEvent.click(await screen.findByTestId("listen-tab-chapter"));
+    const btn = (await screen.findByTestId("listen-recap-generate")) as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("surfaces a recap generation error", async () => {
+    mockRecapVideo.mockRejectedValue(new APIError(503, "Xuất video recap chưa khả dụng trên máy chủ này (thiếu ffmpeg)."));
+    render(<ListenMode pageId="p1" chapterId="c1" chapterPageCount={5} />);
+    fireEvent.click(screen.getByTestId("listen-mode-trigger"));
+    fireEvent.click(await screen.findByTestId("listen-tab-chapter"));
+    fireEvent.click(await screen.findByTestId("listen-recap-generate"));
+    const err = await screen.findByTestId("listen-error");
+    expect(err.textContent).toContain("ffmpeg");
   });
 });
