@@ -5,13 +5,16 @@ Công nghệ phần mềm cho hệ thống Trí tuệ Nhân tạo**, HCMUS · GV
 Văn Vũ, ThS. Trương Phước Lộc, ThS. Ngô Ngọc Đăng Khoa. Ngày báo cáo:
 **10/07/2026** · thời lượng **15 phút (gồm demo) + 10 phút Q&A**.
 
-> **Bám theo PA5:** slide đã có đủ các phần bắt buộc — phát biểu vấn đề & định vị
-> (Vision), **quản lý dự án & phân công 6 thành viên** (slide 21), mô hình use case
-> + **sơ đồ use case** (slide 8) + NFR, kiến trúc & công nghệ, **đánh giá mô hình AI**
-> (slide 14), và demo (slide 17–19). Slide 22 nêu **Katalon Studio** — công cụ kiểm
-> thử tự động bắt buộc của PA5 phần (a): tối thiểu 2 use case (UC01, UC02) × ≥2
-> scenario, báo cáo Pass/Fail kèm test script (nộp thành **một tài liệu riêng**,
-> chấm chung với phần trình bày).
+> **Bám theo đúng thứ tự PA5:** slide đi theo chính xác 6 mục PA5 yêu cầu, theo
+> thứ tự — **I. Vấn đề, định vị & người dùng** (slide 3–6) → **II. Quản lý dự án**:
+> cơ cấu nhóm & trách nhiệm 6 thành viên (slide 7–8) → **III. Yêu cầu phần mềm**:
+> mô hình use case + **sơ đồ use case** + NFR (slide 9–12) → **IV. Phân tích &
+> Thiết kế**: kiến trúc, pipeline AI, RAG, công nghệ, bảo mật, triển khai
+> (slide 13–18) → **V. Đánh giá**: kết quả mô hình ML + kiểm thử tự động
+> (slide 19–20) → **VI. Demo** (slide 21–24) → **VII. Kết luận** (slide 25–28).
+> Slide 20 nêu **Katalon Studio** — công cụ kiểm thử tự động bắt buộc của PA5
+> phần (a): tối thiểu 2 use case (UC01, UC02) × ≥2 scenario, báo cáo Pass/Fail
+> kèm test script (nộp thành **một tài liệu riêng**, chấm chung với phần trình bày).
 
 | Tệp | Mô tả |
 | --- | --- |
@@ -46,7 +49,7 @@ mực đen + đỏ manga + vàng nhấn. Font an toàn (Arial + Calibri) hỗ tr
 
 ## 1. Việc cần bạn tự làm — chèn ảnh chụp web
 
-3 slide demo (**17, 18, 19**) có sẵn các **khung nét đứt** ghi
+3 slide demo (**22, 23, 24**) có sẵn các **khung nét đứt** ghi
 “CHÈN ẢNH CHỤP MÀN HÌNH” kèm route cần chụp. Cách làm:
 
 1. Chạy web: `cd frontend && npm run dev` → mở http://localhost:3000
@@ -63,24 +66,38 @@ Ngoài 3 slide demo, bạn có thể chèn thêm ảnh vào bất kỳ slide nà
 
 ---
 
-## 2. Cấu trúc 28 slide
+## 2. Cấu trúc 28 slide (đúng thứ tự 6 mục PA5)
 
-| # | Slide | # | Slide |
-| --- | --- | --- | --- |
-| 1 | Trang bìa | 15 | Ngăn xếp công nghệ |
-| 2 | Nội dung (agenda) | 16 | Tính năng nổi bật |
-| 3 | Bối cảnh & Vấn đề | 17 | **Demo A** — Trang chủ & Upload |
-| 4 | Giải pháp (định vị) | 18 | **Demo A** — Reader & Studio QC |
-| 5 | So sánh cạnh tranh | 19 | **Demo B** — Batch · Q&A · Thư viện |
-| 6 | Người dùng (personas) | 20 | Quy trình (RUP + Scrum) |
-| 7 | Use case chính | 21 | **Tổ chức nhóm & phân công (6 TV)** |
-| 8 | **Sơ đồ use case** | 22 | Kiểm thử & CI/CD (Katalon) |
-| 9 | Yêu cầu chức năng (F01–F09) | 23 | Bảo mật nhiều lớp |
-| 10 | Yêu cầu phi chức năng | 24 | Triển khai |
-| 11 | Kiến trúc 3 dịch vụ | 25 | Hạn chế & lỗi đã biết |
-| 12 | Pipeline dịch AI | 26 | Hướng phát triển |
-| 13 | RAG Q&A | 27 | Kết luận |
-| 14 | Mô hình ML & kết quả | 28 | Cảm ơn & Q&A |
+| # | Slide | Mục PA5 |
+| --- | --- | --- |
+| 1 | Trang bìa | — |
+| 2 | Nội dung (agenda) | — |
+| 3 | Bối cảnh & Vấn đề | I. Problem statement |
+| 4 | Giải pháp (định vị) | I. Product position statement |
+| 5 | So sánh cạnh tranh | I. Product position statement |
+| 6 | Người dùng (personas) | I. Users/market |
+| 7 | Quy trình (RUP + Scrum) | II. Project management |
+| 8 | **Tổ chức nhóm & phân công (6 TV)** | II. Team structure & responsibilities |
+| 9 | Use case chính | III. Use-case model |
+| 10 | **Sơ đồ use case** | III. Use-case model |
+| 11 | Yêu cầu chức năng (F01–F09) | III. Use-case model |
+| 12 | Yêu cầu phi chức năng | III. Non-functional requirements |
+| 13 | Kiến trúc 3 dịch vụ | IV. Architecture |
+| 14 | Pipeline dịch AI | IV. Architecture & technologies |
+| 15 | RAG Q&A | IV. Architecture & technologies |
+| 16 | Ngăn xếp công nghệ | IV. Technologies used |
+| 17 | Bảo mật nhiều lớp | IV. Architecture & technologies |
+| 18 | Triển khai | IV. Architecture & technologies |
+| 19 | Mô hình ML & kết quả | V. Evaluation |
+| 20 | Kiểm thử & CI/CD (Katalon) | V. Evaluation |
+| 21 | Tính năng nổi bật | VI. Demo (giới thiệu) |
+| 22 | **Demo A** — Trang chủ & Upload | VI. Demo |
+| 23 | **Demo A** — Reader & Studio QC | VI. Demo |
+| 24 | **Demo B** — Batch · Q&A · Thư viện | VI. Demo |
+| 25 | Hạn chế & lỗi đã biết | VII. Kết luận (bổ sung) |
+| 26 | Hướng phát triển | VII. Kết luận (bổ sung) |
+| 27 | Kết luận | VII. Kết luận (bổ sung) |
+| 28 | Cảm ơn & Q&A | — |
 
 Mỗi slide đều có **ghi chú người trình bày** (Presenter Notes) — mở tab **View ▸
 Notes** trong PowerPoint để xem gợi ý nói.
@@ -89,8 +106,8 @@ Notes** trong PowerPoint để xem gợi ý nói.
 
 ## 3. Cần chỉnh trước khi trình bày
 
-- **Tên & MSSV 6 thành viên** đã điền sẵn (slide bìa + slide 21). Kiểm tra lại nếu có sai sót.
-- Chèn ảnh chụp web vào **slide 17–19** (xem mục 1).
+- **Tên & MSSV 6 thành viên** đã điền sẵn (slide bìa + slide 8). Kiểm tra lại nếu có sai sót.
+- Chèn ảnh chụp web vào **slide 22–24** (xem mục 1).
 - Kiểm tra lại tên GVHD nếu khác.
 
 ---
