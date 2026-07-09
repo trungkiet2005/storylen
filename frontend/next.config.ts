@@ -31,6 +31,12 @@ const imgSrc = [
   "https://www.mangaread.org",
 ].join(" ");
 
+// <audio>/<video> resource loading (narration + chapter recap videos, both
+// served from Supabase Storage signed URLs) falls under media-src — without
+// it, CSP falls back to default-src 'self' and silently blocks playback
+// (element renders, controls appear, but the resource never loads).
+const mediaSrc = ["'self'", "https://*.supabase.co"].join(" ");
+
 const securityHeaders = [
   // Block clickjacking. SAMEORIGIN since we don't embed ourselves.
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
@@ -54,6 +60,7 @@ const securityHeaders = [
       "default-src 'self'",
       `connect-src ${connectSrc}`,
       `img-src ${imgSrc}`,
+      `media-src ${mediaSrc}`,
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "font-src 'self' data:",
