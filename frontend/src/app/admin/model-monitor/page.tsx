@@ -2,41 +2,15 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { SectionHeader } from "@/components/SectionHeader";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface TimeSeries {
-  date: string;
-  avg_ocr_confidence: number;
-  avg_latency_ms: number;
-  success_rate: number;
-  page_count: number;
-}
-
-interface MetricsSummary {
-  total_pages: number;
-  avg_ocr_confidence: number | null;
-  avg_latency_ms: number | null;
-  translation_success_rate: number | null;
-  avg_bubble_count: number | null;
-  bubble_detection_rate: number | null;
-  drift_status: string;
-  drift_details: Array<{ metric: string; recent: number; baseline: number; status: string }> | null;
-  time_series: TimeSeries[];
-}
-
-interface ABVariant {
-  translator: string;
-  sample_count: number;
-  avg_ocr_confidence: number | null;
-  avg_latency_ms: number | null;
-  success_rate: number | null;
-}
-
-interface ABResults {
-  variants: ABVariant[];
-  recommendation: string;
-}
+import {
+  adminGetModelMonitorSummary,
+  adminGetModelMonitorAB,
+  adminSetModelMonitorAB,
+  type ModelMonitorSummary as MetricsSummary,
+  type ModelMonitorABResults as ABResults,
+  type ModelMonitorTimeSeries as TimeSeries,
+  type ModelMonitorABVariantName,
+} from "@/lib/api";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -110,47 +84,40 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
 export default function AdminModelMonitorPage() {
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
   const [abResults, setAbResults] = useState<ABResults | null>(null);
-  const [abVariant, setAbVariant] = useState<"off" | "experiment_50">("off");
+  const [abVariant, setAbVariant] = useState<ModelMonitorABVariantName>("off");
   const [days, setDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [abSaving, setAbSaving] = useState(false);
-
-  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "";
+  const [abNotice, setAbNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [sumRes, abRes] = await Promise.all([
-        fetch(`${apiBase}/admin/model-monitor/summary?days=${days}`, { credentials: "include" }),
-        fetch(`${apiBase}/admin/model-monitor/ab-results`, { credentials: "include" }),
+      const [sum, ab] = await Promise.all([
+        adminGetModelMonitorSummary(days),
+        adminGetModelMonitorAB(),
       ]);
-      if (!sumRes.ok) throw new Error(`Summary: ${sumRes.status}`);
-      if (!abRes.ok) throw new Error(`AB: ${abRes.status}`);
-      setSummary(await sumRes.json());
-      setAbResults(await abRes.json());
+      setSummary(sum);
+      setAbResults(ab);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [apiBase, days]);
+  }, [days]);
 
   useEffect(() => { void load(); }, [load]);
 
   async function handleSetAB() {
     setAbSaving(true);
+    setAbNotice(null);
     try {
-      await fetch(`${apiBase}/admin/model-monitor/ab-config`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ variant: abVariant }),
-      });
-      alert(`A/B variant set to: ${abVariant}`);
-    } catch {
-      alert("Failed to set A/B variant.");
+      await adminSetModelMonitorAB(abVariant);
+      setAbNotice(`✓ Đã đặt variant A/B: ${abVariant}`);
+    } catch (e: unknown) {
+      setAbNotice(`✕ Lưu thất bại: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setAbSaving(false);
     }
@@ -322,7 +289,7 @@ export default function AdminModelMonitorPage() {
           <select
             id="ab-variant-select"
             value={abVariant}
-            onChange={(e) => setAbVariant(e.target.value as "off" | "experiment_50")}
+            onChange={(e) => setAbVariant(e.target.value as ModelMonitorABVariantName)}
             style={{ padding: "6px 10px", fontSize: 13, background: "var(--bg-2)", border: "1px solid var(--border)", color: "var(--ink)" }}
           >
             <option value="off">off — Tắt A/B (tất cả dùng config mặc định)</option>
@@ -331,6 +298,16 @@ export default function AdminModelMonitorPage() {
           <button id="ab-save-btn" className="btn btn-sm btn-primary" onClick={handleSetAB} disabled={abSaving}>
             {abSaving ? "Đang lưu…" : "Lưu cấu hình"}
           </button>
+          {abNotice && (
+            <span
+              style={{
+                fontSize: 12,
+                color: abNotice.startsWith("✓") ? "#1E8F4E" : "var(--accent)",
+              }}
+            >
+              {abNotice}
+            </span>
+          )}
         </div>
         <div style={{ marginTop: 12, fontSize: 11, color: "var(--muted)" }}>
           Khi bật experiment_50, 50% user (hash by user_id) sẽ dùng detector=yolov8x thay vì default. Hiệu năng và chất lượng sẽ được so sánh tự động trong bảng A/B ở trên.

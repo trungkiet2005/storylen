@@ -133,6 +133,11 @@ def process_page(
         else settings.AI_MODULE_TRANSLATOR
     )
 
+    # Defined before the try so the failure path can still report latency and
+    # (partial) bubbles to the model monitor.
+    _t_start = time.monotonic()
+    raw_bubbles: list[dict] = []
+
     try:
         # ── Step 1: Notify frontend processing has started ─────────────────
         from app.services.pipeline_control import (
@@ -144,7 +149,7 @@ def process_page(
         _register_cancel(page_id)
         raise_if_cancelled(page_id)
         _update_status(page_id, ProcessingStatus.OCR_RUNNING, 10)
-        _t_start = time.monotonic()
+        _t_start = time.monotonic()  # reset once real work begins (excludes setup)
 
         # ── Step 2: Call HF Space — does all heavy lifting ─────────────────
         logger.info("Delegating page %s to ai_module", page_id)
@@ -339,6 +344,21 @@ def process_page(
     except Exception as exc:
         logger.exception("Pipeline failed for page %s", page_id)
         _update_status(page_id, ProcessingStatus.FAILED, 0, error=str(exc))
+
+        # Record the failure so translation_success_rate / drift detection
+        # reflect reality (otherwise only successes are ever logged → 100%).
+        try:
+            from app.services.model_monitor import log_pipeline_metrics
+            log_pipeline_metrics(
+                page_id=page_id,
+                bubbles=raw_bubbles,
+                latency_ms=int((time.monotonic() - _t_start) * 1000),
+                translator_name=translator_name,
+                success=False,
+            )
+        except Exception as _me:
+            logger.debug("model_monitor failure-log skipped: %s", _me)
+
         try:
             owner = supabase.table("manga_pages").select("user_id").eq("page_id", page_id).limit(1).execute()
             user_id = (owner.data or [{}])[0].get("user_id")

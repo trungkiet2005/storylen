@@ -1894,6 +1894,72 @@ export async function adminGetHealth(): Promise<AdminHealth> {
   return request<AdminHealth>("/admin/health");
 }
 
+// ─── Model Monitor (MLOps) ────────────────────────────────────────────────────
+
+export interface ModelMonitorTimeSeries {
+  date: string;
+  avg_ocr_confidence: number;
+  avg_latency_ms: number;
+  success_rate: number;
+  page_count: number;
+}
+
+export interface ModelMonitorDriftDetail {
+  metric: string;
+  recent: number;
+  baseline: number;
+  status: string;
+}
+
+export interface ModelMonitorSummary {
+  total_pages: number;
+  avg_ocr_confidence: number | null;
+  avg_latency_ms: number | null;
+  translation_success_rate: number | null;
+  avg_bubble_count: number | null;
+  bubble_detection_rate: number | null;
+  drift_status: string;
+  drift_details: ModelMonitorDriftDetail[] | null;
+  time_series: ModelMonitorTimeSeries[];
+}
+
+export interface ModelMonitorABVariant {
+  translator: string;
+  sample_count: number;
+  avg_ocr_confidence: number | null;
+  avg_latency_ms: number | null;
+  success_rate: number | null;
+}
+
+export interface ModelMonitorABResults {
+  variants: ModelMonitorABVariant[];
+  recommendation: string;
+}
+
+export type ModelMonitorABVariantName = "off" | "experiment_50";
+
+export async function adminGetModelMonitorSummary(
+  days = 7,
+): Promise<ModelMonitorSummary> {
+  return request<ModelMonitorSummary>(
+    `/admin/model-monitor/summary?days=${encodeURIComponent(days)}`,
+  );
+}
+
+export async function adminGetModelMonitorAB(): Promise<ModelMonitorABResults> {
+  return request<ModelMonitorABResults>("/admin/model-monitor/ab-results");
+}
+
+export async function adminSetModelMonitorAB(
+  variant: ModelMonitorABVariantName,
+): Promise<{ ok: boolean; ab_test_variant: string }> {
+  return request("/admin/model-monitor/ab-config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ variant }),
+  });
+}
+
 // ─── Wibu (Gamification) ─────────────────────────────────────────────────────
 
 export type WibuListStatus = "reading" | "want" | "done" | "dropped";

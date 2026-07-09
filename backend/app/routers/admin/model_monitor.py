@@ -87,13 +87,18 @@ def model_monitor_drift(
     from app.database import get_supabase
 
     supabase = get_supabase()
+    # Only the most-recent 2·window pages matter for drift. Fetch newest-first
+    # (so we never hit the PostgREST 1000-row cap on the oldest rows once the
+    # table grows), then reverse to the ascending order _compute_drift_status
+    # expects (it slices rows[-window:] as "recent").
     rows_resp = (
         supabase.table("model_metrics")
         .select("avg_ocr_confidence, bubble_count, translation_success, recorded_at")
-        .order("recorded_at", desc=False)
+        .order("recorded_at", desc=True)
+        .limit(DRIFT_WINDOW * 2)
         .execute()
     )
-    rows = rows_resp.data or []
+    rows = list(reversed(rows_resp.data or []))
     drift = _compute_drift_status(rows)
     return DriftResponse(
         drift_status=drift["status"],

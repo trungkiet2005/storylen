@@ -12,15 +12,21 @@ Provides:
 """
 from __future__ import annotations
 
+import hashlib
 import logging
-import time
 from datetime import datetime, timezone
-from statistics import mean, stdev
+from statistics import mean
 from typing import Any
 
 from app.database import get_supabase
 
 logger = logging.getLogger(__name__)
+
+# Hard cap on rows pulled into memory for a single aggregation. PostgREST
+# defaults to a 1000-row window; we set an explicit, larger ceiling and always
+# order DESC + reverse so we aggregate the *most recent* rows (never silently
+# fall back to the oldest 1000 as the table grows).
+_MAX_QUERY_ROWS = 5000
 
 # ─── Drift thresholds ─────────────────────────────────────────────────────────
 # If rolling average of metric drops below threshold → drift alert fires.
@@ -103,10 +109,19 @@ def get_metrics_summary(days: int = 7) -> dict[str, Any]:
             supabase.table("model_metrics")
             .select("*")
             .gte("recorded_at", since)
-            .order("recorded_at", desc=False)
+            .order("recorded_at", desc=True)
+            .limit(_MAX_QUERY_ROWS)
             .execute()
         )
-        rows: list[dict] = rows_resp.data or []
+        # Fetched newest-first (so the cap keeps recent data); reverse to the
+        # ascending order the time-series / drift logic expects.
+        rows: list[dict] = list(reversed(rows_resp.data or []))
+        if len(rows) >= _MAX_QUERY_ROWS:
+            logger.warning(
+                "get_metrics_summary: row cap %d reached for days=%d; "
+                "aggregates cover the most-recent %d pages only.",
+                _MAX_QUERY_ROWS, days, _MAX_QUERY_ROWS,
+            )
 
         if not rows:
             return {
@@ -250,8 +265,12 @@ def get_ab_config(user_id: str | None = None) -> dict[str, str]:
         if variant_setting == "off" or not user_id:
             return {"variant": "control"}
 
-        # Hash user_id to deterministically assign variant
-        user_bucket = hash(user_id) % 100
+        # Hash user_id to deterministically assign variant. Python's builtin
+        # hash() is salted per-process (PYTHONHASHSEED), so a user would flip
+        # between control/experiment across restarts and workers — use a stable
+        # digest instead so bucketing is consistent everywhere.
+        digest = hashlib.md5(user_id.encode("utf-8")).hexdigest()
+        user_bucket = int(digest, 16) % 100
         if variant_setting == "experiment_50" and user_bucket < 50:
             # Experiment: use alternative OCR model
             return {
@@ -273,6 +292,8 @@ def get_ab_results() -> dict[str, Any]:
         rows_resp = (
             supabase.table("model_metrics")
             .select("translator, avg_ocr_confidence, latency_ms, translation_success, bubble_count")
+            .order("recorded_at", desc=True)
+            .limit(_MAX_QUERY_ROWS)
             .execute()
         )
         rows = rows_resp.data or []
