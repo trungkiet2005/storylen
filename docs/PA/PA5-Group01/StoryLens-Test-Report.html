@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StoryLens — Automated Test Report</title>
+<style>
+  :root{
+    --bg:#f6f3ec;
+    --bg-panel:#ffffff;
+    --ink:#1e1b16;
+    --ink-soft:#5b5648;
+    --ink-faint:#8b8574;
+    --accent:#2c3e6b;
+    --accent-soft:#e7e9f2;
+    --pass:#2f8f5b;
+    --pass-bg:#e3f3ea;
+    --fail:#c94545;
+    --fail-bg:#fbe8e8;
+    --border:#e2ddd0;
+    --code-bg:#211f1a;
+    --code-ink:#e8e3d6;
+    --code-accent:#9fb0e0;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#15171c;
+      --bg-panel:#1c1f27;
+      --ink:#ece8de;
+      --ink-soft:#a6a190;
+      --ink-faint:#726c5c;
+      --accent:#8fa0d9;
+      --accent-soft:#232a40;
+      --pass:#6fcf97;
+      --pass-bg:#16261d;
+      --fail:#f28b82;
+      --fail-bg:#2c1a1a;
+      --border:#2a2d36;
+      --code-bg:#0f1015;
+      --code-ink:#e4e0d2;
+      --code-accent:#9fb0e0;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;
+  }
+  .page{
+    max-width:880px;
+    margin:0 auto;
+    padding:56px 24px 96px;
+  }
+  h1,h2,h3{
+    font-family:Georgia,"Iowan Old Style","Palatino Linotype",serif;
+    color:var(--ink);
+    margin:0;
+  }
+  .masthead{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    padding-bottom:28px;
+    border-bottom:2px solid var(--accent);
+  }
+  .eyebrow{
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+    font-size:12px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--accent);
+  }
+  h1{font-size:34px;font-weight:700;}
+  .subtitle{color:var(--ink-soft);font-size:16px;max-width:60ch;}
+  .meta-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+    gap:14px 24px;
+    margin-top:6px;
+  }
+  .meta-item dt{
+    font-family:"SFMono-Regular",Consolas,monospace;
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    margin-bottom:3px;
+  }
+  .meta-item dd{
+    margin:0;
+    font-size:14.5px;
+    color:var(--ink);
+  }
+  .meta-item a{color:var(--accent);}
+
+  .stat-row{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:14px;
+    margin:32px 0 44px;
+  }
+  .stat-tile{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px 18px;
+  }
+  .stat-tile .num{
+    font-family:"SFMono-Regular",Consolas,monospace;
+    font-variant-numeric:tabular-nums;
+    font-size:28px;
+    font-weight:600;
+    color:var(--accent);
+  }
+  .stat-tile .label{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+
+  .usecase{margin-top:52px;}
+  .usecase-head{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    margin-bottom:6px;
+  }
+  .usecase-head .tag{
+    font-family:"SFMono-Regular",Consolas,monospace;
+    font-size:12px;
+    color:var(--accent);
+    background:var(--accent-soft);
+    border-radius:5px;
+    padding:2px 8px;
+  }
+  .usecase-head h2{font-size:22px;}
+  .usecase-desc{color:var(--ink-soft);font-size:14.5px;margin:6px 0 20px;max-width:66ch;}
+
+  .tc-card{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:22px 24px;
+    margin-bottom:18px;
+  }
+  .tc-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .tc-name{
+    font-family:"SFMono-Regular",Consolas,monospace;
+    font-size:15.5px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .tc-desc{color:var(--ink-soft);font-size:14px;margin-top:5px;max-width:64ch;}
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-family:"SFMono-Regular",Consolas,monospace;
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:0.04em;
+    padding:5px 12px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .pill.pass{background:var(--pass-bg);color:var(--pass);}
+  .pill.fail{background:var(--fail-bg);color:var(--fail);}
+  .pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;}
+
+  table.steps{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:16px;
+    font-size:13.5px;
+  }
+  table.steps th{
+    text-align:left;
+    font-family:"SFMono-Regular",Consolas,monospace;
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--ink-faint);
+    padding:6px 10px 8px 0;
+    border-bottom:1px solid var(--border);
+  }
+  table.steps td{
+    padding:8px 10px 8px 0;
+    border-bottom:1px solid var(--border);
+    color:var(--ink-soft);
+    vertical-align:top;
+  }
+  table.steps td.step-no{
+    font-family:"SFMono-Regular",Consolas,monospace;
+    color:var(--ink-faint);
+    width:28px;
+  }
+  table.steps tr:last-child td{border-bottom:none;}
+  table.steps td.result-pass{color:var(--pass);font-weight:600;}
+
+  details.script{margin-top:16px;}
+  details.script summary{
+    cursor:pointer;
+    font-family:"SFMono-Regular",Consolas,monospace;
+    font-size:12.5px;
+    color:var(--accent);
+    letter-spacing:0.02em;
+    user-select:none;
+  }
+  details.script summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+  pre{
+    background:var(--code-bg);
+    color:var(--code-ink);
+    border-radius:8px;
+    padding:16px 18px;
+    overflow-x:auto;
+    font-size:12.5px;
+    line-height:1.6;
+    margin:10px 0 0;
+  }
+  pre code{font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;}
+  .kw{color:var(--code-accent);}
+
+  .footnote{
+    margin-top:56px;
+    padding-top:20px;
+    border-top:1px solid var(--border);
+    font-size:13px;
+    color:var(--ink-faint);
+  }
+  .footnote p{margin:0 0 8px;}
+
+  @media print{
+    body{background:#fff;}
+    details.script{display:none;}
+  }
+  @media (max-width:600px){
+    .stat-row{grid-template-columns:repeat(2,1fr);}
+    h1{font-size:27px;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">Automated Testing — Assignment Deliverable</div>
+    <h1>StoryLens — Automated Test Report</h1>
+    <p class="subtitle">Two use-cases, two scenarios each, executed automatically against the live application with Katalon Studio (Runtime Engine, command-line mode).</p>
+    <dl class="meta-grid">
+      <div class="meta-item"><dt>Application under test</dt><dd><a href="https://storylen.vercel.app/">storylen.vercel.app</a></dd></div>
+      <div class="meta-item"><dt>Test tool</dt><dd>Katalon Studio 11.3.0 (katalonc, CLI)</dd></div>
+      <div class="meta-item"><dt>Browser</dt><dd>Chrome 150.0.7871.49</dd></div>
+      <div class="meta-item"><dt>Execution date</dt><dd>09 Jul 2026, 13:59–14:00</dd></div>
+    </dl>
+  </header>
+
+  <section class="stat-row">
+    <div class="stat-tile"><div class="num">2</div><div class="label">Use-cases</div></div>
+    <div class="stat-tile"><div class="num">4</div><div class="label">Scenarios (test cases)</div></div>
+    <div class="stat-tile"><div class="num">4</div><div class="label">Passed</div></div>
+    <div class="stat-tile"><div class="num">100%</div><div class="label">Pass rate</div></div>
+  </section>
+
+  <!-- Use case 1 -->
+  <section class="usecase">
+    <div class="usecase-head">
+      <span class="tag">UC‑1</span>
+      <h2>Đăng nhập (Login)</h2>
+    </div>
+    <p class="usecase-desc">Verifies that the login form on <code>/login</code> correctly rejects invalid submissions and never grants access with bad or missing credentials.</p>
+
+    <article class="tc-card">
+      <div class="tc-head">
+        <div>
+          <div class="tc-name">Login_InvalidCredentials</div>
+          <div class="tc-desc">Submit the login form with an email/password combination that does not exist. Expected: login is rejected and the user stays on <code>/login</code>.</div>
+        </div>
+        <span class="pill pass">PASSED</span>
+      </div>
+      <table class="steps">
+        <thead><tr><th>#</th><th>Action</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td class="step-no">1</td><td>Open Chrome, navigate to <code>https://storylen.vercel.app/login</code></td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">2</td><td>Enter email <code>invalid_user_test@example.com</code> into <code>#login-email</code></td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">3</td><td>Enter password <code>WrongPassword123!</code> into <code>#login-password</code></td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">4</td><td>Click the "Đăng nhập" submit button</td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">5</td><td>Verify current URL still matches <code>.*/login.*</code></td><td class="result-pass">Passed</td></tr>
+        </tbody>
+      </table>
+      <details class="script">
+        <summary>▸ View Katalon test script (Groovy)</summary>
+        <pre><code><span class="kw">import static</span> com.kms.katalon.core.testobject.ObjectRepository.findTestObject
+<span class="kw">import</span> com.kms.katalon.core.webui.keyword.WebUiBuiltInKeywords <span class="kw">as</span> WebUI
+
+WebUI.openBrowser(<span class="kw">''</span>)
+WebUI.navigateToUrl(<span class="kw">'https://storylen.vercel.app/login'</span>)
+WebUI.maximizeWindow()
+
+WebUI.setText(findTestObject(<span class="kw">'StoryLens/input_LoginEmail'</span>), <span class="kw">'invalid_user_test@example.com'</span>)
+WebUI.setText(findTestObject(<span class="kw">'StoryLens/input_LoginPassword'</span>), <span class="kw">'WrongPassword123!'</span>)
+
+WebUI.click(findTestObject(<span class="kw">'StoryLens/button_LoginSubmit'</span>))
+WebUI.delay(3)
+
+WebUI.verifyMatch(WebUI.getUrl(), <span class="kw">'.*/login.*'</span>, <span class="kw">true</span>)
+WebUI.closeBrowser()</code></pre>
+      </details>
+    </article>
+
+    <article class="tc-card">
+      <div class="tc-head">
+        <div>
+          <div class="tc-name">Login_EmptyFields</div>
+          <div class="tc-desc">Submit the login form with both fields left blank. Expected: submission is blocked, user stays on <code>/login</code>.</div>
+        </div>
+        <span class="pill pass">PASSED</span>
+      </div>
+      <table class="steps">
+        <thead><tr><th>#</th><th>Action</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td class="step-no">1</td><td>Open Chrome, navigate to <code>https://storylen.vercel.app/login</code></td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">2</td><td>Click the "Đăng nhập" submit button without filling any field</td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">3</td><td>Verify current URL still matches <code>.*/login.*</code></td><td class="result-pass">Passed</td></tr>
+        </tbody>
+      </table>
+      <details class="script">
+        <summary>▸ View Katalon test script (Groovy)</summary>
+        <pre><code><span class="kw">import static</span> com.kms.katalon.core.testobject.ObjectRepository.findTestObject
+<span class="kw">import</span> com.kms.katalon.core.webui.keyword.WebUiBuiltInKeywords <span class="kw">as</span> WebUI
+
+WebUI.openBrowser(<span class="kw">''</span>)
+WebUI.navigateToUrl(<span class="kw">'https://storylen.vercel.app/login'</span>)
+WebUI.maximizeWindow()
+
+WebUI.click(findTestObject(<span class="kw">'StoryLens/button_LoginSubmit'</span>))
+WebUI.delay(2)
+
+WebUI.verifyMatch(WebUI.getUrl(), <span class="kw">'.*/login.*'</span>, <span class="kw">true</span>)
+WebUI.closeBrowser()</code></pre>
+      </details>
+    </article>
+  </section>
+
+  <!-- Use case 2 -->
+  <section class="usecase">
+    <div class="usecase-head">
+      <span class="tag">UC‑2</span>
+      <h2>Điều hướng chính (Main navigation)</h2>
+    </div>
+    <p class="usecase-desc">Verifies that the primary navigation icons on the home page route to the correct pages.</p>
+
+    <article class="tc-card">
+      <div class="tc-head">
+        <div>
+          <div class="tc-name">Nav_ToBrowsePage</div>
+          <div class="tc-desc">From the home page, click the "Kho truyện" (Browse) nav icon. Expected: URL changes to <code>/browse</code>.</div>
+        </div>
+        <span class="pill pass">PASSED</span>
+      </div>
+      <table class="steps">
+        <thead><tr><th>#</th><th>Action</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td class="step-no">1</td><td>Open Chrome, navigate to <code>https://storylen.vercel.app/</code></td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">2</td><td>Click nav link <code>a[href='/browse']</code></td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">3</td><td>Verify current URL matches <code>.*/browse.*</code></td><td class="result-pass">Passed</td></tr>
+        </tbody>
+      </table>
+      <details class="script">
+        <summary>▸ View Katalon test script (Groovy)</summary>
+        <pre><code><span class="kw">import static</span> com.kms.katalon.core.testobject.ObjectRepository.findTestObject
+<span class="kw">import</span> com.kms.katalon.core.webui.keyword.WebUiBuiltInKeywords <span class="kw">as</span> WebUI
+
+WebUI.openBrowser(<span class="kw">''</span>)
+WebUI.navigateToUrl(<span class="kw">'https://storylen.vercel.app/'</span>)
+WebUI.maximizeWindow()
+
+WebUI.click(findTestObject(<span class="kw">'StoryLens/link_NavBrowse'</span>))
+WebUI.delay(2)
+
+WebUI.verifyMatch(WebUI.getUrl(), <span class="kw">'.*/browse.*'</span>, <span class="kw">true</span>)
+WebUI.closeBrowser()</code></pre>
+      </details>
+    </article>
+
+    <article class="tc-card">
+      <div class="tc-head">
+        <div>
+          <div class="tc-name">Nav_ToForumPage</div>
+          <div class="tc-desc">From the home page, click the "Diễn đàn" (Forum) nav icon. Expected: URL changes to <code>/forum</code>.</div>
+        </div>
+        <span class="pill pass">PASSED</span>
+      </div>
+      <table class="steps">
+        <thead><tr><th>#</th><th>Action</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td class="step-no">1</td><td>Open Chrome, navigate to <code>https://storylen.vercel.app/</code></td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">2</td><td>Click nav link <code>a[href='/forum']</code></td><td class="result-pass">Passed</td></tr>
+          <tr><td class="step-no">3</td><td>Verify current URL matches <code>.*/forum.*</code></td><td class="result-pass">Passed</td></tr>
+        </tbody>
+      </table>
+      <details class="script">
+        <summary>▸ View Katalon test script (Groovy)</summary>
+        <pre><code><span class="kw">import static</span> com.kms.katalon.core.testobject.ObjectRepository.findTestObject
+<span class="kw">import</span> com.kms.katalon.core.webui.keyword.WebUiBuiltInKeywords <span class="kw">as</span> WebUI
+
+WebUI.openBrowser(<span class="kw">''</span>)
+WebUI.navigateToUrl(<span class="kw">'https://storylen.vercel.app/'</span>)
+WebUI.maximizeWindow()
+
+WebUI.click(findTestObject(<span class="kw">'StoryLens/link_NavForum'</span>))
+WebUI.delay(2)
+
+WebUI.verifyMatch(WebUI.getUrl(), <span class="kw">'.*/forum.*'</span>, <span class="kw">true</span>)
+WebUI.closeBrowser()</code></pre>
+      </details>
+    </article>
+  </section>
+
+  <div class="footnote">
+    <p>Executed via <code>katalonc.exe -runMode=console -testSuitePath="Test Suites/StoryLens Test Suite" -browserType=Chrome</code>, Katalon project <code>StoryLensTests</code>. Test Suite run 20260709_135947 completed with exit code 0, 4/4 test cases passed.</p>
+    <p>Object Repository uses CSS/ID locators (<code>#login-email</code>, <code>#login-password</code>, <code>a[href='/browse']</code>, <code>a[href='/forum']</code>) captured directly from the rendered DOM of storylen.vercel.app.</p>
+  </div>
+
+</div>
+</body>
+</html>

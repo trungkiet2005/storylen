@@ -129,15 +129,16 @@ function logoChip(s, x, y, sz) {
   const infoY = 5.05;
   const cells = [
     ["MÔN HỌC", "CSC10011 — CNPM cho hệ thống AI"],
-    ["GVHD", "GS.TS Nguyễn Văn Vũ"],
+    ["GVHD", "GS.TS Nguyễn Văn Vũ\nThS. Trương Phước Lộc\nThS. Ngô Ngọc Đăng Khoa"],
     ["NHÓM", "Nhóm 1 — StoryLens"],
     ["NGÀY BÁO CÁO", "10/07/2026 · HCMUS"],
   ];
   const cwd = (11.0) / 4;
   cells.forEach((c, i) => {
     const x = 1.1 + i * cwd;
+    const isGvhd = i === 1;
     s.addText(c[0], { x, y: infoY, w: cwd - 0.2, h: 0.26, color: GOLD, bold: true, fontFace: HEAD, fontSize: 9.5, charSpacing: 2, margin: 0 });
-    s.addText(c[1], { x, y: infoY + 0.26, w: cwd - 0.2, h: 0.6, color: PAPER, fontFace: BODY, fontSize: 12.5, margin: 0, valign: "top" });
+    s.addText(c[1], { x, y: infoY + 0.26, w: cwd - 0.2, h: isGvhd ? 1.0 : 0.6, color: PAPER, fontFace: BODY, fontSize: isGvhd ? 10 : 12.5, lineSpacingMultiple: isGvhd ? 1.15 : undefined, margin: 0, valign: "top" });
   });
   s.addText("Thành viên: Đào Sỹ Duy Minh · Nguyễn Đình Hà Dương · Huỳnh Trung Kiệt · Phạm Phú Hòa · Trần Chí Nguyên · Nguyễn Lâm Phú Quý", { x: 1.1, y: 6.35, w: 11.2, h: 0.34, color: SLATE, italic: true, fontFace: BODY, fontSize: 10.5, margin: 0 });
   s.addText("storylens-api.onrender.com  ·  Next.js 16 · FastAPI · HuggingFace Spaces · Supabase", { x: 1.1, y: 6.72, w: 11, h: 0.34, color: "8A8176", fontFace: BODY, fontSize: 10.5, margin: 0 });
@@ -1036,12 +1037,13 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
     ["Web", "storylens-api.onrender.com"],
     ["AI Module", "huynhtrungkiet09032005-ai-storylen.hf.space"],
     ["Tài khoản demo", "demo.pa3@storylens.app"],
-    ["Nhóm", "Nhóm 1 — CSC10011 · GVHD: GS.TS Nguyễn Văn Vũ"],
+    ["Nhóm", "Nhóm 1 — CSC10011 · GVHD: GS.TS Nguyễn Văn Vũ, ThS. Trương Phước Lộc, ThS. Ngô Ngọc Đăng Khoa"],
   ];
   links.forEach((l, i) => {
     const y = 4.3 + i * 0.6;
+    const isTeam = i === links.length - 1;
     s.addText(l[0].toUpperCase(), { x: 1.1, y, w: 2.3, h: 0.4, color: GOLD, bold: true, fontFace: HEAD, fontSize: 11, charSpacing: 1.5, margin: 0, valign: "middle" });
-    s.addText(l[1], { x: 3.5, y, w: 9, h: 0.4, color: PAPER, fontFace: BODY, fontSize: 14, margin: 0, valign: "middle" });
+    s.addText(l[1], { x: 3.5, y, w: 9, h: 0.4, color: PAPER, fontFace: BODY, fontSize: isTeam ? 11 : 14, margin: 0, valign: "middle" });
   });
   s.addNotes("Slide cảm ơn + Q&A. Sẵn sàng demo trực tiếp nếu Thầy yêu cầu. Nhớ đánh thức AI Module trước khi demo.");
 })();
