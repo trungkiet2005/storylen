@@ -11,10 +11,11 @@ easy to test/review:
     audit.py       - audit log viewer
     app_settings.py - runtime feature flags & limits
     health.py      - upstream service probes
+    model_monitor.py - MLOps model quality metrics, drift detection, A/B testing
 """
 from fastapi import APIRouter
 
-from . import ai_source, analytics, app_settings, audit, content, credits, health, users
+from . import ai_source, analytics, app_settings, audit, content, credits, health, model_monitor, users
 
 router = APIRouter(prefix="/admin")
 
@@ -26,5 +27,6 @@ router.include_router(app_settings.router)     # /admin/settings/...
 router.include_router(health.router)           # /admin/health
 router.include_router(credits.router)          # /admin/credits/...
 router.include_router(ai_source.router)        # /admin/ai-source/...
+router.include_router(model_monitor.router)    # /admin/model-monitor/...
 
 __all__ = ["router"]

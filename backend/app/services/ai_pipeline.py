@@ -20,6 +20,7 @@ Fixes:
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -143,6 +144,7 @@ def process_page(
         _register_cancel(page_id)
         raise_if_cancelled(page_id)
         _update_status(page_id, ProcessingStatus.OCR_RUNNING, 10)
+        _t_start = time.monotonic()
 
         # ── Step 2: Call HF Space — does all heavy lifting ─────────────────
         logger.info("Delegating page %s to ai_module", page_id)
@@ -278,6 +280,19 @@ def process_page(
                     )
 
         _update_status(page_id, ProcessingStatus.COMPLETED, 100)
+
+        # Best-effort: log model quality metrics for MLOps monitoring.
+        try:
+            from app.services.model_monitor import log_pipeline_metrics
+            log_pipeline_metrics(
+                page_id=page_id,
+                bubbles=raw_bubbles,
+                latency_ms=int((time.monotonic() - _t_start) * 1000),
+                translator_name=translator_name,
+                success=True,
+            )
+        except Exception as _me:
+            logger.debug("model_monitor log skipped: %s", _me)
 
         # Best-effort notification + achievement check (failures must not break pipeline).
         try:
