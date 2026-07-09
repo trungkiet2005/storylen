@@ -710,33 +710,44 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
                 ))}
               </div>
 
-              {current && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginLeft: 4,
+                  paddingLeft: 12,
+                  borderLeft: "1.5px solid var(--border)",
+                }}
+              >
+                {current && (
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => setShowEditPanel(true)}
+                    title="Mở panel ngữ cảnh để sửa bản dịch ngay trong reader"
+                    style={{ fontSize: 11, padding: "4px 8px" }}
+                  >
+                    <Icon name="settings" size={11} /> Chỉnh sửa
+                  </button>
+                )}
+
+                {current && (
+                  <ListenMode
+                    pageId={null}
+                    chapterId={current.chapter_id}
+                    chapterPageCount={series?.chapters.find(c => c.chapter_id === current.chapter_id)?.page_count}
+                  />
+                )}
+
                 <button
-                  className="btn btn-sm"
-                  onClick={() => setShowEditPanel(true)}
-                  title="Mở panel ngữ cảnh để sửa bản dịch ngay trong reader"
+                  onClick={() => setImmersive(true)}
+                  className="btn btn-sm btn-ghost"
+                  title="Đọc toàn màn hình (F)"
                   style={{ fontSize: 11, padding: "4px 8px" }}
                 >
-                  <Icon name="settings" size={11} /> Chỉnh sửa
+                  <Icon name="eye" size={11} /> Toàn màn hình
                 </button>
-              )}
-
-              {current && (
-                <ListenMode
-                  pageId={null}
-                  chapterId={current.chapter_id}
-                  chapterPageCount={series?.chapters.find(c => c.chapter_id === current.chapter_id)?.page_count}
-                />
-              )}
-
-              <button
-                onClick={() => setImmersive(true)}
-                className="btn btn-sm btn-ghost"
-                title="Đọc toàn màn hình (F)"
-                style={{ fontSize: 11, padding: "4px 8px" }}
-              >
-                <Icon name="eye" size={11} /> Toàn màn hình
-              </button>
+              </div>
 
               <div style={{ flex: 1 }} />
 
