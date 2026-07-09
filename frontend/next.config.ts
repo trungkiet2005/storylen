@@ -16,6 +16,7 @@ const connectSrc = [
   apiOrigin,
   "https://*.supabase.co",
   "https://api.mangadex.org",
+  "https://challenges.cloudflare.com", // Turnstile challenge verification
   "wss:",  // backend WebSocket progress channel (added in this pass)
 ].join(" ");
 
@@ -62,7 +63,8 @@ const securityHeaders = [
       `img-src ${imgSrc}`,
       `media-src ${mediaSrc}`,
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+      "frame-src 'self' https://challenges.cloudflare.com",
       "font-src 'self' data:",
       "frame-ancestors 'self'",
       "base-uri 'self'",
