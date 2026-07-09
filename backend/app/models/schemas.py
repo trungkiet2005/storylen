@@ -352,6 +352,8 @@ class TTSEngineInfo(BaseModel):
 class VoicesResponse(BaseModel):
     default_engine: str
     engines: list[TTSEngineInfo] = []
+    credit_cost_per_page: int = 1
+    max_chapter_pages: int = 60
 
 
 class ChapterNarrateResponse(BaseModel):
@@ -369,3 +371,9 @@ class ChapterNarrationStatusResponse(BaseModel):
     status: str
     error: Optional[str] = None
     segments: list[dict] = []
+
+
+class RecapVideoResponse(BaseModel):
+    """A rendered, narrated recap video (.mp4) for one chapter."""
+    chapter_id: str
+    video_url: str
