@@ -153,22 +153,24 @@ function logoChip(s, x, y, sz) {
   kicker(s, M, 0.5, "Nội dung trình bày");
   heading(s, "Nội dung");
   const items = [
-    ["I", "Bối cảnh & Vấn đề", "Nhu cầu đọc manga · điểm đau người dùng · định vị sản phẩm"],
-    ["II", "Yêu cầu & Người dùng", "Persona · use case · yêu cầu chức năng và phi chức năng"],
-    ["III", "Kiến trúc & AI", "3 dịch vụ · pipeline dịch · RAG Q&A · mô hình ML & kết quả"],
-    ["IV", "Hiện thực & Chất lượng", "Tính năng · demo · kiểm thử/CI · bảo mật · triển khai"],
-    ["V", "Kết quả & Hướng phát triển", "Hạn chế · lỗi đã biết · roadmap · kết luận"],
+    ["I", "Bối cảnh, định vị & người dùng", "Vấn đề · tuyên ngôn định vị (Vision) · thị trường/persona"],
+    ["II", "Quản lý dự án", "Cơ cấu nhóm · trách nhiệm từng thành viên · quy trình RUP + Scrum"],
+    ["III", "Yêu cầu phần mềm", "Mô hình use case (sơ đồ + luồng) · yêu cầu phi chức năng (NFR)"],
+    ["IV", "Phân tích & Thiết kế", "Kiến trúc 3 dịch vụ · pipeline AI · RAG · công nghệ sử dụng"],
+    ["V", "Đánh giá", "Kết quả huấn luyện mô hình ML · kiểm thử tự động (Katalon) & CI"],
+    ["VI", "Demo", "Tính năng nổi bật · demo trực tiếp các use case chính"],
+    ["VII", "Kết luận", "Hạn chế · lỗi đã biết · hướng phát triển · tổng kết"],
   ];
-  const y0 = 1.95, rh = 0.92, gap = 0.12;
+  const y0 = 1.82, rh = 0.66, gap = 0.09;
   items.forEach((it, i) => {
     const y = y0 + i * (rh + gap);
     panel(s, M, y, CW, rh, { fill: i % 2 ? CREAM : PAPER });
-    badge(s, M + 0.16, y + (rh - 0.62) / 2, 0.62, it[0], { fill: i === 0 ? RED : INK, fs: 20 });
-    s.addText(it[1], { x: M + 1.0, y: y + 0.13, w: 4.9, h: 0.4, color: INK, bold: true, fontFace: HEAD, fontSize: 17, margin: 0, valign: "middle" });
-    s.addText(it[2], { x: M + 6.0, y: y + 0.13, w: CW - 6.2, h: rh - 0.26, color: SLATE, fontFace: BODY, fontSize: 12.5, margin: 0, valign: "middle" });
+    badge(s, M + 0.14, y + (rh - 0.5) / 2, 0.5, it[0], { fill: i === 0 ? RED : INK, fs: 15 });
+    s.addText(it[1], { x: M + 0.82, y: y + 0.08, w: 4.7, h: rh - 0.16, color: INK, bold: true, fontFace: HEAD, fontSize: 14.5, margin: 0, valign: "middle" });
+    s.addText(it[2], { x: M + 5.6, y: y + 0.08, w: CW - 5.8, h: rh - 0.16, color: SLATE, fontFace: BODY, fontSize: 11, margin: 0, valign: "middle" });
   });
   footer(s, 2);
-  s.addNotes("Trình bày 5 phần lớn trong ~15 phút (gồm demo), sau đó 10 phút Q&A. Phần III và IV là trọng tâm kỹ thuật; phần demo nằm trong IV. Mỗi thành viên trình bày ít nhất một phần (≥ 3 phút/người).");
+  s.addNotes("Trình bày 7 phần theo đúng thứ tự PA5 trong ~15 phút (gồm demo), sau đó 10 phút Q&A. Phần IV và V là trọng tâm kỹ thuật; phần demo nằm trong VI. Mỗi thành viên trình bày ít nhất một phần (≥ 3 phút/người).");
 })();
 
 /* ============================================================
@@ -295,7 +297,7 @@ function logoChip(s, x, y, sz) {
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "II · Người dùng mục tiêu");
+  kicker(s, M, 0.5, "I · Người dùng mục tiêu");
   heading(s, "Ba nhóm người dùng chính");
   const ps = [
     ["Sinh viên đại học", "18–25", "Đọc manga Nhật, kiểm tra bản dịch, tìm hiểu nội dung sâu.", "Dịch chính xác; AI trả lời chi tiết về nhân vật & cốt truyện.", RED],
@@ -320,11 +322,93 @@ function logoChip(s, x, y, sz) {
 })();
 
 /* ============================================================
+ * SLIDE 19 — PROCESS (RUP + Scrum + roles)
+ * ============================================================ */
+(() => {
+  const s = lightSlide();
+  kicker(s, M, 0.5, "II · Quản lý dự án");
+  heading(s, "RUP rút gọn + Scrum theo sprint 2 tuần");
+  // 4 pha RUP
+  const phases = [["Inception", "Vision, kế hoạch, weekly report"], ["Elaboration", "Use case, kiến trúc, UI prototype, test plan"], ["Construction", "Source code, test case, defect, báo cáo"], ["Transition", "Triển khai, demo, nộp bài cuối kỳ"]];
+  const py = 1.98, pw = (CW - 3 * 0.24) / 4;
+  phases.forEach((p, i) => {
+    const x = M + i * (pw + 0.24);
+    panel(s, x, py, pw, 1.5, { fill: i === 3 ? CREAM : PAPER });
+    s.addText("PHA " + (i + 1), { x: x + 0.2, y: py + 0.16, w: pw - 0.4, h: 0.26, color: RED, bold: true, fontFace: HEAD, fontSize: 9.5, charSpacing: 2, margin: 0 });
+    s.addText(p[0], { x: x + 0.2, y: py + 0.42, w: pw - 0.4, h: 0.4, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0, valign: "top" });
+    s.addText(p[1], { x: x + 0.2, y: py + 0.84, w: pw - 0.4, h: 0.6, color: SLATE, fontFace: BODY, fontSize: 11, margin: 0, valign: "top" });
+    if (i < 3) arrow(s, x + pw + 0.02, py + 0.75, 0.2, 0, { width: 2 });
+  });
+  // Scrum + Roles
+  panel(s, M, 3.72, 5.7, 3.0, { fill: INK, shadow: RED });
+  s.addText("WEEKLY SCRUM", { x: M + 0.32, y: 3.95, w: 5, h: 0.3, color: GOLD, bold: true, fontFace: HEAD, fontSize: 12, charSpacing: 2, margin: 0 });
+  s.addText([
+    { text: "Đã làm gì từ tuần trước?", options: { bullet: { code: "2022", indent: 14 }, color: PAPER, breakLine: true, paraSpaceAfter: 8 } },
+    { text: "Đang gặp vướng mắc gì?", options: { bullet: { code: "2022", indent: 14 }, color: PAPER, breakLine: true, paraSpaceAfter: 8 } },
+    { text: "Tuần tới sẽ hoàn thành gì?", options: { bullet: { code: "2022", indent: 14 }, color: PAPER, breakLine: true, paraSpaceAfter: 8 } },
+  ], { x: M + 0.32, y: 4.35, w: 5.1, h: 1.5, fontFace: BODY, fontSize: 14, margin: 0, valign: "top" });
+  s.addText("Sprint = 2 tuần · PR review trước khi merge · CI xanh mới nộp.", { x: M + 0.32, y: 6.0, w: 5.1, h: 0.6, color: "C9C0B4", italic: true, fontFace: BODY, fontSize: 11.5, margin: 0, valign: "top" });
+
+  panel(s, 6.55, 3.72, CW - (6.55 - M), 3.0, { fill: PAPER });
+  s.addText("VAI TRÒ THEO RUP (mẫu)", { x: 6.8, y: 3.95, w: 5.6, h: 0.3, color: RED, bold: true, fontFace: HEAD, fontSize: 12, charSpacing: 1.5, margin: 0 });
+  const roles = [["Team Lead / PM", "Kế hoạch, phân công, weekly report"], ["Business Analyst", "Thu thập & rà soát yêu cầu"], ["Designer", "Kiến trúc, UI, tài liệu SAD"], ["Implementer ×3", "Source code, unit test, review"], ["Tester", "Test plan, test case, system test"]];
+  const ry = 4.35;
+  roles.forEach((r, i) => {
+    const yy = ry + i * 0.46;
+    s.addShape(rect, { x: 6.8, y: yy + 0.04, w: 0.12, h: 0.3, fill: { color: i === 3 ? RED : INK } });
+    s.addText(r[0], { x: 7.02, y: yy, w: 2.5, h: 0.38, color: INK, bold: true, fontFace: HEAD, fontSize: 12.5, margin: 0, valign: "middle" });
+    s.addText(r[1], { x: 9.5, y: yy, w: CW - (9.5 - M) - 0.2, h: 0.38, color: SLATE, fontFace: BODY, fontSize: 11.5, margin: 0, valign: "middle" });
+  });
+  footer(s, 19);
+  s.addNotes("Quy trình theo RUP rút gọn + Scrum (LN03b). Bảng bên phải là mẫu vai trò theo RUP; phân công thực tế cho 6 thành viên ở slide kế tiếp.");
+})();
+
+/* ============================================================
+ * SLIDE 19B — TEAM ORGANIZATION & RESPONSIBILITIES
+ * ============================================================ */
+(() => {
+  const s = lightSlide();
+  kicker(s, M, 0.5, "II · Quản lý dự án");
+  heading(s, "Cơ cấu nhóm & phân công công việc");
+  s.addText([
+    { text: "Nhóm 6 thành viên · mô hình phẳng (flat team) — ", options: { color: INK, bold: true, fontFace: HEAD, fontSize: 12 } },
+    { text: "không cấp bậc cứng nhắc; mọi quyết định kỹ thuật quan trọng được thảo luận tập thể.", options: { color: SLATE, fontFace: BODY, fontSize: 12 } },
+  ], { x: M, y: 1.78, w: CW, h: 0.36, margin: 0, valign: "middle" });
+
+  const members = [
+    ["23122041", "Đào Sỹ Duy Minh", "Project Manager & AI/ML Engineer", RED, "Quản lý tiến độ, điều phối nhóm · Fine-tune OCR cho manga tiếng Nhật · Prompt engineering cho dịch LLM"],
+    ["23122002", "Nguyễn Đình Hà Dương", "AI/ML Engineer (OCR)", RED, "Chuẩn bị & xử lý dataset manga · Hỗ trợ fine-tune OCR · Đánh giá accuracy, phân tích lỗi"],
+    ["23122039", "Huỳnh Trung Kiệt", "Backend Developer", INK, "FastAPI backend · Thiết kế cơ sở dữ liệu · Tích hợp pipeline OCR/dịch vào server"],
+    ["23122030", "Phạm Phú Hòa", "AI/ML Engineer (RAG)", GREEN, "Tích hợp LLM (Gemini) · Vector database (pgvector) · Pipeline hỏi–đáp RAG"],
+    ["23122044", "Trần Chí Nguyên", "Frontend Developer", BLUE, "Giao diện Next.js/React (UI-UX) · Upload & Reader · Màn hình hỏi–đáp Q&A"],
+    ["23122048", "Nguyễn Lâm Phú Quý", "QA & Business Analyst", GOLD, "Tài liệu (SDP, Vision, Use case) · Test case & test plan · UAT, kiểm thử end-to-end"],
+  ];
+  const colW = [1.2, 2.15, 2.55, CW - (1.2 + 2.15 + 2.55)];
+  const th = o => ({ fill: { color: INK }, color: PAPER, bold: true, fontFace: HEAD, fontSize: 11, valign: "middle", align: o || "left" });
+  const data = [[
+    { text: "MSSV", options: th() }, { text: "Họ và tên", options: th() },
+    { text: "Vai trò", options: th() }, { text: "Trách nhiệm chính", options: th() },
+  ]];
+  members.forEach((m, i) => {
+    const bg = i % 2 ? CREAM : PAPER;
+    data.push([
+      { text: m[0], options: { fill: { color: bg }, color: SLATE, fontFace: BODY, fontSize: 10, valign: "middle" } },
+      { text: m[1], options: { fill: { color: bg }, color: INK, bold: true, fontFace: HEAD, fontSize: 10.5, valign: "middle" } },
+      { text: m[2], options: { fill: { color: bg }, color: m[3], bold: true, fontFace: BODY, fontSize: 10, valign: "middle" } },
+      { text: m[4], options: { fill: { color: bg }, color: INK2, fontFace: BODY, fontSize: 9.5, valign: "middle" } },
+    ]);
+  });
+  s.addTable(data, { x: M, y: 2.3, w: CW, colW, rowH: [0.4, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72], border: { pt: 1, color: HAIR }, margin: [3, 5, 3, 5], valign: "middle" });
+  footer(s, 20);
+  s.addNotes("Cơ cấu nhóm phẳng, 6 thành viên. PA5 yêu cầu nêu rõ team structure + trách nhiệm từng người: mỗi bạn phụ trách một mảng (PM/AI-OCR, AI-OCR, Backend, AI-RAG, Frontend, QA/BA) và ai cũng trình bày một phần khi bảo vệ.");
+})();
+
+/* ============================================================
  * SLIDE 7 — USE CASES
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "II · Luồng nghiệp vụ");
+  kicker(s, M, 0.5, "III · Luồng nghiệp vụ");
   heading(s, "Các use case chính");
   const ucs = [
     ["UC01", "Upload & Dịch trang", "Tải 1 trang → pipeline AI phát hiện, đọc, xoá nền, dịch, render chữ Việt.", RED],
@@ -354,7 +438,7 @@ function logoChip(s, x, y, sz) {
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "II · Mô hình use case");
+  kicker(s, M, 0.5, "III · Mô hình use case");
   heading(s, "Sơ đồ use case tổng quát");
 
   // Đoạn thẳng an toàn: luôn dùng w/h ≥ 0 + flipH/flipV (tránh XML âm PowerPoint báo lỗi)
@@ -432,7 +516,7 @@ function logoChip(s, x, y, sz) {
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "II · Yêu cầu chức năng");
+  kicker(s, M, 0.5, "III · Yêu cầu chức năng");
   heading(s, "9 nhóm yêu cầu chức năng (F01–F09)");
   const frs = [
     ["F01", "Xác thực & hồ sơ", "Đăng ký/đăng nhập, cookie HttpOnly, avatar, đổi mật khẩu/email, GDPR."],
@@ -463,7 +547,7 @@ function logoChip(s, x, y, sz) {
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "II · Yêu cầu phi chức năng");
+  kicker(s, M, 0.5, "III · Yêu cầu phi chức năng");
   heading(s, "Chất lượng: hiệu năng, bảo mật, sẵn sàng");
   // 4 stat callouts
   const stats = [
@@ -502,7 +586,7 @@ function logoChip(s, x, y, sz) {
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "III · Kiến trúc hệ thống");
+  kicker(s, M, 0.5, "IV · Kiến trúc hệ thống");
   heading(s, "Ba dịch vụ triển khai độc lập");
   const box = (x, y, w, h, title, sub, lines, color) => {
     panel(s, x, y, w, h, { fill: PAPER });
@@ -539,7 +623,7 @@ function logoChip(s, x, y, sz) {
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "III · Pipeline dịch AI");
+  kicker(s, M, 0.5, "IV · Pipeline dịch AI");
   heading(s, "Từ ảnh gốc đến bản dịch overlay");
   const steps = [
     ["YOLOv8", "Phát hiện bong bóng thoại", RED],
@@ -576,7 +660,7 @@ function logoChip(s, x, y, sz) {
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "III · Hỏi–đáp thông minh");
+  kicker(s, M, 0.5, "IV · Hỏi–đáp thông minh");
   heading(s, "RAG Q&A trên nội dung truyện");
   const steps = [
     ["1", "Câu hỏi", "Người dùng hỏi về 1 trang / series bằng ngôn ngữ tự nhiên."],
@@ -607,53 +691,11 @@ function logoChip(s, x, y, sz) {
 })();
 
 /* ============================================================
- * SLIDE 13 — ML MODELS & RESULTS
- * ============================================================ */
-(() => {
-  const s = lightSlide();
-  kicker(s, M, 0.5, "III · Mô hình ML & đánh giá");
-  heading(s, "Kết quả huấn luyện vượt ngưỡng đặt ra");
-  // trái: bar chart YOLOv8
-  panel(s, M, 1.98, 6.35, 4.5, { fill: PAPER });
-  s.addText("YOLOv8 · Phát hiện bong bóng", { x: M + 0.3, y: 2.14, w: 5.8, h: 0.36, color: INK, bold: true, fontFace: HEAD, fontSize: 14.5, margin: 0 });
-  s.addText("Manga109-s · test 956 ảnh / 14.130 box · ngưỡng 85%", { x: M + 0.3, y: 2.48, w: 5.8, h: 0.3, color: SLATE, italic: true, fontFace: BODY, fontSize: 11, margin: 0 });
-  s.addChart(pres.charts.BAR, [{ name: "YOLOv8", labels: ["mAP@.5", "mAP@.5:.95", "Precision", "Recall"], values: [95.3, 84.4, 97.3, 93.8] }], {
-    x: M + 0.15, y: 2.85, w: 6.05, h: 3.5, barDir: "col",
-    chartColors: [RED, RED, RED, RED],
-    showValue: true, dataLabelPosition: "outEnd", dataLabelColor: INK, dataLabelFontFace: HEAD, dataLabelFontSize: 11, dataLabelFontBold: true, dataLabelFormatCode: "0.0",
-    valAxisMinVal: 0, valAxisMaxVal: 100, valAxisHidden: true, valGridLine: { style: "none" }, catGridLine: { style: "none" },
-    catAxisLabelColor: INK, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 11,
-    showLegend: false, showTitle: false, barGapWidthPct: 55,
-  });
-  // phải: OCR + Gemini
-  const cards = [
-    ["manga-ocr (fine-tuned)", "OCR tiếng Nhật · test 14.130 mẫu", [["CER", "6.1%"], ["Char-Acc", "93.9%"], ["Exact", "67.5%"]], INK],
-    ["Gemini 2.5 Flash", "Dịch ngữ cảnh · human-in-the-loop", [["👍 hài lòng", "≥ 80%"], ["Model", "2.5 Flash"], ["Embedding", "768-dim"]], GREEN],
-  ];
-  const rx = 7.5, rw = CW - (7.5 - M);
-  cards.forEach((c, i) => {
-    const y = 1.98 + i * 2.32;
-    panel(s, rx, y, rw, 2.16, { fill: i ? CREAM : PAPER });
-    s.addShape(rect, { x: rx, y, w: 0.16, h: 2.16, fill: { color: c[3] } });
-    s.addText(c[0], { x: rx + 0.34, y: y + 0.16, w: rw - 0.5, h: 0.4, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0, valign: "middle" });
-    s.addText(c[1], { x: rx + 0.34, y: y + 0.56, w: rw - 0.5, h: 0.3, color: SLATE, italic: true, fontFace: BODY, fontSize: 11, margin: 0 });
-    const mw = (rw - 0.34 - 0.3) / 3;
-    c[2].forEach((m, j) => {
-      const mx = rx + 0.34 + j * mw;
-      s.addText(m[1], { x: mx, y: y + 0.95, w: mw - 0.1, h: 0.55, color: c[3], bold: true, fontFace: HEAD, fontSize: 22, margin: 0, valign: "middle" });
-      s.addText(m[0], { x: mx, y: y + 1.52, w: mw - 0.1, h: 0.3, color: SLATE, fontFace: BODY, fontSize: 11, margin: 0 });
-    });
-  });
-  footer(s, 13);
-  s.addNotes("Kết quả ML thật đưa vào SAD mục 7.5. YOLOv8 mAP@0.5 95.3% và OCR CER 6.1% đều vượt ngưỡng. Gemini đánh giá bằng human-in-the-loop.");
-})();
-
-/* ============================================================
  * SLIDE 14 — TECH STACK
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "III · Công nghệ");
+  kicker(s, M, 0.5, "IV · Công nghệ");
   heading(s, "Ngăn xếp công nghệ");
   const groups = [
     ["Frontend", RED, ["Next.js 16 (App Router)", "React 19 · TypeScript", "Tailwind + Framer Motion", "PWA + offline"]],
@@ -672,193 +714,6 @@ function logoChip(s, x, y, sz) {
   });
   footer(s, 14);
   s.addNotes("Stack đầy đủ 3 dịch vụ + dữ liệu. Nhấn: mọi thứ chạy trên tier miễn phí/rẻ nhưng vẫn production.");
-})();
-
-/* ============================================================
- * SLIDE 15 — FEATURE HIGHLIGHTS
- * ============================================================ */
-(() => {
-  const s = lightSlide();
-  kicker(s, M, 0.5, "IV · Tính năng nổi bật");
-  heading(s, "Ngoài lõi dịch — một hệ sinh thái đầy đủ");
-  const fs = [
-    ["Reader nâng cao", "Nhiều chế độ đọc, phím tắt, vuốt mobile, từ điển bong bóng, cảnh báo độ tin cậy thấp.", RED],
-    ["Studio QC", "Hiệu đính per-bubble (approve/reject), tìm–thay thế hàng loạt, phản hồi 👍/👎.", INK],
-    ["Thư viện & chia sẻ", "Xuất bản chương công khai, đọc ẩn danh, chia sẻ link TTL + OG image.", BLUE],
-    ["Cộng đồng", "Diễn đàn (mention, đính kèm, vote), bình luận chương, hồ sơ /u/{username}.", GREEN],
-    ["Gamification (Wibu)", "Bookmark, rating, reading list, mục tiêu, XP/level, thành tựu + thông báo.", GOLD],
-    ["Credit & thanh toán", "Free 5/ngày; gói basic/pro/premium; Stripe checkout/webhook; điểm danh streak.", INK2],
-  ];
-  const y0 = 1.98, cw = (CW - 2 * 0.28) / 3, ch = 2.15, gx = 0.28, gy = 0.18;
-  fs.forEach((f, i) => {
-    const col = i % 3, row = Math.floor(i / 3);
-    const x = M + col * (cw + gx), y = y0 + row * (ch + gy);
-    panel(s, x, y, cw, ch, { fill: PAPER });
-    s.addShape(rect, { x: x + 0.26, y: y + 0.28, w: 0.46, h: 0.46, fill: { color: f[2] } });
-    s.addText(String(i + 1), { x: x + 0.26, y: y + 0.28, w: 0.46, h: 0.46, align: "center", valign: "middle", color: PAPER, bold: true, fontFace: HEAD, fontSize: 15, margin: 0 });
-    s.addText(f[0], { x: x + 0.9, y: y + 0.26, w: cw - 1.1, h: 0.5, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0, valign: "middle" });
-    s.addText(f[1], { x: x + 0.28, y: y + 0.92, w: cw - 0.56, h: 1.1, color: SLATE, fontFace: BODY, fontSize: 12.3, margin: 0, valign: "top" });
-  });
-  footer(s, 15);
-  s.addNotes("Hệ sinh thái quanh lõi dịch: reader, QC, thư viện, cộng đồng, gamification, thanh toán. Cho thấy quy mô production.");
-})();
-
-/* ============================================================
- * SLIDES 16–18 — DEMO SCREENSHOTS (placeholders)
- * ============================================================ */
-function demoSlide(n, part, title, shots, note) {
-  const s = lightSlide();
-  kicker(s, M, 0.5, "IV · Demo · " + part);
-  heading(s, title);
-  const y = 1.95;
-  if (shots.length === 2) {
-    const w = (CW - 0.5) / 2, h = 4.4;
-    shots.forEach((sh, i) => shot(s, M + i * (w + 0.5), y, w, h, sh[0], sh[1]));
-  } else {
-    const w = CW, h = 4.5;
-    shot(s, M, y, w, h, shots[0][0], shots[0][1]);
-  }
-  if (note) {
-    s.addText([{ text: "Điểm nhấn khi demo:  ", options: { bold: true, color: RED, fontFace: HEAD, fontSize: 12 } }, { text: note, options: { color: SLATE, fontFace: BODY, fontSize: 12 } }],
-      { x: M, y: 6.6, w: CW, h: 0.4, margin: 0, valign: "middle" });
-  }
-  footer(s, n);
-  return s;
-}
-demoSlide(16, "Luồng A", "Trang chủ & Upload → Dịch",
-  [["/  (Trang chủ)", "Landing + nền anime động + 'Tiếp tục đọc'"], ["/upload", "Kéo-thả trang manga Nhật, chọn cấu hình AI"]],
-  "đăng nhập → kéo-thả 1 trang → pipeline chạy realtime (YOLOv8 → manga-ocr → LaMa → Gemini).")
-  .addNotes("Chụp trang chủ và trang upload. Khi demo: đăng nhập tài khoản demo, kéo-thả 1 trang, chờ pipeline.");
-demoSlide(17, "Luồng A", "Reader overlay & Studio QC",
-  [["/reader?page=…", "Bản dịch phủ bong bóng, bật/tắt so sánh"], ["/studio (QC)", "Hiệu đính per-bubble, tìm–thay thế"]],
-  "mở Reader xem overlay tiếng Việt; bật/tắt bản gốc; mở từ điển bong bóng; hiệu đính trong Studio.")
-  .addNotes("Chụp Reader có overlay dịch và màn Studio QC. Cần AI Module sống để có bản dịch thật.");
-demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện",
-  [["/upload (batch) · /qa", "Batch nhiều trang + tiến trình x/N realtime; hỏi–đáp"], ["/library · /admin", "Thư viện công khai; bảng điều khiển quản trị"]],
-  "batch cả chương xử lý tuần tự; hỏi AI về nội dung; xuất bản lên thư viện; xem admin dashboard.")
-  .addNotes("Chụp batch upload + tiến trình, Q&A, thư viện công khai và admin. Đây là luồng B (UC03) + RAG (UC04).");
-
-/* ============================================================
- * SLIDE 19 — PROCESS (RUP + Scrum + roles)
- * ============================================================ */
-(() => {
-  const s = lightSlide();
-  kicker(s, M, 0.5, "IV · Quy trình phát triển");
-  heading(s, "RUP rút gọn + Scrum theo sprint 2 tuần");
-  // 4 pha RUP
-  const phases = [["Inception", "Vision, kế hoạch, weekly report"], ["Elaboration", "Use case, kiến trúc, UI prototype, test plan"], ["Construction", "Source code, test case, defect, báo cáo"], ["Transition", "Triển khai, demo, nộp bài cuối kỳ"]];
-  const py = 1.98, pw = (CW - 3 * 0.24) / 4;
-  phases.forEach((p, i) => {
-    const x = M + i * (pw + 0.24);
-    panel(s, x, py, pw, 1.5, { fill: i === 3 ? CREAM : PAPER });
-    s.addText("PHA " + (i + 1), { x: x + 0.2, y: py + 0.16, w: pw - 0.4, h: 0.26, color: RED, bold: true, fontFace: HEAD, fontSize: 9.5, charSpacing: 2, margin: 0 });
-    s.addText(p[0], { x: x + 0.2, y: py + 0.42, w: pw - 0.4, h: 0.4, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0, valign: "top" });
-    s.addText(p[1], { x: x + 0.2, y: py + 0.84, w: pw - 0.4, h: 0.6, color: SLATE, fontFace: BODY, fontSize: 11, margin: 0, valign: "top" });
-    if (i < 3) arrow(s, x + pw + 0.02, py + 0.75, 0.2, 0, { width: 2 });
-  });
-  // Scrum + Roles
-  panel(s, M, 3.72, 5.7, 3.0, { fill: INK, shadow: RED });
-  s.addText("WEEKLY SCRUM", { x: M + 0.32, y: 3.95, w: 5, h: 0.3, color: GOLD, bold: true, fontFace: HEAD, fontSize: 12, charSpacing: 2, margin: 0 });
-  s.addText([
-    { text: "Đã làm gì từ tuần trước?", options: { bullet: { code: "2022", indent: 14 }, color: PAPER, breakLine: true, paraSpaceAfter: 8 } },
-    { text: "Đang gặp vướng mắc gì?", options: { bullet: { code: "2022", indent: 14 }, color: PAPER, breakLine: true, paraSpaceAfter: 8 } },
-    { text: "Tuần tới sẽ hoàn thành gì?", options: { bullet: { code: "2022", indent: 14 }, color: PAPER, breakLine: true, paraSpaceAfter: 8 } },
-  ], { x: M + 0.32, y: 4.35, w: 5.1, h: 1.5, fontFace: BODY, fontSize: 14, margin: 0, valign: "top" });
-  s.addText("Sprint = 2 tuần · PR review trước khi merge · CI xanh mới nộp.", { x: M + 0.32, y: 6.0, w: 5.1, h: 0.6, color: "C9C0B4", italic: true, fontFace: BODY, fontSize: 11.5, margin: 0, valign: "top" });
-
-  panel(s, 6.55, 3.72, CW - (6.55 - M), 3.0, { fill: PAPER });
-  s.addText("VAI TRÒ THEO RUP (mẫu)", { x: 6.8, y: 3.95, w: 5.6, h: 0.3, color: RED, bold: true, fontFace: HEAD, fontSize: 12, charSpacing: 1.5, margin: 0 });
-  const roles = [["Team Lead / PM", "Kế hoạch, phân công, weekly report"], ["Business Analyst", "Thu thập & rà soát yêu cầu"], ["Designer", "Kiến trúc, UI, tài liệu SAD"], ["Implementer ×3", "Source code, unit test, review"], ["Tester", "Test plan, test case, system test"]];
-  const ry = 4.35;
-  roles.forEach((r, i) => {
-    const yy = ry + i * 0.46;
-    s.addShape(rect, { x: 6.8, y: yy + 0.04, w: 0.12, h: 0.3, fill: { color: i === 3 ? RED : INK } });
-    s.addText(r[0], { x: 7.02, y: yy, w: 2.5, h: 0.38, color: INK, bold: true, fontFace: HEAD, fontSize: 12.5, margin: 0, valign: "middle" });
-    s.addText(r[1], { x: 9.5, y: yy, w: CW - (9.5 - M) - 0.2, h: 0.38, color: SLATE, fontFace: BODY, fontSize: 11.5, margin: 0, valign: "middle" });
-  });
-  footer(s, 19);
-  s.addNotes("Quy trình theo RUP rút gọn + Scrum (LN03b). Bảng bên phải là mẫu vai trò theo RUP; phân công thực tế cho 6 thành viên ở slide kế tiếp.");
-})();
-
-/* ============================================================
- * SLIDE 19B — TEAM ORGANIZATION & RESPONSIBILITIES
- * ============================================================ */
-(() => {
-  const s = lightSlide();
-  kicker(s, M, 0.5, "IV · Tổ chức nhóm");
-  heading(s, "Cơ cấu nhóm & phân công công việc");
-  s.addText([
-    { text: "Nhóm 6 thành viên · mô hình phẳng (flat team) — ", options: { color: INK, bold: true, fontFace: HEAD, fontSize: 12 } },
-    { text: "không cấp bậc cứng nhắc; mọi quyết định kỹ thuật quan trọng được thảo luận tập thể.", options: { color: SLATE, fontFace: BODY, fontSize: 12 } },
-  ], { x: M, y: 1.78, w: CW, h: 0.36, margin: 0, valign: "middle" });
-
-  const members = [
-    ["23122041", "Đào Sỹ Duy Minh", "Project Manager & AI/ML Engineer", RED, "Quản lý tiến độ, điều phối nhóm · Fine-tune OCR cho manga tiếng Nhật · Prompt engineering cho dịch LLM"],
-    ["23122002", "Nguyễn Đình Hà Dương", "AI/ML Engineer (OCR)", RED, "Chuẩn bị & xử lý dataset manga · Hỗ trợ fine-tune OCR · Đánh giá accuracy, phân tích lỗi"],
-    ["23122039", "Huỳnh Trung Kiệt", "Backend Developer", INK, "FastAPI backend · Thiết kế cơ sở dữ liệu · Tích hợp pipeline OCR/dịch vào server"],
-    ["23122030", "Phạm Phú Hòa", "AI/ML Engineer (RAG)", GREEN, "Tích hợp LLM (Gemini) · Vector database (pgvector) · Pipeline hỏi–đáp RAG"],
-    ["23122044", "Trần Chí Nguyên", "Frontend Developer", BLUE, "Giao diện Next.js/React (UI-UX) · Upload & Reader · Màn hình hỏi–đáp Q&A"],
-    ["23122048", "Nguyễn Lâm Phú Quý", "QA & Business Analyst", GOLD, "Tài liệu (SDP, Vision, Use case) · Test case & test plan · UAT, kiểm thử end-to-end"],
-  ];
-  const colW = [1.2, 2.15, 2.55, CW - (1.2 + 2.15 + 2.55)];
-  const th = o => ({ fill: { color: INK }, color: PAPER, bold: true, fontFace: HEAD, fontSize: 11, valign: "middle", align: o || "left" });
-  const data = [[
-    { text: "MSSV", options: th() }, { text: "Họ và tên", options: th() },
-    { text: "Vai trò", options: th() }, { text: "Trách nhiệm chính", options: th() },
-  ]];
-  members.forEach((m, i) => {
-    const bg = i % 2 ? CREAM : PAPER;
-    data.push([
-      { text: m[0], options: { fill: { color: bg }, color: SLATE, fontFace: BODY, fontSize: 10, valign: "middle" } },
-      { text: m[1], options: { fill: { color: bg }, color: INK, bold: true, fontFace: HEAD, fontSize: 10.5, valign: "middle" } },
-      { text: m[2], options: { fill: { color: bg }, color: m[3], bold: true, fontFace: BODY, fontSize: 10, valign: "middle" } },
-      { text: m[4], options: { fill: { color: bg }, color: INK2, fontFace: BODY, fontSize: 9.5, valign: "middle" } },
-    ]);
-  });
-  s.addTable(data, { x: M, y: 2.3, w: CW, colW, rowH: [0.4, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72], border: { pt: 1, color: HAIR }, margin: [3, 5, 3, 5], valign: "middle" });
-  footer(s, 20);
-  s.addNotes("Cơ cấu nhóm phẳng, 6 thành viên. PA5 yêu cầu nêu rõ team structure + trách nhiệm từng người: mỗi bạn phụ trách một mảng (PM/AI-OCR, AI-OCR, Backend, AI-RAG, Frontend, QA/BA) và ai cũng trình bày một phần khi bảo vệ.");
-})();
-
-/* ============================================================
- * SLIDE 20 — TESTING & CI
- * ============================================================ */
-(() => {
-  const s = lightSlide();
-  kicker(s, M, 0.5, "IV · Kiểm thử & CI/CD");
-  heading(s, "Chất lượng được kiểm thử & tự động hoá");
-  // trái: các loại test (Katalon Studio là kiểm thử tự động bắt buộc của PA5)
-  const tests = [
-    ["Katalon Studio", "Kiểm thử UI tự động: UC01 Upload–Dịch & UC02 Đọc overlay · ≥2 scenario/UC · Pass/Fail", true],
-    ["Unit / Component", "Vitest + React Testing Library (frontend)"],
-    ["Backend", "pytest + respx (mock Supabase/Gemini)"],
-    ["E2E", "Playwright: auth, home, protected, mobile, forum, edge-cases"],
-    ["Tĩnh", "tsc --noEmit · ESLint · Python type hints"],
-  ];
-  const tCol = [RED, GOLD, INK, BLUE, GREEN];
-  panel(s, M, 1.98, 6.5, 4.55, { fill: PAPER });
-  s.addText("Tầng kiểm thử", { x: M + 0.3, y: 2.12, w: 5.9, h: 0.36, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0 });
-  tests.forEach((t, i) => {
-    const y = 2.6 + i * 0.76;
-    s.addShape(rect, { x: M + 0.3, y, w: 0.46, h: 0.46, fill: { color: tCol[i] } });
-    s.addText(String(i + 1), { x: M + 0.3, y, w: 0.46, h: 0.46, align: "center", valign: "middle", color: PAPER, bold: true, fontFace: HEAD, fontSize: 14, margin: 0 });
-    s.addText([{ text: t[0], options: { color: INK, bold: true, fontFace: HEAD, fontSize: 13.5 } }, ...(t[2] ? [{ text: "  · PA5", options: { color: RED, bold: true, fontFace: HEAD, fontSize: 10 } }] : [])], { x: M + 0.92, y: y - 0.06, w: 5.4, h: 0.34, margin: 0, valign: "middle" });
-    s.addText(t[1], { x: M + 0.92, y: y + 0.28, w: 5.4, h: 0.44, color: SLATE, fontFace: BODY, fontSize: 11, margin: 0, valign: "top" });
-  });
-  // phải: CI pipeline
-  panel(s, 7.45, 1.98, CW - (7.45 - M), 4.55, { fill: INK, shadow: RED });
-  s.addText("GITHUB ACTIONS · 5 JOB SONG SONG", { x: 7.7, y: 2.2, w: 5, h: 0.3, color: GOLD, bold: true, fontFace: HEAD, fontSize: 11.5, charSpacing: 1.5, margin: 0 });
-  const jobs = ["Typecheck (tsc)", "Lint (ESLint)", "Production build", "Playwright E2E", "Backend pytest"];
-  jobs.forEach((j, i) => {
-    const y = 2.65 + i * 0.72;
-    s.addShape(rect, { x: 7.7, y, w: CW - (7.45 - M) - 0.5, h: 0.58, fill: { color: INK2 }, line: { color: "4A4038", width: 1 } });
-    s.addText("✓", { x: 7.85, y, w: 0.4, h: 0.58, color: GREEN, bold: true, fontFace: HEAD, fontSize: 16, margin: 0, valign: "middle" });
-    s.addText(j, { x: 8.3, y, w: 3.8, h: 0.58, color: PAPER, fontFace: BODY, fontSize: 13, margin: 0, valign: "middle" });
-    s.addText("main", { x: CW + M - 1.5, y, w: 1.1, h: 0.58, align: "right", color: SLATE, italic: true, fontFace: BODY, fontSize: 10, margin: 0, valign: "middle" });
-  });
-  s.addText("Mọi PR phải review + CI xanh trước khi merge vào main.", { x: 7.7, y: 6.15, w: 5, h: 0.3, color: "C9C0B4", italic: true, fontFace: BODY, fontSize: 11, margin: 0 });
-  footer(s, 20);
-  s.addNotes("Kiểm thử đa tầng + CI 5 job song song. Katalon Studio là công cụ kiểm thử tự động bắt buộc của PA5: tối thiểu 2 use case (UC01, UC02), mỗi use case ≥ 2 scenario, báo cáo Pass/Fail kèm test script. Định nghĩa 'done' gồm review, test pass, deploy & verify trên production.");
 })();
 
 /* ============================================================
@@ -924,11 +779,158 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
 })();
 
 /* ============================================================
+ * SLIDE 13 — ML MODELS & RESULTS
+ * ============================================================ */
+(() => {
+  const s = lightSlide();
+  kicker(s, M, 0.5, "V · Mô hình ML & đánh giá");
+  heading(s, "Kết quả huấn luyện vượt ngưỡng đặt ra");
+  // trái: bar chart YOLOv8
+  panel(s, M, 1.98, 6.35, 4.5, { fill: PAPER });
+  s.addText("YOLOv8 · Phát hiện bong bóng", { x: M + 0.3, y: 2.14, w: 5.8, h: 0.36, color: INK, bold: true, fontFace: HEAD, fontSize: 14.5, margin: 0 });
+  s.addText("Manga109-s · test 956 ảnh / 14.130 box · ngưỡng 85%", { x: M + 0.3, y: 2.48, w: 5.8, h: 0.3, color: SLATE, italic: true, fontFace: BODY, fontSize: 11, margin: 0 });
+  s.addChart(pres.charts.BAR, [{ name: "YOLOv8", labels: ["mAP@.5", "mAP@.5:.95", "Precision", "Recall"], values: [95.3, 84.4, 97.3, 93.8] }], {
+    x: M + 0.15, y: 2.85, w: 6.05, h: 3.5, barDir: "col",
+    chartColors: [RED, RED, RED, RED],
+    showValue: true, dataLabelPosition: "outEnd", dataLabelColor: INK, dataLabelFontFace: HEAD, dataLabelFontSize: 11, dataLabelFontBold: true, dataLabelFormatCode: "0.0",
+    valAxisMinVal: 0, valAxisMaxVal: 100, valAxisHidden: true, valGridLine: { style: "none" }, catGridLine: { style: "none" },
+    catAxisLabelColor: INK, catAxisLabelFontFace: BODY, catAxisLabelFontSize: 11,
+    showLegend: false, showTitle: false, barGapWidthPct: 55,
+  });
+  // phải: OCR + Gemini
+  const cards = [
+    ["manga-ocr (fine-tuned)", "OCR tiếng Nhật · test 14.130 mẫu", [["CER", "6.1%"], ["Char-Acc", "93.9%"], ["Exact", "67.5%"]], INK],
+    ["Gemini 2.5 Flash", "Dịch ngữ cảnh · human-in-the-loop", [["👍 hài lòng", "≥ 80%"], ["Model", "2.5 Flash"], ["Embedding", "768-dim"]], GREEN],
+  ];
+  const rx = 7.5, rw = CW - (7.5 - M);
+  cards.forEach((c, i) => {
+    const y = 1.98 + i * 2.32;
+    panel(s, rx, y, rw, 2.16, { fill: i ? CREAM : PAPER });
+    s.addShape(rect, { x: rx, y, w: 0.16, h: 2.16, fill: { color: c[3] } });
+    s.addText(c[0], { x: rx + 0.34, y: y + 0.16, w: rw - 0.5, h: 0.4, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0, valign: "middle" });
+    s.addText(c[1], { x: rx + 0.34, y: y + 0.56, w: rw - 0.5, h: 0.3, color: SLATE, italic: true, fontFace: BODY, fontSize: 11, margin: 0 });
+    const mw = (rw - 0.34 - 0.3) / 3;
+    c[2].forEach((m, j) => {
+      const mx = rx + 0.34 + j * mw;
+      s.addText(m[1], { x: mx, y: y + 0.95, w: mw - 0.1, h: 0.55, color: c[3], bold: true, fontFace: HEAD, fontSize: 22, margin: 0, valign: "middle" });
+      s.addText(m[0], { x: mx, y: y + 1.52, w: mw - 0.1, h: 0.3, color: SLATE, fontFace: BODY, fontSize: 11, margin: 0 });
+    });
+  });
+  footer(s, 13);
+  s.addNotes("Kết quả ML thật đưa vào SAD mục 7.5. YOLOv8 mAP@0.5 95.3% và OCR CER 6.1% đều vượt ngưỡng. Gemini đánh giá bằng human-in-the-loop.");
+})();
+
+/* ============================================================
+ * SLIDE 20 — TESTING & CI
+ * ============================================================ */
+(() => {
+  const s = lightSlide();
+  kicker(s, M, 0.5, "V · Kiểm thử & CI/CD");
+  heading(s, "Chất lượng được kiểm thử & tự động hoá");
+  // trái: các loại test (Katalon Studio là kiểm thử tự động bắt buộc của PA5)
+  const tests = [
+    ["Katalon Studio", "Kiểm thử UI tự động: UC01 Upload–Dịch & UC02 Đọc overlay · ≥2 scenario/UC · Pass/Fail", true],
+    ["Unit / Component", "Vitest + React Testing Library (frontend)"],
+    ["Backend", "pytest + respx (mock Supabase/Gemini)"],
+    ["E2E", "Playwright: auth, home, protected, mobile, forum, edge-cases"],
+    ["Tĩnh", "tsc --noEmit · ESLint · Python type hints"],
+  ];
+  const tCol = [RED, GOLD, INK, BLUE, GREEN];
+  panel(s, M, 1.98, 6.5, 4.55, { fill: PAPER });
+  s.addText("Tầng kiểm thử", { x: M + 0.3, y: 2.12, w: 5.9, h: 0.36, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0 });
+  tests.forEach((t, i) => {
+    const y = 2.6 + i * 0.76;
+    s.addShape(rect, { x: M + 0.3, y, w: 0.46, h: 0.46, fill: { color: tCol[i] } });
+    s.addText(String(i + 1), { x: M + 0.3, y, w: 0.46, h: 0.46, align: "center", valign: "middle", color: PAPER, bold: true, fontFace: HEAD, fontSize: 14, margin: 0 });
+    s.addText([{ text: t[0], options: { color: INK, bold: true, fontFace: HEAD, fontSize: 13.5 } }, ...(t[2] ? [{ text: "  · PA5", options: { color: RED, bold: true, fontFace: HEAD, fontSize: 10 } }] : [])], { x: M + 0.92, y: y - 0.06, w: 5.4, h: 0.34, margin: 0, valign: "middle" });
+    s.addText(t[1], { x: M + 0.92, y: y + 0.28, w: 5.4, h: 0.44, color: SLATE, fontFace: BODY, fontSize: 11, margin: 0, valign: "top" });
+  });
+  // phải: CI pipeline
+  panel(s, 7.45, 1.98, CW - (7.45 - M), 4.55, { fill: INK, shadow: RED });
+  s.addText("GITHUB ACTIONS · 5 JOB SONG SONG", { x: 7.7, y: 2.2, w: 5, h: 0.3, color: GOLD, bold: true, fontFace: HEAD, fontSize: 11.5, charSpacing: 1.5, margin: 0 });
+  const jobs = ["Typecheck (tsc)", "Lint (ESLint)", "Production build", "Playwright E2E", "Backend pytest"];
+  jobs.forEach((j, i) => {
+    const y = 2.65 + i * 0.72;
+    s.addShape(rect, { x: 7.7, y, w: CW - (7.45 - M) - 0.5, h: 0.58, fill: { color: INK2 }, line: { color: "4A4038", width: 1 } });
+    s.addText("✓", { x: 7.85, y, w: 0.4, h: 0.58, color: GREEN, bold: true, fontFace: HEAD, fontSize: 16, margin: 0, valign: "middle" });
+    s.addText(j, { x: 8.3, y, w: 3.8, h: 0.58, color: PAPER, fontFace: BODY, fontSize: 13, margin: 0, valign: "middle" });
+    s.addText("main", { x: CW + M - 1.5, y, w: 1.1, h: 0.58, align: "right", color: SLATE, italic: true, fontFace: BODY, fontSize: 10, margin: 0, valign: "middle" });
+  });
+  s.addText("Mọi PR phải review + CI xanh trước khi merge vào main.", { x: 7.7, y: 6.15, w: 5, h: 0.3, color: "C9C0B4", italic: true, fontFace: BODY, fontSize: 11, margin: 0 });
+  footer(s, 20);
+  s.addNotes("Kiểm thử đa tầng + CI 5 job song song. Katalon Studio là công cụ kiểm thử tự động bắt buộc của PA5: tối thiểu 2 use case (UC01, UC02), mỗi use case ≥ 2 scenario, báo cáo Pass/Fail kèm test script. Định nghĩa 'done' gồm review, test pass, deploy & verify trên production.");
+})();
+
+/* ============================================================
+ * SLIDE 15 — FEATURE HIGHLIGHTS
+ * ============================================================ */
+(() => {
+  const s = lightSlide();
+  kicker(s, M, 0.5, "VI · Tính năng nổi bật");
+  heading(s, "Ngoài lõi dịch — một hệ sinh thái đầy đủ");
+  const fs = [
+    ["Reader nâng cao", "Nhiều chế độ đọc, phím tắt, vuốt mobile, từ điển bong bóng, cảnh báo độ tin cậy thấp.", RED],
+    ["Studio QC", "Hiệu đính per-bubble (approve/reject), tìm–thay thế hàng loạt, phản hồi 👍/👎.", INK],
+    ["Thư viện & chia sẻ", "Xuất bản chương công khai, đọc ẩn danh, chia sẻ link TTL + OG image.", BLUE],
+    ["Cộng đồng", "Diễn đàn (mention, đính kèm, vote), bình luận chương, hồ sơ /u/{username}.", GREEN],
+    ["Gamification (Wibu)", "Bookmark, rating, reading list, mục tiêu, XP/level, thành tựu + thông báo.", GOLD],
+    ["Credit & thanh toán", "Free 5/ngày; gói basic/pro/premium; Stripe checkout/webhook; điểm danh streak.", INK2],
+  ];
+  const y0 = 1.98, cw = (CW - 2 * 0.28) / 3, ch = 2.15, gx = 0.28, gy = 0.18;
+  fs.forEach((f, i) => {
+    const col = i % 3, row = Math.floor(i / 3);
+    const x = M + col * (cw + gx), y = y0 + row * (ch + gy);
+    panel(s, x, y, cw, ch, { fill: PAPER });
+    s.addShape(rect, { x: x + 0.26, y: y + 0.28, w: 0.46, h: 0.46, fill: { color: f[2] } });
+    s.addText(String(i + 1), { x: x + 0.26, y: y + 0.28, w: 0.46, h: 0.46, align: "center", valign: "middle", color: PAPER, bold: true, fontFace: HEAD, fontSize: 15, margin: 0 });
+    s.addText(f[0], { x: x + 0.9, y: y + 0.26, w: cw - 1.1, h: 0.5, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0, valign: "middle" });
+    s.addText(f[1], { x: x + 0.28, y: y + 0.92, w: cw - 0.56, h: 1.1, color: SLATE, fontFace: BODY, fontSize: 12.3, margin: 0, valign: "top" });
+  });
+  footer(s, 15);
+  s.addNotes("Hệ sinh thái quanh lõi dịch: reader, QC, thư viện, cộng đồng, gamification, thanh toán. Cho thấy quy mô production.");
+})();
+
+/* ============================================================
+ * SLIDES 16–18 — DEMO SCREENSHOTS (placeholders)
+ * ============================================================ */
+function demoSlide(n, part, title, shots, note) {
+  const s = lightSlide();
+  kicker(s, M, 0.5, "VI · Demo · " + part);
+  heading(s, title);
+  const y = 1.95;
+  if (shots.length === 2) {
+    const w = (CW - 0.5) / 2, h = 4.4;
+    shots.forEach((sh, i) => shot(s, M + i * (w + 0.5), y, w, h, sh[0], sh[1]));
+  } else {
+    const w = CW, h = 4.5;
+    shot(s, M, y, w, h, shots[0][0], shots[0][1]);
+  }
+  if (note) {
+    s.addText([{ text: "Điểm nhấn khi demo:  ", options: { bold: true, color: RED, fontFace: HEAD, fontSize: 12 } }, { text: note, options: { color: SLATE, fontFace: BODY, fontSize: 12 } }],
+      { x: M, y: 6.6, w: CW, h: 0.4, margin: 0, valign: "middle" });
+  }
+  footer(s, n);
+  return s;
+}
+demoSlide(16, "Luồng A", "Trang chủ & Upload → Dịch",
+  [["/  (Trang chủ)", "Landing + nền anime động + 'Tiếp tục đọc'"], ["/upload", "Kéo-thả trang manga Nhật, chọn cấu hình AI"]],
+  "đăng nhập → kéo-thả 1 trang → pipeline chạy realtime (YOLOv8 → manga-ocr → LaMa → Gemini).")
+  .addNotes("Chụp trang chủ và trang upload. Khi demo: đăng nhập tài khoản demo, kéo-thả 1 trang, chờ pipeline.");
+demoSlide(17, "Luồng A", "Reader overlay & Studio QC",
+  [["/reader?page=…", "Bản dịch phủ bong bóng, bật/tắt so sánh"], ["/studio (QC)", "Hiệu đính per-bubble, tìm–thay thế"]],
+  "mở Reader xem overlay tiếng Việt; bật/tắt bản gốc; mở từ điển bong bóng; hiệu đính trong Studio.")
+  .addNotes("Chụp Reader có overlay dịch và màn Studio QC. Cần AI Module sống để có bản dịch thật.");
+demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện",
+  [["/upload (batch) · /qa", "Batch nhiều trang + tiến trình x/N realtime; hỏi–đáp"], ["/library · /admin", "Thư viện công khai; bảng điều khiển quản trị"]],
+  "batch cả chương xử lý tuần tự; hỏi AI về nội dung; xuất bản lên thư viện; xem admin dashboard.")
+  .addNotes("Chụp batch upload + tiến trình, Q&A, thư viện công khai và admin. Đây là luồng B (UC03) + RAG (UC04).");
+
+/* ============================================================
  * SLIDE 23 — LIMITATIONS & KNOWN DEFECTS
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "V · Nhìn thẳng vào hạn chế");
+  kicker(s, M, 0.5, "VII · Nhìn thẳng vào hạn chế");
   heading(s, "Hạn chế & lỗi đã biết");
   const lims = [
     ["Cold start", "Render free & HF Spaces ngủ sau khi rảnh → lần đầu chậm 15–60s (đã có keep-alive)."],
@@ -964,7 +966,7 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
  * ============================================================ */
 (() => {
   const s = lightSlide();
-  kicker(s, M, 0.5, "V · Hướng phát triển");
+  kicker(s, M, 0.5, "VII · Hướng phát triển");
   heading(s, "Roadmap tiếp theo");
   const fw = [
     ["OCR & dịch tốt hơn", "Fine-tune thêm cho SFX/chữ viết tay; hỗ trợ thêm cặp ngôn ngữ (Hàn, Anh)."],
@@ -993,7 +995,7 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
 (() => {
   const s = darkSlide();
   s.addShape(rect, { x: 0, y: 0, w: 0.28, h: H, fill: { color: RED } });
-  kicker(s, M + 0.2, 0.6, "V · Kết luận", GOLD);
+  kicker(s, M + 0.2, 0.6, "VII · Kết luận", GOLD);
   s.addText("Một sản phẩm AI hoàn chỉnh, chạy thật.", { x: M + 0.2, y: 0.95, w: CW - 0.2, h: 0.9, color: PAPER, bold: true, fontFace: HEAD, fontSize: 32, margin: 0, valign: "top" });
   const stats = [
     ["3", "dịch vụ triển khai độc lập", RED],
