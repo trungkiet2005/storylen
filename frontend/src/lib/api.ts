@@ -970,6 +970,97 @@ export async function askQuestionStream(
   }
 }
 
+// ─── Narration / Listen mode ───────────────────────────────────────────────
+
+export interface TTSVoiceInfo {
+  id: string;
+  label: string;
+  locale: string;
+  gender: string;
+}
+
+export interface TTSEngineInfo {
+  engine: string;
+  available: boolean;
+  is_default: boolean;
+  voices: TTSVoiceInfo[];
+}
+
+export interface VoicesResponse {
+  default_engine: string;
+  engines: TTSEngineInfo[];
+}
+
+export interface NarrationResponse {
+  page_id: string;
+  script: string;
+  audio_url: string | null;
+  mime: string;
+  engine: string;
+  voice: string;
+  source: "vlm" | "dialogue_fallback";
+  dialogue_lines: string[];
+}
+
+export interface NarrateOptions {
+  engine?: string;
+  voice?: string;
+  rate?: string;
+}
+
+export interface ChapterNarrateResponse {
+  job_id: string;
+  chapter_id: string;
+  total: number;
+  status: string;
+}
+
+export interface ChapterNarrationStatus {
+  job_id: string;
+  chapter_id: string;
+  total: number;
+  done: number;
+  status: string;
+  error?: string | null;
+  segments: Array<Record<string, unknown>>;
+}
+
+/** List available TTS engines + voices for the reader's voice picker. */
+export async function listVoices(): Promise<VoicesResponse> {
+  return request<VoicesResponse>("/narrate/voices");
+}
+
+/** Generate a spoken narration (VLM script → TTS audio) for one page. */
+export async function narratePage(
+  pageId: string,
+  options: NarrateOptions = {},
+): Promise<NarrationResponse> {
+  return request<NarrationResponse>(`/narrate/page/${pageId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
+}
+
+/** Kick off a background job that narrates every page in a chapter. */
+export async function narrateChapter(
+  chapterId: string,
+  options: NarrateOptions = {},
+): Promise<ChapterNarrateResponse> {
+  return request<ChapterNarrateResponse>(`/narrate/chapter/${chapterId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
+}
+
+/** Poll a chapter narration job for progress + completed segments. */
+export async function getChapterNarrationStatus(
+  jobId: string,
+): Promise<ChapterNarrationStatus> {
+  return request<ChapterNarrationStatus>(`/narrate/chapter/status/${jobId}`);
+}
+
 // ─── History ─────────────────────────────────────────────────────────────────
 
 export async function getHistory(params?: {

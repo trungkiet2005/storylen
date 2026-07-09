@@ -302,6 +302,36 @@ Query flow:
   alternative translations, and a cultural note for a structured popup in the
   reader. LRU-cached in-process.
 
+### Listen Mode (AI narration + TTS)
+
+- **What:** turns a translated page into spoken audio. A vision LLM (VLM) reads
+  the page art, weaves the already-translated Vietnamese dialogue into a short
+  storytelling script, then a pluggable TTS engine voices it. Frontend surface:
+  `<ListenMode />` drawer in the reader (`components/ListenMode.tsx`), a "🔊 Nghe"
+  button next to the bookmark control.
+- **VLM:** `services/vlm_client.py` calls an ollama-compatible `/api/generate`
+  (default model `qwen2.5vl:7b` — a direct responder; `qwen3-vl:8b` also works but
+  *thinks* and needs a bigger token budget). Base URL comes from `VLM_BASE_URL`
+  but, like the ai_module, can be overridden at runtime via `app_settings`
+  (`vlm_provider="tunnel"`, `vlm_tunnel_url="https://…"`) — see
+  `services/narration_source.py`. The pod's ollama is exposed with a Cloudflare
+  quick-tunnel (`cloudflared tunnel --url http://localhost:11434 --http-host-header localhost:11434`).
+- **TTS:** `services/tts/` is a pluggable registry — `edge` (Microsoft neural,
+  no key, default), `pyttsx3` (offline SAPI fallback), `coqui` (XTTS on the pod,
+  enabled only when `COQUI_TTS_URL` is set). Users pick engine + voice; the API
+  exposes availability via `GET /v1/narrate/voices`.
+- **Orchestration:** `services/narration.py` fetches page + ordered dialogue,
+  calls the VLM (graceful **dialogue fallback** if the VLM is down), synthesizes,
+  and uploads to the `manga-audio` bucket. `routers/narration.py`:
+  `POST /narrate/page/{id}`, `POST /narrate/chapter/{id}` (background job +
+  `GET /narrate/chapter/status/{job_id}`), `GET /narrate/voices`,
+  `POST /narrate/recap/{chapter_id}` (ffmpeg recap `.mp4`, `services/recap_video.py`,
+  hidden when ffmpeg is absent). Each narrated page costs `NARRATION_CREDIT_COST`
+  credits (default 1), gated before generation.
+- **Setup:** create a private `manga-audio` Storage bucket; set `VLM_BASE_URL`
+  (or the `app_settings` override); `pip install edge-tts pyttsx3` (in
+  requirements). Recap export additionally needs `ffmpeg` on the host.
+
 ---
 
 ## Database (Supabase PostgreSQL + pgvector + pg_trgm)
@@ -349,7 +379,7 @@ Patches: `backend/supabase_patch.sql` holds out-of-band fixes applied after a
 migration shipped — review before re-running a full migration set.
 
 Storage buckets: `manga-originals` (private), `manga-thumbnails` (private),
-`avatars` (public read).
+`avatars` (public read), `manga-audio` (private — narration mp3 + recap mp4).
 
 ---
 
@@ -369,13 +399,18 @@ Storage buckets: `manga-originals` (private), `manga-thumbnails` (private),
     switcher hidden in header, credit-badge plan hidden, username hidden, CTAs reachable
   - `forum.spec.ts` — forum list, category filter, sort, new-thread gating,
     login-required prompt for anonymous users
+  - `narration.spec.ts` — Listen mode: trigger wired into reader, voice picker,
+    generate → audio + script (VLM + TTS mocked in fixtures)
+- `ListenMode.test.tsx` (Vitest RTL) covers the drawer's interaction states.
 - API mocking: `frontend/e2e/fixtures.ts` (`withMockedApi`, `clearStorage`,
   `gotoApp`). Default 200 fallback so unmocked endpoints don't break UI.
 
 ### Backend
 
 - Pytest at `backend/tests/` (`test_forum.py`, `test_scraper.py`,
-  `test_idempotency.py`). Uses `respx` to mock Supabase + Gemini HTTP.
+  `test_idempotency.py`, plus narration: `test_tts_registry.py`,
+  `test_vlm_client.py`, `test_narration_service.py`, `test_narration_router.py`).
+  Uses `respx` to mock Supabase / Gemini / VLM HTTP.
 
 ### CI
 

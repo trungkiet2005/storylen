@@ -22,6 +22,7 @@ import {
 } from '@/lib/api';
 import { AddToSeriesModal } from '@/components/AddToSeriesModal';
 import { BubbleDictionaryModal } from '@/components/BubbleDictionaryModal';
+import { ListenMode } from '@/components/ListenMode';
 import { TranslationFeedback } from '@/components/TranslationFeedback';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -1296,6 +1297,9 @@ function ReaderContent() {
                 <Icon name={bookmarked ? "star-fill" : "star"} size={14}/>
               </motion.button>
             )}
+
+            {/* Listen mode — AI narration + TTS */}
+            {pageData && <ListenMode pageId={pageData.page_id} />}
 
             {/* Export page as PDF */}
             {pageData?.original_image_url && (

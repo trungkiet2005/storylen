@@ -185,6 +185,60 @@ export async function withMockedApi(page: Page, opts: { authenticated?: boolean 
       });
     }
 
+    // ── Narration / Listen mode ──────────────────────────────────────────
+    if (path === "/narrate/voices" && method === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json", headers: cors,
+        body: JSON.stringify({
+          default_engine: "edge",
+          engines: [
+            {
+              engine: "edge", available: true, is_default: true,
+              voices: [
+                { id: "vi-VN-HoaiMyNeural", label: "Hoài My (nữ, VN)", locale: "vi-VN", gender: "Female" },
+                { id: "vi-VN-NamMinhNeural", label: "Nam Minh (nam, VN)", locale: "vi-VN", gender: "Male" },
+              ],
+            },
+            { engine: "pyttsx3", available: false, is_default: false, voices: [] },
+            { engine: "coqui", available: false, is_default: false, voices: [] },
+          ],
+        }),
+      });
+    }
+    if (path.startsWith("/narrate/page/") && method === "POST") {
+      const pid = path.split("/").pop() || "p1";
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json", headers: cors,
+        body: JSON.stringify({
+          page_id: pid,
+          script: "Người hùng bước ra khỏi bóng tối, ánh mắt cương nghị.",
+          audio_url: `https://audio.example.com/${pid}.mp3`,
+          mime: "audio/mpeg", engine: "edge", voice: "vi-VN-HoaiMyNeural",
+          source: "vlm", dialogue_lines: ["Ta đến đây"],
+        }),
+      });
+    }
+
+    // ── Page (reader) ────────────────────────────────────────────────────
+    if (/^\/page\/[^/]+$/.test(path) && method === "GET") {
+      const pid = path.split("/")[2];
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json", headers: cors,
+        body: JSON.stringify({
+          page_id: pid,
+          original_image_url: `https://img.example.com/${pid}.png`,
+          translated_image_url: null,
+          thumbnail_url: null,
+          status: "translated",
+          processed_data: [],
+          metadata: { page_number: 1 },
+        }),
+      });
+    }
+
     // ── Fallback: empty 200 — unmocked feature pings shouldn't block UI ─
     // We log to help diagnose, but never fail (the page may have many
     // tangential calls we don't care about for the test under inspection).
