@@ -1,0 +1,12 @@
+{
+  "image_size": [
+    1024,
+    1024
+  ],
+  "base_load_s": 4.0,
+  "base_pred": "俺は絶対に．．．けない！！",
+  "base_infer_s": 0.964,
+  "ft_load_s": 3.12,
+  "ft_pred": "僕．．絶対に．．．けない！！！",
+  "ft_infer_s": 0.646
+}

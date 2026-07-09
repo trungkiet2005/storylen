@@ -1,0 +1,33 @@
+{
+  "note": "LATENCY-ONLY SMOKE TEST. Images are AI-generated manga-style marketing artwork bundled with the frontend (frontend/public/), NOT real Manga109-s / scanned manga pages. Detection counts and confidences are NOT representative of production box quality on genuine manga content -- see PA3 SAD section 7.5 / the metadata.json under ai_module/models/manga_ocr/weights/ for the real Manga109-s test-split metrics (mAP@0.5=0.9525, CER=0.0611 etc.), which is the ground truth this PA4 report relies on.",
+  "weights_path": "ai_module\\models\\manga_yolo\\best.pt",
+  "ultralytics_version": "8.4.48",
+  "model_load_time_s": 7.3466,
+  "warmup_inference_time_s": 0.441,
+  "per_image": [
+    {
+      "image": "manga_hero_ja.png",
+      "latency_s": 0.141,
+      "n_detections": 2,
+      "confidences": [
+        0.88,
+        0.272
+      ],
+      "mean_confidence": 0.576
+    },
+    {
+      "image": "manga_hero_clean.png",
+      "latency_s": 0.1357,
+      "n_detections": 0,
+      "confidences": [],
+      "mean_confidence": null
+    },
+    {
+      "image": "manga_panel_samurai.png",
+      "latency_s": 0.1329,
+      "n_detections": 0,
+      "confidences": [],
+      "mean_confidence": null
+    }
+  ]
+}
