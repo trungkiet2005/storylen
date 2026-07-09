@@ -5,18 +5,29 @@
 ---
 
 ## 📑 MỤC LỤC
-1. [Chủ đề 1: Quy trình Phát triển phần mềm (Agile/Scrum & RUP)](#chủ-đề-1-quy-trình-phát-triển-phần-mềm-agilescrum--rup)
+1. [Chủ đề 1: Quy trình Phát triển phần mềm & Quản lý (Scrum PM)](#chủ-đề-1-quy-trình-phát-triển-phần-mềm--quản-lý-scrum-pm)
 2. [Chủ đề 2: Kỹ nghệ Yêu cầu (Requirements Engineering)](#chủ-đề-2-kỹ-nghệ-yêu-cầu-requirements-engineering)
 3. [Chủ đề 3: Kiến trúc Phần mềm & Cơ sở dữ liệu (Architecture & DB)](#chủ-đề-3-kiến-trúc-phần-mềm--cơ-sở-dữ-liệu-architecture--db)
-4. [Chủ đề 4: Quy trình Học máy & Tích hợp AI (ML Workflow)](#chủ-đề-4-quy-trình-học-máy--tích-hợp-ai-ml-workflow)
-5. [Chủ đề 5: Lập trình thời AI (Vibe Coding & Guardrails)](#chủ-đề-5-lập-trình-thời-ai-vibe-coding--guardrails)
+4. [Chủ đề 4: Quy trình Học máy & Đánh giá mô hình AI (ML Workflow & Evaluation)](#chủ-đề-4-quy-trình-học-máy--đánh-giá-mô-hình-ai-ml-workflow--evaluation)
+5. [Chủ đề 5: Lập trình thời AI (Vibe Coding, Linter & Typecheck)](#chủ-đề-5-lập-trình-thời-ai-vibe-coding-linter--typecheck)
 6. [Chủ đề 6: Thiết kế Giao diện (UI/UX Design)](#chủ-đề-6-thiết-kế-giao-diện-uiux-design)
-7. [Chủ đề 7: Kiểm thử phần mềm & Đảm bảo Chất lượng (Testing & QA)](#chủ-đề-7-kiểm-thự-phần-mềm--đảm-bảo-chất-lượng-testing--qa)
+7. [Chủ đề 7: Quy trình Kiểm thử & Báo cáo chất lượng (Testing & QA)](#chủ-đề-7-quy-trình-kiểm-thử--báo-cáo-chất-lượng-testing--qa)
 8. [Chủ đề 8: Bảo mật & Đạo đức AI (Security & AI Ethics)](#chủ-đề-8-bảo-mật--đạo-đức-ai-security--ai-ethics)
 
 ---
 
-## Chủ đề 1: Quy trình Phát triển phần mềm (Agile/Scrum & RUP)
+## Giải thích nhanh: Linter & Typecheck là gì?
+
+* **Linter (Trình phân tích tĩnh/Định dạng code):**
+  * *Là gì:* Một công cụ tự động đọc mã nguồn mà không cần chạy chương trình, nhằm phát hiện ra các lỗi cú pháp, đoạn code dư thừa (biến khai báo nhưng không dùng), hoặc vi phạm quy ước viết code (naming convention, thụt lề).
+  * *Thực tế:* Nhóm dùng **ESLint** cho frontend JavaScript/TypeScript. Linter giúp đồng bộ định dạng mã nguồn giữa cả 6 thành viên trong nhóm, giúp code trông thống nhất như do một người viết.
+* **Typecheck (Kiểm tra kiểu dữ liệu tĩnh):**
+  * *Là gì:* Quá trình rà soát xem lập trình viên có sử dụng đúng kiểu dữ liệu của biến hay không (ví dụ: một hàm yêu cầu truyền vào "chuỗi kí tự" nhưng lập trình viên lại truyền vào "số"). Nếu sai kiểu, chương trình có thể bị crash khi chạy thực tế (Runtime Error).
+  * *Thực tế:* Nhóm dùng TypeScript và chạy lệnh `npx tsc --noEmit` ở CI/CD. Cờ `--noEmit` nghĩa là chỉ chạy trình biên dịch của TypeScript để rà lỗi kiểu dữ liệu chứ không xuất ra file `.js` thực tế, giúp tốc độ kiểm tra cực nhanh.
+
+---
+
+## Chủ đề 1: Quy trình Phát triển phần mềm & Quản lý (Scrum PM)
 
 ### 💬 Câu 1: Tại sao nhóm lại chọn mô hình Agile/Scrum để phát triển StoryLens mà không dùng mô hình Thác nước (Waterfall)?
 * **Trả lời:** 
@@ -34,11 +45,17 @@
   * Bạn Duy Minh đóng vai trò là **Project Manager kiêm AI/ML Engineer**.
   * Với vai trò PM, Minh điều phối tiến độ dựa trên Product Backlog, phân chia các đầu việc cho các Sprint backlog, tổ chức họp Scrum và quản trị rủi ro kỹ thuật. Minh quản lý chất lượng code bằng việc bắt buộc cấu hình **Code Review qua Pull Request** trên GitHub. Mỗi Pull Request phải được ít nhất 1 thành viên review và hệ thống CI báo xanh mới được merge vào nhánh chính.
 
+### 💬 Câu 4: Là Manager, bạn ước lượng nỗ lực (effort) và thời gian (schedule) cho dự án bằng cách nào? Có dùng COCOMO không?
+* **Trả lời:**
+  * Do dự án là phi thương mại và phát triển theo mô hình Agile, nhóm sử dụng kỹ thuật **Planning Poker** kết hợp với **Story Points** để ước lượng nỗ lực một cách tương đối thay vì dùng COCOMO thuần túy (vì COCOMO yêu cầu biết trước số dòng code KLOC, thứ cực kỳ khó đoán định ở giai đoạn đầu của dự án AI).
+  * Nhóm lấy tính năng "Auth (Đăng nhập/Đăng ký)" làm mốc chuẩn (độ khó = 2 Story Points). Sau đó các thành viên so sánh tính năng khác với mốc này để gán điểm (ví dụ: "Pipeline AI" có độ khó gấp nhiều lần $\to$ 8 Story Points).
+  * Sau Sprint 1 và 2, nhóm đo được **Velocity (Vận tốc của nhóm)** khoảng 20 Story Points/Sprint, từ đó PM dễ dàng dự báo được các tính năng trong Product Backlog cần bao nhiêu Sprint để hoàn thành và lập lịch biểu thực tế.
+
 ---
 
 ## Chủ đề 2: Kỹ nghệ Yêu cầu (Requirements Engineering)
 
-### 💬 Câu 4: Hãy phân biệt Yêu cầu chức năng (FR) và Yêu cầu phi chức năng (NFR) trong StoryLens. Cho ví dụ cụ thể.
+### 💬 Câu 5: Hãy phân biệt Yêu cầu chức năng (FR) và Yêu cầu phi chức năng (NFR) trong StoryLens. Cho ví dụ cụ thể.
 * **Trả lời:**
   * **Yêu cầu chức năng (FR):** Mô tả những hành vi hay chức năng cụ thể mà hệ thống bắt buộc phải thực hiện.
     * *Ví dụ:* Người dùng có thể kéo thả ảnh manga lên để hệ thống tự động nhận dạng và dịch; Người dùng có thể nhập câu hỏi để AI giải đáp về cốt truyện thông qua ô chat RAG.
@@ -48,14 +65,14 @@
       * *Bảo mật (Security):* Token/Session đăng nhập của người dùng phải được lưu trữ trong Cookie HttpOnly để chống tấn công XSS đánh cắp token.
       * *Độ sẵn sàng (Availability):* Hệ thống có cơ chế keep-alive để hạn chế cold start của các service chạy trên cloud miễn phí dưới 5 giây.
 
-### 💬 Câu 5: Trong sơ đồ Use Case của nhóm, mối quan hệ `<<include>>` và `<<extend>>` được thể hiện như thế nào? Hãy lấy ví dụ thực tế.
+### 💬 Câu 6: Trong sơ đồ Use Case của nhóm, mối quan hệ `<<include>>` và `<<extend>>` được thể hiện như thế nào? Hãy lấy ví dụ thực tế.
 * **Trả lời:**
   * **`<<include>>` (Bắt buộc):** Dùng khi một use case luôn chứa hành vi của một use case khác.
     * *Ví dụ:* Use case **"Dịch một chương truyện (Batch)"** luôn bắt buộc phải gọi use case **"Trừ credit tài khoản"** và use case **"Dịch một trang truyện"** liên tiếp. Không thể dịch truyện mà không qua bước kiểm tra/trừ credit.
   * **`<<extend>>` (Tùy chọn/Có điều kiện):** Dùng để mô tả hành vi chỉ xảy ra dưới một số điều kiện nhất định.
     * *Ví dụ:* Use case **"Hiệu đính bản dịch (Studio QC)"** mở rộng use case **"Đọc truyện (Reader)"**. Người dùng đang đọc truyện thông thường, chỉ khi họ phát hiện lỗi dịch và có quyền chỉnh sửa, họ mới kích hoạt tính năng mở Studio QC để sửa text đè lên bong bóng thoại.
 
-### 💬 Câu 6: Giải thích kịch bản ngoại lệ (Exception Flow) của use case "Đặt dịch vụ/Thanh toán gói credit" khi Stripe bị lỗi hoặc kết nối mạng bị ngắt giữa chừng.
+### 💬 Câu 7: Giải thích kịch bản ngoại lệ (Exception Flow) của use case "Đặt dịch vụ/Thanh toán gói credit" khi Stripe bị lỗi hoặc kết nối mạng bị ngắt giữa chừng.
 * **Trả lời:**
   * Khi người dùng nhấn "Thanh toán" ở frontend, hệ thống sẽ gửi request kèm theo một **Idempotency Key (Khóa bất biến)**.
   * Nếu Stripe phản hồi lỗi hoặc mạng bị ngắt đột ngột:
@@ -66,7 +83,7 @@
 
 ## Chủ đề 3: Kiến trúc Phần mềm & Cơ sở dữ liệu (Architecture & DB)
 
-### 💬 Câu 7: Tại sao nhóm chọn kiến trúc tách rời (Microservice) giữa Frontend, Backend và AI Module? Nó có ưu nhược điểm gì?
+### 💬 Câu 8: Tại sao nhóm chọn kiến trúc tách rời (Microservice) giữa Frontend, Backend và AI Module? Nó có ưu nhược điểm gì?
 * **Trả lời:**
   * **Lý do chọn:** Các thư viện AI như PyTorch, các model YOLOv8 và manga-ocr có kích thước rất nặng (~4GB Docker Image) và tiêu tốn nhiều tài nguyên RAM/GPU khi inference. Backend API (FastAPI) và Frontend (Next.js) thì nhẹ và cần phản hồi nhanh. Nếu gộp chung, việc deploy lên các nền tảng đám mây sẽ rất đắt và chậm.
   * **Ưu điểm:**
@@ -74,7 +91,7 @@
     * Scale độc lập: Có thể dễ dàng đem AI Module lên chạy GPU trên HuggingFace Spaces/Kaggle, trong khi backend API chạy CPU giá rẻ trên Render.
   * **Nhược điểm:** Tăng độ trễ (latency) do phải giao tiếp qua mạng giữa Backend API và AI Module qua giao thức HTTP. Nhóm khắc phục bằng cách thiết lập giao tiếp **WebSocket** truyền trạng thái tiến trình thời gian thực (ví dụ: *Đang nhận diện chữ... 30%*, *Đang dịch... 60%*) để người dùng không có cảm giác phải chờ đợi vô định.
 
-### 💬 Câu 8: Tại sao nhóm nói Pipeline xử lý ảnh manga là kiến trúc "Đường ống và bộ lọc" (Pipe-and-Filter)?
+### 💬 Câu 9: Tại sao nhóm nói Pipeline xử lý ảnh manga là kiến trúc "Đường ống và bộ lọc" (Pipe-and-Filter)?
 * **Trả lời:**
   * Mỗi bước xử lý ảnh trong pipeline hoạt động như một **Bộ lọc (Filter)** độc lập nhận dữ liệu vào, biến đổi và xuất dữ liệu ra:
     1. *Filter 1 (YOLOv8):* Nhận ảnh gốc $\to$ Xuất tọa độ bong bóng thoại.
@@ -84,16 +101,16 @@
     5. *Filter 5 (Render Engine):* Nhận ảnh sạch nền + text tiếng Việt $\to$ Xuất ảnh manga đã dịch hoàn chỉnh.
   * Dữ liệu được truyền tải tuần tự giữa các bộ lọc này thông qua các **Đường ống (Pipes)** là các API request/response nội bộ.
 
-### 💬 Câu 9: Tính năng hỏi đáp RAG hoạt động thế nào trên Cơ sở dữ liệu? Làm sao đảm bảo người dùng A không truy vấn được nội dung truyện riêng tư của người dùng B?
+### 💬 Câu 10: Tính năng hỏi đáp RAG hoạt động thế nào trên Cơ sở dữ liệu? Làm sao đảm bảo người dùng A không truy vấn được nội dung truyện riêng tư của người dùng B?
 * **Trả lời:**
   * **Cách thức hoạt động:** Các đoạn hội thoại tiếng Việt sau khi dịch được chuyển thành vector embedding (768 chiều) bằng mô hình embedding của Gemini và lưu vào bảng CSDL Postgres hỗ trợ extension `pgvector`. Khi người dùng đặt câu hỏi, câu hỏi cũng được vector hóa, sau đó backend thực hiện tìm kiếm độ tương đồng Cosine (Cosine Similarity) để lấy ra các đoạn hội thoại liên quan nhất làm ngữ cảnh (context) đưa vào Gemini sinh câu trả lời.
   * **Bảo mật phân quyền:** Nhóm thiết lập chính sách **Row Level Security (RLS)** trên Supabase Postgres. Mỗi bảng lưu trữ thông tin trang truyện và vector embedding đều có trường `owner_id`. Câu lệnh query SQL luôn tự động ép thêm điều kiện `WHERE owner_id = auth.uid()` hoặc sử dụng policy của Supabase, ngăn chặn tuyệt đối việc rò rỉ dữ liệu chéo giữa các tài khoản.
 
 ---
 
-## Chủ đề 4: Quy trình Học máy & Tích hợp AI (ML Workflow)
+## Chủ đề 4: Quy trình Học máy & Đánh giá mô hình AI (ML Workflow & Evaluation)
 
-### 💬 Câu 10: Hãy nêu 8 bước của ML Workflow mà nhóm đã áp dụng khi tích hợp mô hình phát hiện bong bóng thoại YOLOv8.
+### 💬 Câu 11: Hãy nêu 8 bước của ML Workflow mà nhóm đã áp dụng khi tích hợp mô hình phát hiện bong bóng thoại YOLOv8.
 * **Trả lời:**
   1. **Requirements:** Xác định bài toán phát hiện bong bóng thoại manga, đầu ra là các bounding box, mục tiêu độ chính xác mAP@0.5 đạt trên 85%.
   2. **Data Collection & Preparation:** Thu thập dữ liệu từ bộ Manga109-s, chuẩn hóa ảnh về kích thước $640 \times 640$, gán nhãn bong bóng thoại dạng YOLO.
@@ -104,31 +121,42 @@
   7. **Model Operating & Monitoring:** Backend giám sát thời gian xử lý của mô hình, lưu log các ca lỗi nhận diện bong bóng để phân tích.
   8. **Model Maintenance:** Từ các ca lỗi (bong bóng dị hình, truyện cổ điển), nhóm thu thập thêm dữ liệu khó để gán nhãn bổ sung và tiến hành huấn luyện lại (retrain) mô hình.
 
-### 💬 Câu 11: Làm thế nào nhóm đánh giá chất lượng của mô hình OCR và Dịch thuật LLM?
+### 💬 Câu 12: Hãy giải thích ý nghĩa toán học của các metric Precision và mAP@0.5 dùng để đánh giá YOLOv8.
 * **Trả lời:**
-  * **Mô hình OCR (manga-ocr):** Nhóm sử dụng độ đo **CER (Character Error Rate - Tỷ lệ lỗi ký tự)** trên tập dữ liệu test gồm 500 mẫu bong bóng thoại có nhãn chuẩn (ground truth). Kết quả sau fine-tune đạt CER là **6.1%** (tương đương độ chính xác nhận dạng ký tự đạt gần 94%).
-  * **Mô hình dịch thuật (Gemini):** Vì dịch thuật ngôn ngữ rất khó đánh giá tự động bằng các metric cứng như BLEU/ROUGE (do ngôn ngữ dịch linh hoạt), nhóm áp dụng phương pháp **Human-in-the-loop (Đánh giá có con người tham gia)**. Nhóm xây dựng giao diện Studio QC để lập trình viên và người dùng thử nghiệm tự chấm điểm bản dịch theo thang điểm từ 1-5 về độ tự nhiên, đúng xưng hô và giữ ngữ cảnh. Điểm trung bình đạt **4.2/5** (trên 80% hài lòng).
+  * **Precision (Độ chính xác):** Đo tỷ lệ số bong bóng thoại dự đoán đúng trên tổng số bong bóng hệ thống phát hiện ra:
+    $$\text{Precision} = \frac{TP}{TP + FP}$$
+    *(Với TP là phát hiện đúng bong bóng thật, FP là phát hiện nhầm các vùng ảnh không phải bong bóng).* Precision đạt **97.3%** nghĩa là hệ thống cực kỳ ít khi vẽ nhầm khung dịch vào các chi tiết phong cảnh.
+  * **mAP@0.5 (Mean Average Precision tại ngưỡng IoU = 0.5):** 
+    * Đầu tiên, tính chỉ số **IoU (Intersection over Union)**: diện tích phần giao nhau chia cho diện tích phần hợp của khung dự đoán và khung thật. Nếu IoU $\ge$ 0.5 thì tính là dự đoán đúng.
+    * mAP@0.5 là trung bình cộng của Average Precision trên toàn bộ các lớp (ở đây lớp duy nhất là "bong bóng thoại") tại ngưỡng IoU này. Chỉ số đạt **95.3%** chứng minh mô hình định vị khung thoại cực kỳ sát và bao phủ trọn vẹn văn bản gốc.
+
+### 💬 Câu 13: Mô hình manga-ocr được đánh giá thế nào? Chỉ số CER hoạt động ra sao?
+* **Trả lời:**
+  * Mô hình nhận dạng ký tự tiếng Nhật/Trung (**manga-ocr**) được nhóm đánh giá bằng chỉ số **CER (Character Error Rate - Tỷ lệ lỗi ký tự)**:
+    $$\text{CER} = \frac{S + D + I}{N}$$
+    *Trong đó: $S$ là số ký tự bị thay thế sai, $D$ là số ký tự bị bỏ sót (xóa), $I$ là số ký tự bị chèn thừa, và $N$ là tổng số ký tự của nhãn chuẩn gốc.*
+  * Chỉ số CER đạt **6.1%** nghĩa là trong 100 chữ tiếng Nhật gốc, mô hình chỉ nhận diện sai khoảng 6 ký tự. Đây là tỷ lệ cực kỳ nhỏ và hoàn toàn có thể được bù đắp bởi khả năng tự suy luận ngữ cảnh khi đưa vào Gemini dịch ở bước sau.
 
 ---
 
-## Chủ đề 5: Lập trình thời AI (Vibe Coding & Guardrails)
+## Chủ đề 5: Lập trình thời AI (Vibe Coding, Linter & Typecheck)
 
-### 💬 Câu 12: Nhóm bạn đã dùng AI Assistant để sinh code (Vibe Coding). Vậy làm thế nào nhóm kiểm soát chất lượng code để tránh lỗi "đập chuột chũi" (Whack-a-mole loop)?
+### 💬 Câu 14: Nhóm bạn đã dùng AI Assistant để sinh code (Vibe Coding). Vậy làm thế nào nhóm kiểm soát chất lượng code để tránh lỗi "đập chuột chũi" (Whack-a-mole loop)?
 * **Trả lời:**
   * Lạm dụng AI sinh code dễ dẫn đến suy thoái kiến trúc phần mềm và lỗi lan truyền (sửa A hỏng B). Để kiểm soát, nhóm áp dụng triết lý **Vibe Engineering** bằng cách dựng sẵn một bộ khung bảo vệ tự động (**Guardrails/Harness**):
     1. *Phân tích tĩnh:* Ép kiểu chặt chẽ bằng TypeScript (`tsc --noEmit`) kết hợp ESLint để phát hiện ngay lập tức các đoạn code AI sinh bị thiếu import, sai tên hàm hoặc sai kiểu dữ liệu.
     2. *Hệ thống kiểm thử tự động (CI/CD Gates):* Thiết lập GitHub Actions tự động chạy **5 job song song** mỗi khi có commit mới. Hệ thống sẽ tự động chạy toàn bộ unit test (Vitest ở frontend, pytest ở backend) và E2E test (Playwright) để quét lỗi. Nếu AI sinh code làm hỏng bất kỳ tính năng cũ nào, hệ thống CI sẽ báo đỏ và chặn không cho merge code.
 
-### 💬 Câu 6: Theo bạn, Vibe Coding có làm lập trình viên bị "teo kỹ năng" (Skill atrophy) không? Nhóm bạn khắc phục thế nào?
+### 💬 Câu 15: Phân biệt vai trò của Linter và Typecheck trong quá trình phát triển dự án StoryLens.
 * **Trả lời:**
-  * Có rủi ro đó nếu lập trình viên chỉ copy-paste prompt mà không đọc hiểu code.
-  * Nhóm khắc phục bằng nguyên tắc: *"Chỉ chấp nhận đoạn code mình thực sự hiểu"* và *"Viết prompt như viết tài liệu đặc tả (specification)"*. Thay vì bắt AI tự mò giải pháp, thành viên nhóm phải thiết kế cấu trúc dữ liệu và giải thuật trước, sau đó mô tả rõ ràng ràng buộc và đầu vào/đầu ra để AI sinh mã boilerplate, giúp tiết kiệm thời gian gõ cú pháp mà vẫn nắm quyền kiểm soát kiến trúc hệ thống.
+  * **Linter (ESLint):** Đóng vai trò là "người sửa lỗi hành vi và định dạng". Nó bắt các lỗi như: biến khai báo nhưng không dùng, thiếu dấu ngoặc, hoặc code viết không đúng chuẩn Clean Code. Giúp mã nguồn sạch và đồng bộ.
+  * **Typecheck (TypeScript Compiler - `tsc`):** Đóng vai trò là "người gác cổng tính đúng đắn của kiểu dữ liệu". Nó đảm bảo cấu trúc dữ liệu truyền qua lại giữa các hàm hoặc gọi API từ backend gửi lên frontend phải khớp 100%. Ví dụ, nếu backend đổi kiểu trả về của API credits từ `number` thành `string`, Typecheck ở frontend sẽ lập tức báo lỗi đỏ ngay khi build, ngăn chặn lỗi crash trang web.
 
 ---
 
 ## Chủ đề 6: Thiết kế Giao diện (UI/UX Design)
 
-### 💬 Câu 13: Hãy trình bày cách StoryLens ứng dụng các nguyên lý UI/UX: Nhất quán (Consistency) và Sự đa dạng người dùng (User Diversity).
+### 💬 Câu 16: Hãy trình bày cách StoryLens ứng dụng các nguyên lý UI/UX: Nhất quán (Consistency) và Sự đa dạng người dùng (User Diversity).
 * **Trả lời:**
   * **Tính nhất quán (Consistency):** Nhóm xây dựng một Design System đồng nhất bằng Tailwind/CSS Variable. Toàn bộ các trang từ Library, Forum đến Studio đều sử dụng chung bảng màu HSL, chung kiểu bo góc nút bấm (rounded corners) và font chữ không chân (Inter/Outfit). Trạng thái tải (loading skeletons) và thông báo lỗi (toasts) đều hoạt động đồng bộ.
   * **Sự đa dạng người dùng (User Diversity):**
@@ -137,37 +165,37 @@
 
 ---
 
-## Chủ đề 7: Kiểm thử phần mềm & Đảm bảo Chất lượng (Testing & QA)
+## Chủ đề 7: Quy trình Kiểm thử & Báo cáo chất lượng (Testing & QA)
 
-### 💬 Câu 14: Phân biệt Verification và Validation trong thực tế kiểm thử đồ án StoryLens.
+### 💬 Câu 17: Phân biệt Verification và Validation trong thực tế kiểm thử đồ án StoryLens. Nhóm bạn đã làm gì cho mỗi phần?
 * **Trả lời:**
-  * **Verification (Thẩm tra - "Làm sản phẩm đúng đặc tả"):** Nhóm viết các bộ kiểm thử đơn vị (Unit test) và kiểm thử tích hợp (Integration test) để đối chiếu hành vi của code với tài liệu SRS.
-    * *Ví dụ:* Chạy test case kiểm tra xem khi gọi API `/api/v1/auth/register` với mật khẩu dưới 6 ký tự thì hệ thống có trả về đúng mã lỗi `422 Unprocessable Entity` như đặc tả SRS thiết kế hay không.
-  * **Validation (Thẩm định - "Làm đúng sản phẩm khách hàng cần"):** Nhóm thực hiện chạy các bài kiểm thử E2E bằng Playwright trên các luồng nghiệp vụ thực tế và tổ chức các buổi demo thực tế cho người dùng đọc thử manga để xem bản dịch tiếng Việt có mượt mà, dễ hiểu và giao diện đọc có trực quan trên các thiết bị di động hay không.
+  * **Verification (Thẩm tra - "Làm sản phẩm đúng đặc tả"):**
+    * *Thực tế:* Nhóm cài đặt CI chạy tự động kiểm tra code. Viết unit test bằng Vitest và pytest để đảm bảo các module hoạt động đúng đặc tả chức năng thiết kế (ví dụ: đăng ký mật khẩu yếu bị chặn, nạp tiền đúng thì cộng credits đúng).
+  * **Validation (Thẩm định - "Làm đúng sản phẩm khách hàng cần"):**
+    * *Thực tế:* Nhóm chạy các kịch bản kiểm thử E2E bằng **Playwright** mô phỏng hành trình người dùng thực tế và trực tiếp mở các đợt chạy thử nghiệm (Beta testing) mời bạn bè, những người đam mê đọc manga trải nghiệm hệ thống và góp ý để tinh chỉnh UI/UX.
 
-### 💬 Câu 15: Tại sao nhóm cần đến 3 thư viện kiểm thử khác nhau (Vitest, pytest, Playwright)? Có trùng lặp công sức không?
+### 💬 Câu 18: Hãy so sánh kiểm thử tự động E2E bằng Playwright và kịch bản chạy trên Katalon Studio trong đồ án. Tại sao nhóm dùng cả hai?
 * **Trả lời:**
-  * Không trùng lặp vì mỗi công cụ phục vụ một tầng kiểm thử khác nhau trong kim tự tháp kiểm thử (Testing Pyramid):
-    1. **Vitest + React Testing Library:** Chạy kiểm thử đơn vị (Unit test) cực nhanh cho các hàm logic frontend và các React component độc lập trên Node.js (không cần mở trình duyệt thật).
-    2. **pytest + respx:** Chạy kiểm thử đơn vị và tích hợp cho Backend API viết bằng FastAPI (Python). Mock các request gọi sang Gemini hoặc HuggingFace để kiểm tra tính đúng đắn của logic backend độc lập với môi trường mạng.
-    3. **Playwright:** Chạy kiểm thử đầu-cuối (End-to-End). Playwright sẽ tự khởi động một trình duyệt Chromium/Webkit thật, giả lập người dùng click vào giao diện, điền form đăng nhập, tải ảnh lên và kiểm tra xem ảnh dịch có hiển thị đúng trên màn hình không. Đây là chốt chặn cuối cùng kiểm tra sự phối hợp của cả Frontend, Backend và Database.
+  * **Playwright:** Được tích hợp trực tiếp vào **CI/CD** của nhóm trên GitHub Actions. Playwright chạy ở chế độ không giao diện (headless) cực kỳ nhanh trên máy chủ ảo của GitHub mỗi khi push code để đảm bảo code không có lỗi hồi quy (regression) và giữ vững tính ổn định kỹ thuật của sản phẩm.
+  * **Katalon Studio:** Dùng để hiện thực **báo cáo kiểm thử tự động của môn học (PA5)**. QA của nhóm dùng Katalon Studio để kéo thả, ghi lại kịch bản (record/playback) cho hai use case cốt lõi là `UC01` và `UC02`. Nó xuất ra các tài liệu kiểm thử trực quan bằng hình ảnh, video và file HTML báo cáo phục vụ cho việc chấm điểm học thuật của môn học Công nghệ Phần mềm.
+  * **Sự bổ trợ:** Playwright giúp đội dev bảo vệ code ở môi trường phát triển (CI/CD), còn Katalon giúp QA tạo lập báo cáo kiểm thử tự động chuyên nghiệp cho môn học.
 
 ---
 
 ## Chủ đề 8: Bảo mật & Đạo đức AI (Security & AI Ethics)
 
-### 💬 Câu 16: Lỗ hổng SSRF là gì? Tại sao StoryLens có nguy cơ bị SSRF và nhóm đã phòng chống như thế nào?
+### 💬 Câu 19: Lỗ hổng SSRF là gì? Tại sao StoryLens có nguy cơ bị SSRF và nhóm đã phòng chống như thế nào?
 * **Trả lời:**
   * **SSRF (Server-Side Request Forgery)** xảy ra khi kẻ tấn công gửi một URL nội bộ (ví dụ: `http://127.0.0.1:8000/admin` hoặc `http://192.168.1.1`) và lừa server backend thực hiện request tải dữ liệu từ địa chỉ đó, từ đó kẻ tấn công có thể quét cổng nội bộ hoặc đánh cắp thông tin nhạy cảm phía sau tường lửa.
   * **Nguy cơ của StoryLens:** Hệ thống có tính năng "Import from source" cho phép người dùng nhập link ảnh manga từ các trang web khác để dịch. Server backend bắt buộc phải tải ảnh từ link người dùng nhập về.
   * **Cách phòng chống:** Backend áp dụng cơ chế **Domain Allowlist (Danh sách miền cho phép)**. Backend chỉ thực hiện tải ảnh từ các domain truyện lớn đã được kiểm duyệt an toàn (như MangaDex). Mọi URL trỏ về IP nội bộ hoặc domain lạ ngoài whitelist đều bị chặn ngay lập tức ở tầng kiểm định.
 
-### 💬 Câu 17: Hãy giải thích cách StoryLens bảo vệ thông tin đăng nhập của người dùng khỏi tấn công XSS.
+### 💬 Câu 20: Hãy giải thích cách StoryLens bảo vệ thông tin đăng nhập của người dùng khỏi tấn công XSS.
 * **Trả lời:**
   * Nếu lưu Token đăng nhập (JWT) trong `LocalStorage` hoặc `SessionStorage`, kẻ tấn công có thể dùng mã độc JavaScript (XSS) để đọc và đánh cắp token dễ dàng.
   * Nhóm giải quyết bằng cách lưu JWT token vào **HttpOnly Cookie** ở phía Backend gửi về. Thuộc tính `HttpOnly` ngăn chặn hoàn toàn JavaScript tiếp cận cookie này. Đồng thời nhóm bật thuộc tính `Secure` (chỉ gửi qua HTTPS) và `SameSite=Strict` để phòng chống tấn công giả mạo yêu cầu chéo trang (CSRF).
 
-### 💬 Câu 18: Về mặt đạo đức AI (AI Ethics), làm thế nào đồ án StoryLens giải quyết vấn đề bản quyền tác giả truyện manga?
+### 💬 Câu 21: Về mặt đạo đức AI (AI Ethics), làm thế nào đồ án StoryLens giải quyết vấn đề bản quyền tác giả truyện manga?
 * **Trả lời:**
   * Bản quyền là vấn đề nhạy cảm nhất đối với các ứng dụng dịch thuật. StoryLens giải quyết bằng hai cơ chế:
     1. *Cô lập thư viện đọc:* Mặc định các chương truyện do người dùng tải lên dịch đều ở chế độ **riêng tư (Private)**, chỉ tài khoản đó được đọc và hỏi đáp RAG. Hệ thống không tự động chia sẻ công khai.
