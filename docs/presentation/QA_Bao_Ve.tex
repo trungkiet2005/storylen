@@ -1,0 +1,378 @@
+% !TEX program = xelatex
+% StoryLens — Bộ câu hỏi & trả lời bảo vệ đồ án (Q&A defense prep)
+% Biên dịch: xelatex QA_Bao_Ve.tex  (chạy 2 lần để có mục lục)
+\documentclass[11pt]{article}
+
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\newfontfamily\headfont{Arial}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{amssymb}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{crimson}{HTML}{C0271A}
+\definecolor{ink}{HTML}{1A1712}
+\definecolor{gold}{HTML}{9C6B10}
+\definecolor{steel}{HTML}{285B7A}
+\definecolor{soft}{HTML}{6E665D}
+
+\newcommand{\arr}{\,\ensuremath{\rightarrow}\,}
+\newcommand{\lte}{\ensuremath{\leq}}
+\newcommand{\gte}{\ensuremath{\geq}}
+% Nhãn nguồn câu hỏi
+\newcommand{\tagPA}{\textcolor{steel}{\footnotesize\textbf{[Tài liệu PA]}}}
+\newcommand{\tagSP}{\textcolor{gold}{\footnotesize\textbf{[Sản phẩm hiện tại]}}}
+\newcommand{\tagBoth}{\textcolor{crimson}{\footnotesize\textbf{[PA vs Hiện tại]}}}
+
+\titleformat{\section}{\Large\bfseries\headfont\color{crimson}}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries\headfont\color{ink}}{}{0em}{}
+\titlespacing{\section}{0pt}{14pt}{6pt}
+
+\pagestyle{fancy}\fancyhf{}
+\lhead{\footnotesize\headfont\textcolor{soft}{StoryLens · Q\&A bảo vệ đồ án}}
+\rhead{\footnotesize\headfont\textcolor{soft}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Khối câu hỏi–trả lời
+\newtcolorbox{qa}[1]{breakable,enhanced,sharp corners,
+  boxrule=0.8pt,colframe=crimson,colback=crimson!3,
+  coltitle=white,colbacktitle=crimson,fonttitle=\bfseries\headfont\small,
+  title={#1},left=7pt,right=7pt,top=5pt,bottom=6pt,
+  before skip=7pt,after skip=7pt}
+\newcommand{\A}{\textbf{\textcolor{crimson}{Trả lời. }}}
+
+\setlist[itemize]{leftmargin=1.4em,itemsep=1pt,topsep=2pt}
+
+\begin{document}
+
+% ─────────── Bìa ───────────
+\begin{titlepage}
+\centering
+\vspace*{2.2cm}
+{\headfont\bfseries\fontsize{15}{18}\selectfont\textcolor{soft}{BỘ CÂU HỎI \& TRẢ LỜI — BẢO VỆ ĐỒ ÁN}}\\[6pt]
+{\headfont\bfseries\fontsize{46}{50}\selectfont\textcolor{ink}{StoryLens}}\\[10pt]
+{\color{crimson}\rule{9cm}{2pt}}\\[10pt]
+{\large Nền tảng AI dịch \& hỏi--đáp Manga theo ngữ cảnh}\\[4pt]
+{\color{soft}\large Chuẩn bị cho phần vấn đáp: từ tài liệu PA + sản phẩm chạy thật}\\[2.4cm]
+\begin{tabular}{rl}
+\textbf{Môn học} & CSC10011 -- Công nghệ phần mềm cho hệ thống Trí tuệ Nhân tạo\\[3pt]
+\textbf{GVHD} & GS.TS Nguyễn Văn Vũ\\[3pt]
+\textbf{Nhóm} & Nhóm 1 -- StoryLens\\[3pt]
+\textbf{Học kỳ} & Xuân 2026 · HCMUS\\
+\end{tabular}
+\vfill
+{\color{soft}\small Nhãn nguồn: \tagPA\ dựa trên tài liệu · \tagSP\ dựa trên code chạy thật · \tagBoth\ điểm khác biệt cần giải thích}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\begin{tcolorbox}[colback=gold!8,colframe=gold,sharp corners,boxrule=0.6pt]
+\small\textbf{Cách dùng tài liệu.} Mỗi câu là một tình huống thầy có thể hỏi khi bảo vệ, kèm gợi ý trả lời ngắn gọn, đúng trọng tâm. Người phụ trách mảng nào nên nắm chắc mảng đó (xem phân công trong file \textit{Script\_Thuyet\_Trinh}). Đặc biệt lưu ý \textbf{Mục 10 --- khác biệt giữa tài liệu PA và sản phẩm hiện tại}: đây là nhóm câu hỏi dễ bị hỏi nhất và cần trả lời trung thực theo tinh thần \textit{phát triển lặp (iterative)} của RUP.
+\end{tcolorbox}
+
+% ══════════════════════════════════════════════════════════════
+\section{Tổng quan đề tài \& Định vị}
+
+\begin{qa}{1. Đề tài của nhóm giải quyết vấn đề gì? \tagPA}
+\A Cộng đồng đọc manga Việt Nam thiếu một nền tảng dịch tự động \textit{hiểu ngữ cảnh} và có \textit{hỏi--đáp thông minh}. Ba điểm đau: bản dịch fan-sub chậm và không đều; công cụ dịch máy (Google Lens) dịch rời rạc, mất xưng hô và mạch truyện; và người đọc không có kênh hỏi ngay về nội dung. StoryLens giải quyết cả ba: dịch có ngữ cảnh cả trang, đọc overlay, và hỏi--đáp bằng RAG.
+\end{qa}
+
+\begin{qa}{2. Vì sao chọn đề tài này? Tính thực tiễn ở đâu? \tagPA}
+\A Manga là thị trường nội dung rất lớn ở Việt Nam nhưng lượng truyện gốc chưa dịch còn khổng lồ. Đề tài vừa có nhu cầu thật, vừa hội tụ nhiều kỹ thuật AI hiện đại (phát hiện đối tượng, OCR, inpainting, dịch máy có ngữ cảnh bằng LLM, và RAG) --- phù hợp với môn Công nghệ phần mềm cho hệ thống AI, cho phép nhóm thực hành trọn vòng đời một sản phẩm AI thật.
+\end{qa}
+
+\begin{qa}{3. Ai là người dùng mục tiêu? \tagPA}
+\A Ba persona: (1) \textbf{sinh viên đại học} (18--25) đọc và tìm hiểu nội dung sâu; (2) \textbf{học sinh THPT} (15--18) cần giao diện dễ dùng, dịch nhanh; (3) \textbf{content creator} (25--35) làm video review, cần xử lý cả chương và sẵn sàng trả phí. Điểm chung: cần dịch chính xác và hỏi được về nội dung.
+\end{qa}
+
+\begin{qa}{4. StoryLens khác gì Google Lens, DeepL/ChatGPT, hay fan-sub? \tagBoth}
+\A Google Lens dịch nhanh nhưng không hiểu ngữ cảnh; DeepL/ChatGPT phải thao tác thủ công, không hỏi--đáp thời gian thực trên chính nội dung; fan-sub thì chậm và không có AI. StoryLens là nền tảng \textit{duy nhất} gộp cả bốn: dịch tự động, hiểu ngữ cảnh cả trang, đọc overlay, và hỏi--đáp RAG có trích nguồn.
+\end{qa}
+
+\begin{qa}{5. Phạm vi (scope) sản phẩm tới đâu? Có gì ngoài phạm vi? \tagSP}
+\A Trong phạm vi: dịch Nhật/Trung \arr\ Việt, đọc overlay, RAG Q\&A, quản lý series/chương, thư viện công khai, cộng đồng, credit/thanh toán, quản trị. Ngoài phạm vi hiện tại: dịch video/anime, tự động hoá bản quyền, và ứng dụng di động native (đã có PWA, app native nằm ở hướng phát triển).
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Yêu cầu \& Use Case}
+
+\begin{qa}{6. Các yêu cầu chức năng chính là gì? \tagPA}
+\A Chín nhóm F01--F09: xác thực \& hồ sơ; upload ảnh; pipeline AI; reader \& overlay; hỏi--đáp RAG; quản lý series/chương; lịch sử; credit \& gói; và quản trị. Lõi AI nằm ở F03 (pipeline) và F05 (RAG).
+\end{qa}
+
+\begin{qa}{7. Actor của hệ thống là ai? \tagPA}
+\A Trong đặc tả use case: \textbf{Người dùng thông thường} và \textbf{Content Creator} là hai actor chính; ngoài ra có \textbf{Admin} cho phần quản trị. Content Creator là người dùng nâng cao (batch cả chương, xuất bản, cần export).
+\end{qa}
+
+\begin{qa}{8. Mô tả luồng chính của use case Upload \& Dịch (UC01). \tagPA}
+\A Người dùng kéo--thả ảnh (JPG/PNG, \lte\ 10MB) \arr\ backend kiểm định dạng, kích thước \arr\ gọi pipeline: YOLOv8 phát hiện bong bóng, manga-ocr đọc chữ Nhật \arr\ dịch có ngữ cảnh \arr\ lưu kết quả (bbox + text\_vi) vào database và vector store \arr\ chuyển sang Reader. Hậu điều kiện: trang được lưu, bản dịch sẵn sàng.
+\end{qa}
+
+\begin{qa}{9. UC01 có những luồng ngoại lệ nào? \tagPA}
+\A Năm luồng thay thế: (1) sai định dạng \arr\ báo lỗi, huỷ; (2) quá 10MB \arr\ yêu cầu nén; (3) mất kết nối khi upload \arr\ nút ``Thử lại''; (4) OCR không thấy text \arr\ vẫn lưu ảnh gốc, báo ``không tìm thấy văn bản''; (5) LLM timeout \arr\ tự chuyển bản dịch dự phòng (M2M100/NLLB). Đây là điểm thể hiện nhóm có nghĩ tới độ bền của hệ thống.
+\end{qa}
+
+\begin{qa}{10. Use case đọc overlay xử lý ``text dịch quá dài'' thế nào? \tagBoth}
+\A Theo đặc tả: thu nhỏ cỡ chữ; nếu vẫn tràn thì cắt bớt kèm ``\ldots'' và tooltip đầy đủ. Trong sản phẩm thật, bước render dùng \textit{tìm nhị phân cỡ chữ} để chọn cỡ lớn nhất còn vừa bounding box, đúng như tinh thần đặc tả.
+\end{qa}
+
+\begin{qa}{11. Yêu cầu phi chức năng nổi bật là gì? \tagPA}
+\A Hiệu năng: UI phản hồi \lte\ 3s, xử lý AI \lte\ 30s/trang, Q\&A \lte\ 10s. Bảo mật: cookie HttpOnly, RBAC + RLS, rate-limit, CSP. Toàn vẹn: ledger credit chỉ ghi thêm; trang treo tự đánh dấu ``failed'' khi restart. Sẵn sàng: CDN cho frontend, backend co giãn, có xử lý cold start.
+\end{qa}
+
+\begin{qa}{12. Vì sao trong đặc tả có use case ``Add a product to cart''? \tagBoth}
+\A Đó là \textbf{văn bản mẫu còn sót} của template RUP (vốn cho ví dụ thương mại điện tử), không phải use case thật của StoryLens. Các use case thật của nhóm là Upload \& Dịch, Đọc overlay, RAG Q\&A, Batch upload, và Xem lịch sử. Nhóm xin ghi nhận và đã loại bỏ ở bản cập nhật.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Kiến trúc \& Quyết định thiết kế}
+
+\begin{qa}{13. Mô tả kiến trúc tổng thể của hệ thống. \tagSP}
+\A Kiến trúc \textit{microservice + phân tầng}, ba dịch vụ triển khai độc lập: Frontend Next.js 16 (Vercel); Backend API FastAPI (Render, Docker, Singapore); AI Module FastAPI (HuggingFace Spaces, \raisebox{0.2ex}{$\sim$}4GB). Trạng thái dùng chung đặt ở Supabase (PostgreSQL + pgvector + Auth + Storage). Google Gemini API lo phần dịch và sinh câu trả lời.
+\end{qa}
+
+\begin{qa}{14. Vì sao tách AI Module thành dịch vụ riêng thay vì gộp vào backend? \tagSP}
+\A Các mô hình (YOLOv8, manga-ocr, LaMa) nặng vài GB RAM. Backend chạy Render tier miễn phí chỉ 512MB, không thể tải nổi. Tách riêng giúp: (1) mỗi phần co giãn độc lập; (2) backend nhẹ, khởi động nhanh; (3) sự cố ở AI Module không kéo sập API chính. Đây là quyết định ``isolate heavy ML workloads'' ghi trong SAD.
+\end{qa}
+
+\begin{qa}{15. Vì sao dùng pgvector thay vì một vector database riêng (ChromaDB/FAISS)? \tagBoth}
+\A Supabase đã cung cấp sẵn PostgreSQL, nên bật extension pgvector là có ngay tìm kiếm vector --- \textbf{không phải vận hành thêm một dịch vụ}. Điều này giảm chi phí hạ tầng và độ phức tạp cho một MVP. Tài liệu PA ban đầu dự kiến ChromaDB; nhóm đã đổi sang pgvector khi hiện thực (xem Mục 10).
+\end{qa}
+
+\begin{qa}{16. Vì sao lưu token trong cookie HttpOnly thay vì localStorage? \tagSP}
+\A Cookie HttpOnly \textbf{không đọc được từ JavaScript}, nên nếu có lỗ hổng XSS thì kẻ tấn công cũng không lấy được token --- chống đánh cắp phiên. localStorage thì JS đọc được, rủi ro hơn. Đây là lý do dự án ``không bao giờ lưu token ở localStorage''.
+\end{qa}
+
+\begin{qa}{17. Backend dùng service-role key bỏ qua RLS --- vậy bảo mật dữ liệu thế nào? \tagSP}
+\A RLS bảo vệ khi \textit{truy cập trực tiếp} database bằng anon key. Backend dùng service-role để linh hoạt, và \textbf{tự kiểm tra quyền sở hữu trong code Python} trước mọi thao tác (mỗi series/page đều kiểm tra user\_id). Hai lớp bổ sung cho nhau: RLS ở tầng DB, ownership check ở tầng ứng dụng.
+\end{qa}
+
+\begin{qa}{18. Nêu một vài quyết định thiết kế quan trọng và lý do. \tagSP}
+\A (1) AI Module riêng --- cô lập tải ML nặng; (2) cookie HttpOnly --- chống XSS; (3) pgvector --- bớt một dịch vụ; (4) nhiều Gemini key xoay vòng --- chống hết quota; (5) BoundedSemaphore cho pipeline --- tránh tràn bộ nhớ trên tier free. Mỗi quyết định đều đánh đổi giữa chi phí, độ phức tạp và độ bền.
+\end{qa}
+
+\begin{qa}{19. Các bảng dữ liệu chính? \tagSP}
+\A \texttt{profiles}, \texttt{manga\_series}, \texttt{manga\_chapters} (cờ \texttt{published\_at} cho thư viện), \texttt{manga\_pages}, \texttt{bubble\_data} (bbox, text, review\_status), \texttt{embeddings} (pgvector), \texttt{qa\_history}, \texttt{credit\_transactions}; cùng các bảng cộng đồng (forum, comments), thông báo, share links. Quan hệ: series \arr\ chapters \arr\ pages \arr\ bubbles/embeddings.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Pipeline AI \& Mô hình ML}
+
+\begin{qa}{20. Mô tả chi tiết pipeline dịch, từng bước và công cụ. \tagSP}
+\A Sáu bước: (1) \textbf{YOLOv8} phát hiện bong bóng thoại; (2) \textbf{manga-ocr} đọc chữ Nhật trong từng bbox; (3) \textbf{LaMa} inpaint xoá chữ gốc; (4) \textbf{Gemini 2.5 Flash} dịch có ngữ cảnh sang tiếng Việt (giữ xưng hô); (5) \textbf{render} vẽ chữ Việt vào bbox (tìm nhị phân cỡ chữ); (6) sinh \textbf{embedding} câu, lưu pgvector. Chạy nền, giới hạn bằng semaphore, có huỷ hợp tác.
+\end{qa}
+
+\begin{qa}{21. YOLOv8 huấn luyện trên dữ liệu nào, kết quả ra sao? \tagSP}
+\A Dữ liệu \textbf{Manga109-s}: 956 ảnh test với 14.130 bounding box. Kết quả: \textbf{mAP@0.5 = 95,3\%}, mAP@0.5:0.95 = 84,4\%, Precision = 97,3\%, Recall = 93,8\% --- đều vượt ngưỡng chấp nhận 85\% nhóm đặt ra.
+\end{qa}
+
+\begin{qa}{22. manga-ocr được fine-tune thế nào, đo bằng chỉ số gì? \tagSP}
+\A Fine-tune trên Manga109-s (test 14.130 mẫu). Chỉ số: \textbf{CER (tỉ lệ lỗi ký tự) = 6,1\%}, tức độ chính xác ký tự \raisebox{0.2ex}{$\sim$}93,9\%, và Exact-match 67,5\%. CER là chuẩn đánh giá OCR: càng thấp càng tốt --- 6,1\% là mức tốt cho chữ manga nhiều biến thể.
+\end{qa}
+
+\begin{qa}{23. Vì sao dịch bằng Gemini mà không train mô hình dịch riêng? \tagSP}
+\A Dịch manga cần \textit{hiểu ngữ cảnh, văn phong, xưng hô} --- LLM như Gemini làm tốt việc này mà không cần tập dữ liệu song ngữ khổng lồ để tự train. Gemini nhận cả trang làm ngữ cảnh, nên bản dịch mạch lạc hơn dịch từng câu. Chi phí thấp (tier free + xoay vòng key) và triển khai nhanh.
+\end{qa}
+
+\begin{qa}{24. Chất lượng dịch được đánh giá thế nào? \tagSP}
+\A Bằng \textbf{human-in-the-loop}: người dùng/QC đánh giá và đạt trên 80\% mức hài lòng; kèm cơ chế phản hồi thích/không thích và màn Studio QC cho phép duyệt/sửa từng bong bóng. Dịch máy khó chấm tự động tuyệt đối, nên vòng lặp con người là thước đo thực tế.
+\end{qa}
+
+\begin{qa}{25. Nếu OCR đọc sai hoặc dịch sai thì hệ thống xử lý ra sao? \tagSP}
+\A Vào \textbf{Studio QC} sửa tay từng bong bóng (approve/reject), có tìm--thay thế hàng loạt; mọi chỉnh sửa lưu \textit{lịch sử hiệu đính}. Với bong bóng độ tin cậy thấp, reader hiển thị cảnh báo. Đây chính là cơ chế con-người-trong-vòng-lặp để bù cho giới hạn của mô hình.
+\end{qa}
+
+\begin{qa}{26. Khi Gemini hết quota (429) thì sao? \tagSP}
+\A Backend giữ một \textit{pool nhiều API key} và \textbf{xoay vòng (round-robin)}; khi một key hết quota thì chuyển key khác, kèm throttle phía client và cache. Nếu cạn toàn bộ, hệ thống báo tính năng tạm không khả dụng thay vì lỗi thô. Admin có thể nạp thêm key và reload nóng.
+\end{qa}
+
+\begin{qa}{27. Đánh giá tĩnh và động của mô hình khác nhau thế nào? Tái huấn luyện ra sao? \tagSP}
+\A \textbf{Đánh giá tĩnh}: đo trên tập test cố định (mAP, CER) trước khi triển khai. \textbf{Đánh giá động}: theo dõi phản hồi thích/không thích và tỉ lệ hiệu đính khi chạy thật. Khi chất lượng tụt hoặc có domain mới, thu thập mẫu hiệu đính làm dữ liệu để fine-tune lại (chi tiết ở SAD mục 7).
+\end{qa}
+
+\begin{qa}{28. Vì sao cần bước inpaint (LaMa)? Không xoá chữ gốc có được không? \tagSP}
+\A Cần, vì phải \textit{xoá chữ Nhật gốc} rồi mới vẽ chữ Việt lên đúng chỗ; nếu không, hai lớp chữ chồng nhau, không đọc được. LaMa inpaint tái tạo nền bong bóng mượt để chữ Việt hiển thị sạch.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Hệ thống Hỏi--Đáp RAG}
+
+\begin{qa}{29. RAG trong StoryLens hoạt động chính xác thế nào? \tagSP}
+\A (1) Câu hỏi được vector hoá bằng \texttt{gemini-embedding-001}; (2) tìm cosine trong pgvector qua RPC \texttt{match\_embeddings}, lấy top-k đoạn thoại liên quan; (3) ghép ngữ cảnh + câu hỏi đưa vào Gemini để sinh câu trả lời \textbf{kèm nguồn trích}. Nhờ ``grounding'' vào nội dung truyện nên hạn chế bịa (hallucinate).
+\end{qa}
+
+\begin{qa}{30. Embedding bao nhiêu chiều, dùng mô hình gì? \tagBoth}
+\A Sản phẩm hiện tại dùng \texttt{gemini-embedding-001} với \textbf{768 chiều}, lưu ở cột \texttt{vector(768)} (migration v7). Tài liệu/PA ban đầu ghi all-MiniLM-L6-v2 384 chiều --- nhóm đã đổi khi hiện thực để đồng bộ chất lượng embedding với chính nhà cung cấp Gemini (xem Mục 10).
+\end{qa}
+
+\begin{qa}{31. Làm sao RAG tránh trả lời bịa (hallucinate)? \tagSP}
+\A Prompt yêu cầu Gemini \textbf{chỉ trả lời dựa trên các đoạn ngữ cảnh truy hồi được}; nếu không tìm thấy đoạn nào đủ ngưỡng tương đồng, hệ thống báo ``chưa tìm thấy thông tin trong nội dung đã upload'' thay vì bịa. Câu trả lời luôn kèm nguồn trích để người dùng kiểm chứng.
+\end{qa}
+
+\begin{qa}{32. Mỗi câu hỏi tốn chi phí gì? \tagSP}
+\A Mỗi câu trả lời \textit{thành công} trừ \textbf{1 credit}. Gói free có 5 credit/ngày (reset 00:00 giờ Việt Nam); các gói trả phí có hạn mức tháng lớn hơn. 1 credit tương đương 1 ảnh dịch hoặc 1 câu Q\&A.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Quy trình, Quản lý dự án \& Vai trò}
+
+\begin{qa}{33. Nhóm dùng quy trình phát triển nào? \tagPA}
+\A \textbf{RUP rút gọn kết hợp Scrum}: bốn pha Inception -- Elaboration -- Construction -- Transition, mỗi sprint 2 tuần. Sản phẩm work-product theo RUP: project plan, vision, use case model, SAD, test plan/test case. Mỗi tuần họp scrum trả lời ba câu hỏi (đã làm gì / vướng gì / sắp làm gì).
+\end{qa}
+
+\begin{qa}{34. Vai trò từng thành viên? \tagPA}
+\A Năm vai trò, mỗi vai trò có người chính + dự phòng: \textbf{Trưởng nhóm/PM} (kế hoạch, phân công, báo cáo); \textbf{Business Analyst} (yêu cầu); \textbf{Designer} (kiến trúc, UI, SAD); \textbf{Implementer} (cần 3 người: code, unit test, review); \textbf{Tester} (test plan, test case, system test). Mọi thành viên đều dự họp và review yêu cầu.
+\end{qa}
+
+\begin{qa}{35. Weekly report ghi những gì? \tagPA}
+\A Theo mẫu scrum: công việc đã hoàn thành tuần qua, khó khăn đang gặp, và kế hoạch tuần tới, kèm tình trạng từng task theo người phụ trách. Nhóm nộp weekly report ở cả PA1, PA2, PA3.
+\end{qa}
+
+\begin{qa}{36. Nhóm quản lý rủi ro thế nào? \tagPA}
+\A Bảng rủi ro trong SDP: hết quota Gemini (xoay vòng key), OCR dưới ngưỡng (fine-tune + sửa tay), cold start HF/Render (keep-alive + retry), sai cấu hình RLS (review migration), và bản quyền (ToS + kiểm duyệt). Mỗi rủi ro có xác suất, mức ảnh hưởng và biện pháp giảm thiểu.
+\end{qa}
+
+\begin{qa}{37. ``Definition of Done'' của nhóm là gì? \tagPA}
+\A Một tính năng được coi là xong khi: code đã review và merge vào \texttt{main}; các test hiện có đều pass; có test tích hợp cho tính năng mới; đã kiểm thử UI (luồng chính + biên); và đã triển khai, xác minh trên môi trường thật.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Kiểm thử, CI/CD \& Chất lượng}
+
+\begin{qa}{38. Chiến lược kiểm thử của nhóm? \tagSP}
+\A Nhiều tầng: \textbf{unit/component} bằng Vitest + React Testing Library; \textbf{backend} bằng pytest + respx (mock Supabase/Gemini); \textbf{E2E} bằng Playwright (auth, home, protected pages, mobile, forum, edge-cases); và kiểm tra tĩnh (TypeScript strict, ESLint, type hints).
+\end{qa}
+
+\begin{qa}{39. CI/CD được cấu hình ra sao? \tagSP}
+\A GitHub Actions chạy \textbf{5 job song song}: typecheck, lint, production build, Playwright E2E, và backend pytest. Mọi pull request phải được review và CI phải xanh trước khi merge vào \texttt{main}; push \texttt{main} thì tự động deploy.
+\end{qa}
+
+\begin{qa}{40. Làm sao test được phần AI vốn không định trước kết quả? \tagSP}
+\A Với AI, nhóm mock lớp HTTP (respx) để test \textit{luồng} pipeline mà không gọi thật; đo chất lượng mô hình bằng tập test tĩnh (mAP, CER); và dùng human-in-the-loop cho chất lượng dịch. Tức tách phần ``logic phần mềm'' (test tự động được) khỏi phần ``chất lượng mô hình'' (đo bằng metric + con người).
+\end{qa}
+
+\begin{qa}{41. Test edge-case gồm những gì? \tagSP}
+\A Bộ \texttt{edge-cases} kiểm: backend sập, bị rate-limit, phiên hết hạn, JSON hỏng, share link hết hạn (410), và trang 404 --- đảm bảo UI xử lý lỗi mượt thay vì vỡ.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Bảo mật}
+
+\begin{qa}{42. Nêu các lớp bảo mật của hệ thống. \tagSP}
+\A (1) Xác thực cookie HttpOnly; (2) phân quyền RBAC (user/admin) + RLS; (3) rate-limit theo endpoint (SlowAPI); (4) captcha Turnstile ở đăng ký/quên mật khẩu; (5) security headers + CSP chặt trên mọi response; (6) kiểm tra ảnh upload; (7) chống SSRF ở đường nhập từ nguồn ngoài.
+\end{qa}
+
+\begin{qa}{43. Chống upload file độc hại thế nào? \tagSP}
+\A Dịch vụ \texttt{image\_validation} \textbf{giải mã lại bytes bằng Pillow \texttt{verify()}} để bác các payload giả mạo MIME (ví dụ file script đổi đuôi \texttt{.jpg}). Chỉ JPEG/PNG/WebP thật mới qua, kèm giới hạn kích thước.
+\end{qa}
+
+\begin{qa}{44. SSRF là gì và nhóm chặn ra sao? \tagSP}
+\A SSRF là khi kẻ tấn công lợi dụng chức năng ``nhập từ URL'' để ép server truy cập tài nguyên nội bộ. Ở đường import (scrape), \texttt{scraper} chỉ nhận URL thuộc \textbf{danh sách domain cho phép} (các site Madara/WordPress đã biết), nên không thể trỏ tới địa chỉ nội bộ tuỳ ý.
+\end{qa}
+
+\begin{qa}{45. Dữ liệu người dùng được bảo vệ theo quyền riêng tư thế nào? \tagSP}
+\A RLS trên các bảng dữ liệu người dùng; hỗ trợ \textbf{GDPR}: người dùng tự export hoặc xoá tài khoản; đổi email/mật khẩu tự phục vụ; token luôn trong cookie HttpOnly. Buckets ảnh gốc/thumbnail để \textit{private}, chỉ avatar public.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Triển khai \& Vận hành}
+
+\begin{qa}{46. Hệ thống được triển khai ở đâu? \tagSP}
+\A Bốn nền tảng: Frontend trên \textbf{Vercel} (CDN toàn cầu); Backend trên \textbf{Render} (Docker, Singapore); AI Module trên \textbf{HuggingFace Spaces}; dữ liệu trên \textbf{Supabase} (AWS). Tất cả tự động deploy khi push \texttt{main}.
+\end{qa}
+
+\begin{qa}{47. Cold start là gì? Nhóm xử lý ra sao? \tagSP}
+\A Tier miễn phí của Render và HF ``ngủ'' khi rảnh, lần gọi đầu phải khởi động lại (chậm 15--60s). Nhóm giảm bằng \textbf{keep-alive ping} (GitHub Actions) và \textbf{retry có backoff} phía frontend (8s, 15s). Đây là đánh đổi để chạy miễn phí.
+\end{qa}
+
+\begin{qa}{48. Tiến trình xử lý cập nhật realtime bằng cách nào? \tagSP}
+\A Qua \textbf{WebSocket} (\texttt{/v1/ws/batch/...}), có \textit{fallback polling} khi WebSocket lỗi, và một \textbf{event bus} phát lại sự kiện đã lỡ khi client kết nối lại. Nhờ vậy thanh tiến trình ``x/N trang'' không bị mất cập nhật.
+\end{qa}
+
+\begin{qa}{49. Giám sát và sao lưu ra sao? \tagSP}
+\A Giám sát bằng \textbf{Sentry + OpenTelemetry}, health check \texttt{/health} và \texttt{/health/deep} (báo trạng thái Supabase, Gemini, AI Module). Sao lưu: Supabase PITR (WAL liên tục, giữ 7 ngày), \texttt{pg\_dump} thủ công trước mỗi migration, và versioning cho storage.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Khác biệt giữa tài liệu PA và sản phẩm hiện tại}
+
+\begin{tcolorbox}[colback=crimson!5,colframe=crimson,sharp corners,boxrule=0.6pt]
+\small\textbf{Tinh thần trả lời:} RUP là quy trình \textit{lặp}. Tài liệu PA là bản đặc tả ban đầu; khi hiện thực qua các sprint, một số lựa chọn kỹ thuật được \textbf{cải tiến có chủ đích} dựa trên ràng buộc thực tế (chi phí, hạ tầng, chất lượng). Trả lời trung thực + nêu \textit{lý do} là điểm cộng, không phải điểm trừ.
+\end{tcolorbox}
+
+\begin{qa}{50. PA ghi dùng ChromaDB + hybrid search (BM25 + semantic), nhưng sản phẩm dùng pgvector cosine. Vì sao đổi? \tagBoth}
+\A Khi hiện thực, nhóm đã có sẵn PostgreSQL trên Supabase, nên bật pgvector là có tìm kiếm vector \textbf{mà không phải vận hành thêm ChromaDB}. Với quy mô hiện tại, cosine trên pgvector đủ tốt và đơn giản hơn; bớt một dịch vụ giúp giảm chi phí và điểm hỏng. Hybrid BM25 có thể bổ sung sau nếu cần recall cao hơn.
+\end{qa}
+
+\begin{qa}{51. PA nói dùng all-MiniLM-L6-v2 (384 chiều), nhưng code dùng gemini-embedding-001 (768 chiều). Vì sao? \tagBoth}
+\A Vì phần dịch và Q\&A đã dùng hệ sinh thái Gemini, nên nhóm thống nhất luôn embedding bằng \texttt{gemini-embedding-001} để chất lượng vector đồng bộ với mô hình sinh câu trả lời, và bớt một phụ thuộc nặng (sentence-transformers/torch) ở backend. Migration v7 tạo lại cột \texttt{vector(768)} cho khớp.
+\end{qa}
+
+\begin{qa}{52. PA mô tả người dùng ẩn danh theo session\_id và lưu 30 ngày, nhưng sản phẩm có tài khoản đầy đủ. Vì sao? \tagBoth}
+\A Khi mở rộng phạm vi (lịch sử, thư viện công khai, credit, cộng đồng), nhóm cần định danh bền vững \arr\ chuyển sang \textbf{Supabase Auth} với cookie HttpOnly, kèm quên/đặt lại mật khẩu, Google OAuth và GDPR. Ý tưởng ẩn danh ban đầu vẫn còn ở phần đọc thư viện công khai (không cần đăng nhập).
+\end{qa}
+
+\begin{qa}{53. PA từng ghi ``Cloud-OCR'', nhưng sản phẩm dùng manga-ocr fine-tune. Vì sao? \tagBoth}
+\A manga-ocr chuyên cho chữ trong manga tiếng Nhật; sau khi fine-tune trên Manga109-s đạt CER 6,1\% --- tốt và \textbf{không phụ thuộc chi phí/giới hạn của Cloud Vision}. Vì thế nhóm chọn manga-ocr cho bản chạy thật.
+\end{qa}
+
+\begin{qa}{54. PA nói fallback dịch bằng Google Translate/NLLB-200, còn hiện tại là M2M100/NLLB. Có mâu thuẫn không? \tagBoth}
+\A Ý tưởng bất biến là \textit{có bản dịch dự phòng khi LLM lỗi/timeout}; nhóm chọn mô hình dịch mã nguồn mở (M2M100/NLLB) để chủ động và không phụ thuộc API trả phí. Đây là tinh chỉnh lựa chọn kỹ thuật, không đổi mục tiêu.
+\end{qa}
+
+\begin{qa}{55. Phạm vi sản phẩm hiện tại rộng hơn nhiều so với 5 use case trong PA. Vì sao? \tagBoth}
+\A Đúng theo tinh thần RUP lặp: 5 use case là lõi ban đầu; qua các sprint Construction, nhóm bổ sung series/chương, credit \& Stripe, thư viện, diễn đàn, thông báo, chia sẻ, gamification và admin --- để sản phẩm đủ ``production''. Các bổ sung này đều phục vụ cùng nhóm người dùng mục tiêu.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Hạn chế, Lỗi \& Hướng phát triển}
+
+\begin{qa}{56. Hạn chế lớn nhất của hệ thống hiện tại? \tagSP}
+\A Ba hạn chế chính: \textbf{cold start} do tier free; \textbf{quota Gemini} lúc cao điểm; và \textbf{OCR với chữ hiệu ứng/viết tay (SFX)} độ chính xác giảm. Ngoài ra bố cục chữ Việt dài đôi khi phải thu nhỏ/cắt, và thứ tự đọc phải-sang-trái ở vài bố cục phức tạp chưa tối ưu.
+\end{qa}
+
+\begin{qa}{57. Lỗi đã biết (known defects) là gì? \tagSP}
+\A Token phiên hết hạn giữa chừng đôi khi cần tải lại trang (đang làm auto-refresh); WebSocket có thể mất gói khi mạng chập chờn (đã có fallback polling); signed URL ảnh có thể hết hạn với phiên đọc rất dài (đã thêm retry); và nền động có thể tụt FPS trên mobile cũ (tắt được trong cài đặt).
+\end{qa}
+
+\begin{qa}{58. Hướng phát triển tiếp theo? \tagSP}
+\A Fine-tune thêm cho SFX/chữ viết tay và thêm cặp ngôn ngữ; cải thiện thứ tự đọc phải-sang-trái; nâng tier để giảm cold start + hàng đợi tác vụ chuyên dụng; cá nhân hoá gợi ý; bổ sung quy trình bản quyền/DMCA; và đóng gói ứng dụng di động.
+\end{qa}
+
+\begin{qa}{59. Nếu scale lên hàng chục nghìn người dùng thì kiến trúc chịu được không? \tagSP}
+\A Frontend đã ở CDN nên co giãn tốt. Backend đóng gói Docker có thể chạy nhiều instance; nút thắt là AI Module (GPU/CPU nặng) --- cần chuyển sang tier trả phí, thêm hàng đợi (queue) và nhiều worker. Database Supabase có thể nâng gói và thêm index (ivfflat) cho pgvector. Tức kiến trúc đã tách đúng chỗ để scale từng phần.
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
+\section{Câu hỏi phản biện \& đóng góp cá nhân}
+
+\begin{qa}{60. Vấn đề bản quyền manga thì sao? \tagSP}
+\A StoryLens là \textbf{công cụ hỗ trợ đọc/dịch}, không phải nơi phát tán trái phép; có điều khoản sử dụng và công cụ kiểm duyệt trong admin. Người dùng chịu trách nhiệm với nội dung tự upload. Hướng phát triển sẽ bổ sung quy trình gỡ nội dung theo DMCA --- đây là rủi ro đã ghi nhận trong SDP.
+\end{qa}
+
+\begin{qa}{61. Chi phí vận hành hiện tại bao nhiêu? \tagSP}
+\A Gần như \textbf{bằng 0} vì chạy trên tier miễn phí: Vercel Hobby, Render Free, HuggingFace Spaces free, Supabase Free, và Gemini free tier (xoay vòng key). Đánh đổi là cold start và giới hạn quota --- chấp nhận được cho phạm vi đồ án/MVP.
+\end{qa}
+
+\begin{qa}{62. Phần nào của dự án khó nhất? Nhóm học được gì? \tagSP}
+\A Khó nhất là \textbf{ghép pipeline AI nhiều bước chạy ổn định trên hạ tầng miễn phí hạn chế tài nguyên} --- phải xử lý bất đồng bộ, giới hạn luồng, huỷ tác vụ, cold start và quota. Nhóm học được cách thiết kế hệ thống chịu lỗi và cân bằng giữa chất lượng AI với ràng buộc chi phí thực tế.
+\end{qa}
+
+\begin{qa}{63. Vì sao không dùng một dịch vụ dịch manga có sẵn thay vì tự xây? \tagSP}
+\A Các dịch vụ có sẵn thường không mở API, không cho tuỳ biến ngữ cảnh tiếng Việt, và \textbf{không có RAG Q\&A}. Tự xây cho phép nhóm kiểm soát toàn bộ pipeline, tối ưu cho tiếng Việt, tích hợp cộng đồng/thư viện, và quan trọng là \textit{học trọn vòng đời một hệ thống AND}.
+\end{qa}
+
+\begin{qa}{64. Mỗi thành viên đóng góp cụ thể gì? \tagPA}
+\A \textit{(Mỗi bạn tự trả lời phần mình theo vai trò đã phân công.)} Gợi ý khung: nêu vai trò (PM/BA/Designer/Implementer/Tester), 2--3 hạng mục chính đã làm (ví dụ: hiện thực pipeline AI, dựng RAG, viết test E2E, thiết kế UI reader\ldots), và một khó khăn đã vượt qua. Trả lời cụ thể, có dẫn chứng phần code/tài liệu mình phụ trách.
+\end{qa}
+
+\vspace{1em}
+\begin{center}\color{soft}\small --- Hết --- \\ Chúc nhóm bảo vệ tốt!\end{center}
+
+\end{document}

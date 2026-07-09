@@ -1,5 +1,5 @@
 /*
- * StoryLens — Slide thuyết trình cuối kỳ (PA3)
+ * StoryLens — Slide thuyết trình cuối kỳ (PA5)
  * CSC10011 · Công nghệ phần mềm cho hệ thống Trí tuệ Nhân tạo · HCMUS
  *
  * Sinh file: StoryLens_Presentation.pptx
@@ -32,6 +32,7 @@ const HAIR  = "D8D0C4"; // đường kẻ mảnh
 const rect = pres.shapes.RECTANGLE;
 const line = pres.shapes.LINE;
 const tri  = pres.shapes.TRIANGLE;
+const oval = pres.shapes.OVAL;
 
 const W = 13.3, H = 7.5, M = 0.62;         // khổ + lề
 const CW = W - 2 * M;                        // vùng nội dung
@@ -60,13 +61,17 @@ function badge(s, x, y, sz, label, o = {}) {
   s.addShape(rect, { x, y, w: sz, h: sz, fill: { color: o.fill || INK } });
   s.addText(String(label), { x, y, w: sz, h: sz, align: "center", valign: "middle", color: o.color || PAPER, bold: true, fontFace: HEAD, fontSize: o.fs ?? 15, margin: 0 });
 }
-// Chân trang (dark = true khi nền tối)
-function footer(s, n, dark = false) {
+// Chân trang — tự đánh số theo thứ tự slide (dark = true khi nền tối).
+// Chấp nhận cả footer(s, n) cũ (bỏ qua n) lẫn footer(s, true) cho nền tối.
+let SLIDE_NO = 0;
+const TOTAL = 28;
+function footer(s, a1, a2) {
+  const dark = a1 === true || a2 === true;
   const nameCol = dark ? PAPER : INK;
   const sc = dark ? "9A9188" : SLATE;
   s.addText([{ text: "StoryLens", options: { bold: true, color: nameCol } }, { text: "   ·   Nhóm 1 · CSC10011", options: { color: sc } }],
     { x: M, y: 7.06, w: 8, h: 0.3, fontFace: BODY, fontSize: 9, margin: 0, valign: "middle" });
-  s.addText(String(n).padStart(2, "0") + " / 26", { x: W - M - 1.4, y: 7.06, w: 1.4, h: 0.3, align: "right", color: sc, fontFace: BODY, fontSize: 9, margin: 0, valign: "middle" });
+  s.addText(String(s._pageNo || 0).padStart(2, "0") + " / " + TOTAL, { x: W - M - 1.4, y: 7.06, w: 1.4, h: 0.3, align: "right", color: sc, fontFace: BODY, fontSize: 9, margin: 0, valign: "middle" });
 }
 // Mũi tên nối (ngang / dọc)
 function arrow(s, x, y, w, h, o = {}) {
@@ -76,11 +81,13 @@ function arrow(s, x, y, w, h, o = {}) {
 function darkSlide() {
   const s = pres.addSlide();
   s.background = { color: INK };
+  s._pageNo = ++SLIDE_NO;
   return s;
 }
 function lightSlide() {
   const s = pres.addSlide();
   s.background = { color: PAPER };
+  s._pageNo = ++SLIDE_NO;
   return s;
 }
 // Khung ảnh placeholder (viền nét đứt = chèn ảnh chụp)
@@ -92,19 +99,26 @@ function shot(s, x, y, w, h, route, caption) {
   s.addText(route, { x, y: y + h / 2 + 0.24, w, h: 0.3, align: "center", color: RED, bold: true, fontFace: BODY, fontSize: 12, margin: 0 });
   if (caption) s.addText(caption, { x, y: y + h + 0.05, w, h: 0.34, align: "center", color: SLATE, italic: true, fontFace: BODY, fontSize: 11, margin: 0, valign: "top" });
 }
+// Chip logo trường (nền trắng + bóng cứng đỏ) — để logo xanh nổi trên nền tối
+const LOGO = "assets/hcmus_logo.png";
+function logoChip(s, x, y, sz) {
+  s.addShape(rect, { x: x + 0.09, y: y + 0.09, w: sz, h: sz, fill: { color: RED } });
+  s.addShape(rect, { x, y, w: sz, h: sz, fill: { color: PAPER } });
+  const lw = sz - 0.32, lh = lw * (411 / 500);
+  s.addImage({ path: LOGO, x: x + 0.16, y: y + (sz - lh) / 2, w: lw, h: lh });
+}
 
 /* ============================================================
  * SLIDE 1 — TITLE
  * ============================================================ */
 (() => {
   const s = darkSlide();
-  // dấu trang trí góc (khối đỏ + vàng)
+  // thanh dọc đỏ + logo trường HCMUS (chip trắng góc phải)
   s.addShape(rect, { x: 0, y: 0, w: 0.28, h: H, fill: { color: RED } });
-  s.addShape(rect, { x: W - 1.9, y: -1.4, w: 3.2, h: 3.2, fill: { color: INK2 }, rotate: 0 });
-  s.addShape(rect, { x: W - 1.55, y: 0.55, w: 0.9, h: 0.9, fill: { color: RED } });
-  s.addShape(rect, { x: W - 1.9, y: 0.9, w: 0.9, h: 0.9, fill: { color: GOLD } });
+  s.addShape(rect, { x: W - 2.35, y: 0.62, w: 0.42, h: 0.42, fill: { color: GOLD } });
+  logoChip(s, W - 2.02, 0.62, 1.5);
 
-  kicker(s, 1.1, 1.05, "Báo cáo đồ án cuối kỳ · PA3", GOLD);
+  kicker(s, 1.1, 1.05, "Báo cáo đồ án cuối kỳ · PA5", GOLD);
   s.addText("StoryLens", { x: 1.02, y: 1.45, w: 10, h: 1.5, color: PAPER, bold: true, fontFace: HEAD, fontSize: 82, margin: 0, valign: "middle" });
   s.addShape(rect, { x: 1.12, y: 3.06, w: 8.4, h: 0.02, fill: { color: RED } });
   s.addText("Nền tảng AI dịch & hỏi–đáp Manga theo ngữ cảnh", { x: 1.1, y: 3.2, w: 10.8, h: 0.6, color: PAPER, fontFace: HEAD, fontSize: 21, margin: 0, valign: "middle" });
@@ -117,7 +131,7 @@ function shot(s, x, y, w, h, route, caption) {
     ["MÔN HỌC", "CSC10011 — CNPM cho hệ thống AI"],
     ["GVHD", "GS.TS Nguyễn Văn Vũ"],
     ["NHÓM", "Nhóm 1 — StoryLens"],
-    ["HỌC KỲ", "Xuân 2026 · HCMUS"],
+    ["NGÀY BÁO CÁO", "10/07/2026 · HCMUS"],
   ];
   const cwd = (11.0) / 4;
   cells.forEach((c, i) => {
@@ -125,9 +139,9 @@ function shot(s, x, y, w, h, route, caption) {
     s.addText(c[0], { x, y: infoY, w: cwd - 0.2, h: 0.26, color: GOLD, bold: true, fontFace: HEAD, fontSize: 9.5, charSpacing: 2, margin: 0 });
     s.addText(c[1], { x, y: infoY + 0.26, w: cwd - 0.2, h: 0.6, color: PAPER, fontFace: BODY, fontSize: 12.5, margin: 0, valign: "top" });
   });
-  s.addText("Thành viên nhóm: ‹điền MSSV – Họ tên các thành viên›", { x: 1.1, y: 6.35, w: 11, h: 0.34, color: SLATE, italic: true, fontFace: BODY, fontSize: 11, margin: 0 });
+  s.addText("Thành viên: Đào Sỹ Duy Minh · Nguyễn Đình Hà Dương · Huỳnh Trung Kiệt · Phạm Phú Hòa · Trần Chí Nguyên · Nguyễn Lâm Phú Quý", { x: 1.1, y: 6.35, w: 11.2, h: 0.34, color: SLATE, italic: true, fontFace: BODY, fontSize: 10.5, margin: 0 });
   s.addText("storylens-api.onrender.com  ·  Next.js 16 · FastAPI · HuggingFace Spaces · Supabase", { x: 1.1, y: 6.72, w: 11, h: 0.34, color: "8A8176", fontFace: BODY, fontSize: 10.5, margin: 0 });
-  s.addNotes("Slide mở đầu. Giới thiệu tên sản phẩm StoryLens, một câu định vị, môn học/GVHD/nhóm. Nhớ điền tên thành viên nhóm.");
+  s.addNotes("Slide mở đầu. Giới thiệu tên sản phẩm StoryLens, một câu định vị, môn học/GVHD/nhóm 1 (6 thành viên).");
 })();
 
 /* ============================================================
@@ -153,7 +167,7 @@ function shot(s, x, y, w, h, route, caption) {
     s.addText(it[2], { x: M + 6.0, y: y + 0.13, w: CW - 6.2, h: rh - 0.26, color: SLATE, fontFace: BODY, fontSize: 12.5, margin: 0, valign: "middle" });
   });
   footer(s, 2);
-  s.addNotes("Trình bày 5 phần lớn. Phần III và IV là trọng tâm kỹ thuật; phần demo nằm trong IV.");
+  s.addNotes("Trình bày 5 phần lớn trong ~15 phút (gồm demo), sau đó 10 phút Q&A. Phần III và IV là trọng tâm kỹ thuật; phần demo nằm trong IV. Mỗi thành viên trình bày ít nhất một phần (≥ 3 phút/người).");
 })();
 
 /* ============================================================
@@ -335,6 +349,84 @@ function shot(s, x, y, w, h, route, caption) {
 })();
 
 /* ============================================================
+ * SLIDE 7B — USE CASE DIAGRAM (sơ đồ use case)
+ * ============================================================ */
+(() => {
+  const s = lightSlide();
+  kicker(s, M, 0.5, "II · Mô hình use case");
+  heading(s, "Sơ đồ use case tổng quát");
+
+  // Đoạn thẳng an toàn: luôn dùng w/h ≥ 0 + flipH/flipV (tránh XML âm PowerPoint báo lỗi)
+  const seg = (x1, y1, x2, y2, ln) => {
+    const x = Math.min(x1, x2), y = Math.min(y1, y2), w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
+    const flipV = (x2 - x1) * (y2 - y1) < 0;
+    s.addShape(line, { x, y, w, h, flipV, line: ln });
+  };
+  // Vẽ tác nhân dạng người que
+  function stick(cx, topY, label, c) {
+    const ln = { color: c, width: 2 };
+    s.addShape(oval, { x: cx - 0.14, y: topY, w: 0.28, h: 0.28, line: { color: c, width: 2 }, fill: { color: PAPER } });
+    seg(cx, topY + 0.28, cx, topY + 0.8, ln);          // thân
+    seg(cx - 0.3, topY + 0.44, cx + 0.3, topY + 0.44, ln); // tay
+    seg(cx, topY + 0.8, cx - 0.24, topY + 1.16, ln);   // chân trái
+    seg(cx, topY + 0.8, cx + 0.24, topY + 1.16, ln);   // chân phải
+    s.addText(label, { x: cx - 1.1, y: topY + 1.2, w: 2.2, h: 0.55, align: "center", color: INK, bold: true, fontFace: HEAD, fontSize: 11.5, margin: 0, valign: "top", lineSpacingMultiple: 0.9 });
+  }
+  const assoc = (x1, y1, x2, y2, o = {}) => seg(x1, y1, x2, y2, { color: o.color || "B8AFA2", width: o.width || 1.25, dashType: o.dash || "solid" });
+
+  // Ranh giới hệ thống
+  const bx = 3.1, by = 1.98, bw = 6.5, bh = 4.62;
+  panel(s, bx, by, bw, bh, { fill: PAPER });
+  s.addText("Hệ thống  StoryLens", { x: bx, y: by + 0.1, w: bw, h: 0.32, align: "center", color: SLATE, bold: true, fontFace: HEAD, fontSize: 11, charSpacing: 1.5, margin: 0 });
+
+  const OW = 2.82, OH = 0.82;
+  const ucs = [
+    { id: "UC02", t: "Đọc overlay",        c: INK,   cx: 4.95, cy: 2.95 },
+    { id: "UC03", t: "Batch cả chương",    c: BLUE,  cx: 4.95, cy: 4.30 },
+    { id: "UC05", t: "Xuất bản & chia sẻ", c: GOLD,  cx: 4.95, cy: 5.65 },
+    { id: "UC01", t: "Upload & Dịch trang",c: RED,   cx: 7.75, cy: 2.95 },
+    { id: "UC04", t: "Hỏi–đáp RAG",        c: GREEN, cx: 7.75, cy: 4.30 },
+    { id: "UC06", t: "Quản trị hệ thống",  c: INK2,  cx: 7.75, cy: 5.65 },
+  ];
+  const byId = Object.fromEntries(ucs.map(u => [u.id, u]));
+  const L = u => [u.cx - OW / 2, u.cy];      // mép trái
+  const R = u => [u.cx + OW / 2, u.cy];      // mép phải
+
+  // Liên kết (vẽ trước, oval đè lên)
+  const reader = [1.72, 3.98];
+  ["UC02", "UC03", "UC05", "UC01", "UC04"].forEach(id => assoc(reader[0], reader[1], ...L(byId[id])));
+  const admin = [10.72, 5.5];
+  assoc(admin[0], admin[1], ...R(byId["UC06"]));
+  // tác nhân phụ AI (nét đứt)
+  assoc(9.9, 3.05, ...R(byId["UC01"]), { dash: "dash", color: "9A7B3A" });
+  assoc(9.9, 3.45, ...R(byId["UC04"]), { dash: "dash", color: "9A7B3A" });
+
+  // Oval use case
+  ucs.forEach(u => {
+    s.addShape(oval, { x: u.cx - OW / 2, y: u.cy - OH / 2, w: OW, h: OH, fill: { color: PAPER }, line: { color: u.c, width: 2 } });
+    s.addText([{ text: u.id + "  ", options: { color: u.c, bold: true, fontFace: HEAD, fontSize: 11 } }, { text: u.t, options: { color: INK, fontFace: BODY, fontSize: 11 } }],
+      { x: u.cx - OW / 2 + 0.1, y: u.cy - OH / 2, w: OW - 0.2, h: OH, align: "center", valign: "middle", margin: 0, lineSpacingMultiple: 0.9 });
+  });
+
+  // Tác nhân
+  stick(1.5, 3.35, "Người đọc\n(User)", INK);
+  stick(10.9, 4.7, "Quản trị viên\n(Admin)", REDDK);
+  // hệ phụ AI (hộp)
+  s.addShape(rect, { x: 9.78, y: 2.72, w: 2.0, h: 0.98, fill: { color: CREAM }, line: { color: INK, width: 1.5 } });
+  s.addText([{ text: "«hệ phụ»\n", options: { color: SLATE, italic: true, fontFace: BODY, fontSize: 9 } }, { text: "AI Module + Gemini", options: { color: INK, bold: true, fontFace: HEAD, fontSize: 10.5 } }],
+    { x: 9.78, y: 2.72, w: 2.0, h: 0.98, align: "center", valign: "middle", margin: 0, lineSpacingMultiple: 0.9 });
+
+  s.addText([
+    { text: "Tác nhân chính: ", options: { bold: true, color: RED, fontFace: HEAD, fontSize: 11 } },
+    { text: "Người đọc, Quản trị viên.   ", options: { color: INK, fontFace: BODY, fontSize: 11 } },
+    { text: "Tác nhân phụ: ", options: { bold: true, color: "9A7B3A", fontFace: HEAD, fontSize: 11 } },
+    { text: "AI Module + Gemini (hỗ trợ UC01 dịch & UC04 Q&A).", options: { color: INK, fontFace: BODY, fontSize: 11 } },
+  ], { x: M, y: 6.72, w: CW, h: 0.32, align: "center", margin: 0, valign: "middle" });
+  footer(s, 8);
+  s.addNotes("Sơ đồ use case: Người đọc dùng UC01–UC05; Quản trị viên dùng UC06; AI Module + Gemini là tác nhân phụ hỗ trợ dịch (UC01) và Q&A (UC04). Demo bao phủ UC01+UC02 (luồng A) và UC03 (luồng B).");
+})();
+
+/* ============================================================
  * SLIDE 8 — FUNCTIONAL REQUIREMENTS
  * ============================================================ */
 (() => {
@@ -501,7 +593,7 @@ function shot(s, x, y, w, h, route, caption) {
     if (i < n - 1) arrow(s, x + cw + 0.04, y + ch / 2, gap - 0.08, 0, { width: 2.25 });
   });
   // callouts
-  const outs = [["1 credit", "trừ mỗi câu trả lời thành công", RED], ["Có nguồn trích", "đính kèm đoạn text làm bằng chứng", INK], ["1536-dim", "vector embedding trong pgvector", BLUE]];
+  const outs = [["1 credit", "trừ mỗi câu trả lời thành công", RED], ["Có nguồn trích", "đính kèm đoạn text làm bằng chứng", INK], ["768-dim", "embedding gemini-001 · pgvector", BLUE]];
   const oy = 5.35, ow = (CW - 2 * 0.3) / 3;
   outs.forEach((o, i) => {
     const x = M + i * (ow + 0.3);
@@ -535,7 +627,7 @@ function shot(s, x, y, w, h, route, caption) {
   // phải: OCR + Gemini
   const cards = [
     ["manga-ocr (fine-tuned)", "OCR tiếng Nhật · test 14.130 mẫu", [["CER", "6.1%"], ["Char-Acc", "93.9%"], ["Exact", "67.5%"]], INK],
-    ["Gemini 2.5 Flash", "Dịch ngữ cảnh · human-in-the-loop", [["👍 hài lòng", "≥ 80%"], ["Model", "2.5 Flash"], ["Embedding", "1536-dim"]], GREEN],
+    ["Gemini 2.5 Flash", "Dịch ngữ cảnh · human-in-the-loop", [["👍 hài lòng", "≥ 80%"], ["Model", "2.5 Flash"], ["Embedding", "768-dim"]], GREEN],
   ];
   const rx = 7.5, rw = CW - (7.5 - M);
   cards.forEach((c, i) => {
@@ -674,7 +766,7 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
   s.addText("Sprint = 2 tuần · PR review trước khi merge · CI xanh mới nộp.", { x: M + 0.32, y: 6.0, w: 5.1, h: 0.6, color: "C9C0B4", italic: true, fontFace: BODY, fontSize: 11.5, margin: 0, valign: "top" });
 
   panel(s, 6.55, 3.72, CW - (6.55 - M), 3.0, { fill: PAPER });
-  s.addText("VAI TRÒ NHÓM (chính + backup)", { x: 6.8, y: 3.95, w: 5.6, h: 0.3, color: RED, bold: true, fontFace: HEAD, fontSize: 12, charSpacing: 1.5, margin: 0 });
+  s.addText("VAI TRÒ THEO RUP (mẫu)", { x: 6.8, y: 3.95, w: 5.6, h: 0.3, color: RED, bold: true, fontFace: HEAD, fontSize: 12, charSpacing: 1.5, margin: 0 });
   const roles = [["Team Lead / PM", "Kế hoạch, phân công, weekly report"], ["Business Analyst", "Thu thập & rà soát yêu cầu"], ["Designer", "Kiến trúc, UI, tài liệu SAD"], ["Implementer ×3", "Source code, unit test, review"], ["Tester", "Test plan, test case, system test"]];
   const ry = 4.35;
   roles.forEach((r, i) => {
@@ -684,7 +776,47 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
     s.addText(r[1], { x: 9.5, y: yy, w: CW - (9.5 - M) - 0.2, h: 0.38, color: SLATE, fontFace: BODY, fontSize: 11.5, margin: 0, valign: "middle" });
   });
   footer(s, 19);
-  s.addNotes("Quy trình theo RUP rút gọn + Scrum (LN03b). Năm vai trò, mỗi vai trò có backup; Implementer cần 3 người.");
+  s.addNotes("Quy trình theo RUP rút gọn + Scrum (LN03b). Bảng bên phải là mẫu vai trò theo RUP; phân công thực tế cho 6 thành viên ở slide kế tiếp.");
+})();
+
+/* ============================================================
+ * SLIDE 19B — TEAM ORGANIZATION & RESPONSIBILITIES
+ * ============================================================ */
+(() => {
+  const s = lightSlide();
+  kicker(s, M, 0.5, "IV · Tổ chức nhóm");
+  heading(s, "Cơ cấu nhóm & phân công công việc");
+  s.addText([
+    { text: "Nhóm 6 thành viên · mô hình phẳng (flat team) — ", options: { color: INK, bold: true, fontFace: HEAD, fontSize: 12 } },
+    { text: "không cấp bậc cứng nhắc; mọi quyết định kỹ thuật quan trọng được thảo luận tập thể.", options: { color: SLATE, fontFace: BODY, fontSize: 12 } },
+  ], { x: M, y: 1.78, w: CW, h: 0.36, margin: 0, valign: "middle" });
+
+  const members = [
+    ["23122041", "Đào Sỹ Duy Minh", "Project Manager & AI/ML Engineer", RED, "Quản lý tiến độ, điều phối nhóm · Fine-tune OCR cho manga tiếng Nhật · Prompt engineering cho dịch LLM"],
+    ["23122002", "Nguyễn Đình Hà Dương", "AI/ML Engineer (OCR)", RED, "Chuẩn bị & xử lý dataset manga · Hỗ trợ fine-tune OCR · Đánh giá accuracy, phân tích lỗi"],
+    ["23122039", "Huỳnh Trung Kiệt", "Backend Developer", INK, "FastAPI backend · Thiết kế cơ sở dữ liệu · Tích hợp pipeline OCR/dịch vào server"],
+    ["23122030", "Phạm Phú Hòa", "AI/ML Engineer (RAG)", GREEN, "Tích hợp LLM (Gemini) · Vector database (pgvector) · Pipeline hỏi–đáp RAG"],
+    ["23122044", "Trần Chí Nguyên", "Frontend Developer", BLUE, "Giao diện Next.js/React (UI-UX) · Upload & Reader · Màn hình hỏi–đáp Q&A"],
+    ["23122048", "Nguyễn Lâm Phú Quý", "QA & Business Analyst", GOLD, "Tài liệu (SDP, Vision, Use case) · Test case & test plan · UAT, kiểm thử end-to-end"],
+  ];
+  const colW = [1.2, 2.15, 2.55, CW - (1.2 + 2.15 + 2.55)];
+  const th = o => ({ fill: { color: INK }, color: PAPER, bold: true, fontFace: HEAD, fontSize: 11, valign: "middle", align: o || "left" });
+  const data = [[
+    { text: "MSSV", options: th() }, { text: "Họ và tên", options: th() },
+    { text: "Vai trò", options: th() }, { text: "Trách nhiệm chính", options: th() },
+  ]];
+  members.forEach((m, i) => {
+    const bg = i % 2 ? CREAM : PAPER;
+    data.push([
+      { text: m[0], options: { fill: { color: bg }, color: SLATE, fontFace: BODY, fontSize: 10, valign: "middle" } },
+      { text: m[1], options: { fill: { color: bg }, color: INK, bold: true, fontFace: HEAD, fontSize: 10.5, valign: "middle" } },
+      { text: m[2], options: { fill: { color: bg }, color: m[3], bold: true, fontFace: BODY, fontSize: 10, valign: "middle" } },
+      { text: m[4], options: { fill: { color: bg }, color: INK2, fontFace: BODY, fontSize: 9.5, valign: "middle" } },
+    ]);
+  });
+  s.addTable(data, { x: M, y: 2.3, w: CW, colW, rowH: [0.4, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72], border: { pt: 1, color: HAIR }, margin: [3, 5, 3, 5], valign: "middle" });
+  footer(s, 20);
+  s.addNotes("Cơ cấu nhóm phẳng, 6 thành viên. PA5 yêu cầu nêu rõ team structure + trách nhiệm từng người: mỗi bạn phụ trách một mảng (PM/AI-OCR, AI-OCR, Backend, AI-RAG, Frontend, QA/BA) và ai cũng trình bày một phần khi bảo vệ.");
 })();
 
 /* ============================================================
@@ -694,21 +826,23 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
   const s = lightSlide();
   kicker(s, M, 0.5, "IV · Kiểm thử & CI/CD");
   heading(s, "Chất lượng được kiểm thử & tự động hoá");
-  // trái: các loại test
+  // trái: các loại test (Katalon Studio là kiểm thử tự động bắt buộc của PA5)
   const tests = [
+    ["Katalon Studio", "Kiểm thử UI tự động: UC01 Upload–Dịch & UC02 Đọc overlay · ≥2 scenario/UC · Pass/Fail", true],
     ["Unit / Component", "Vitest + React Testing Library (frontend)"],
     ["Backend", "pytest + respx (mock Supabase/Gemini)"],
     ["E2E", "Playwright: auth, home, protected, mobile, forum, edge-cases"],
     ["Tĩnh", "tsc --noEmit · ESLint · Python type hints"],
   ];
+  const tCol = [RED, GOLD, INK, BLUE, GREEN];
   panel(s, M, 1.98, 6.5, 4.55, { fill: PAPER });
-  s.addText("Tầng kiểm thử", { x: M + 0.3, y: 2.14, w: 5.9, h: 0.4, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0 });
+  s.addText("Tầng kiểm thử", { x: M + 0.3, y: 2.12, w: 5.9, h: 0.36, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0 });
   tests.forEach((t, i) => {
-    const y = 2.7 + i * 0.92;
-    s.addShape(rect, { x: M + 0.3, y, w: 0.5, h: 0.5, fill: { color: [RED, INK, BLUE, GREEN][i] } });
-    s.addText(String(i + 1), { x: M + 0.3, y, w: 0.5, h: 0.5, align: "center", valign: "middle", color: PAPER, bold: true, fontFace: HEAD, fontSize: 15, margin: 0 });
-    s.addText(t[0], { x: M + 0.95, y: y - 0.04, w: 5.3, h: 0.36, color: INK, bold: true, fontFace: HEAD, fontSize: 14, margin: 0, valign: "middle" });
-    s.addText(t[1], { x: M + 0.95, y: y + 0.32, w: 5.3, h: 0.4, color: SLATE, fontFace: BODY, fontSize: 11.5, margin: 0, valign: "top" });
+    const y = 2.6 + i * 0.76;
+    s.addShape(rect, { x: M + 0.3, y, w: 0.46, h: 0.46, fill: { color: tCol[i] } });
+    s.addText(String(i + 1), { x: M + 0.3, y, w: 0.46, h: 0.46, align: "center", valign: "middle", color: PAPER, bold: true, fontFace: HEAD, fontSize: 14, margin: 0 });
+    s.addText([{ text: t[0], options: { color: INK, bold: true, fontFace: HEAD, fontSize: 13.5 } }, ...(t[2] ? [{ text: "  · PA5", options: { color: RED, bold: true, fontFace: HEAD, fontSize: 10 } }] : [])], { x: M + 0.92, y: y - 0.06, w: 5.4, h: 0.34, margin: 0, valign: "middle" });
+    s.addText(t[1], { x: M + 0.92, y: y + 0.28, w: 5.4, h: 0.44, color: SLATE, fontFace: BODY, fontSize: 11, margin: 0, valign: "top" });
   });
   // phải: CI pipeline
   panel(s, 7.45, 1.98, CW - (7.45 - M), 4.55, { fill: INK, shadow: RED });
@@ -723,7 +857,7 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
   });
   s.addText("Mọi PR phải review + CI xanh trước khi merge vào main.", { x: 7.7, y: 6.15, w: 5, h: 0.3, color: "C9C0B4", italic: true, fontFace: BODY, fontSize: 11, margin: 0 });
   footer(s, 20);
-  s.addNotes("Kiểm thử đa tầng + CI 5 job song song. Định nghĩa 'done' gồm review, test pass, deploy & verify trên production.");
+  s.addNotes("Kiểm thử đa tầng + CI 5 job song song. Katalon Studio là công cụ kiểm thử tự động bắt buộc của PA5: tối thiểu 2 use case (UC01, UC02), mỗi use case ≥ 2 scenario, báo cáo Pass/Fail kèm test script. Định nghĩa 'done' gồm review, test pass, deploy & verify trên production.");
 })();
 
 /* ============================================================
@@ -893,6 +1027,7 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
   const s = darkSlide();
   s.addShape(rect, { x: W - 1.9, y: H - 1.9, w: 0.9, h: 0.9, fill: { color: GOLD } });
   s.addShape(rect, { x: W - 1.55, y: H - 1.55, w: 0.9, h: 0.9, fill: { color: RED } });
+  logoChip(s, W - 2.02, 0.6, 1.5);
   kicker(s, 1.1, 1.6, "Cảm ơn Thầy & các bạn đã lắng nghe", GOLD);
   s.addText("Câu hỏi & Thảo luận", { x: 1.02, y: 2.0, w: 11, h: 1.3, color: PAPER, bold: true, fontFace: HEAD, fontSize: 54, margin: 0, valign: "middle" });
   s.addShape(rect, { x: 1.12, y: 3.35, w: 6.0, h: 0.02, fill: { color: RED } });
