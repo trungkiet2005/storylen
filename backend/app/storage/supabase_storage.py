@@ -223,6 +223,59 @@ def translated_image_public_url(page_id: str) -> str:
     )
 
 
+def upload_narration_audio(
+    audio_bytes: bytes,
+    page_id: str,
+    *,
+    ext: str = "mp3",
+    mime: str = "audio/mpeg",
+    variant: str = "narration",
+) -> str | None:
+    """
+    Upload rendered narration audio for a page to the audio bucket.
+    Returns a signed URL the browser can stream, or None on failure.
+
+    ``variant`` lets callers keep multiple renders per page distinct (e.g. one
+    per engine/voice) without clobbering — e.g. "narration-edge".
+    """
+    bucket = settings.NARRATION_BUCKET
+    storage_path = f"{page_id}/{variant}.{ext}"
+    try:
+        supabase = get_supabase()
+        supabase.storage.from_(bucket).upload(
+            path=storage_path,
+            file=audio_bytes,
+            file_options={"content-type": mime, "upsert": "true"},
+        )
+        logger.info("Uploaded narration audio to %s/%s", bucket, storage_path)
+    except Exception as exc:
+        logger.warning("Narration audio upload failed for page %s: %s", page_id, exc)
+        return None
+
+    # Bucket is private → hand back a time-limited signed URL for the <audio> tag.
+    signed = _get_signed_url(bucket, storage_path)
+    if signed:
+        return signed
+    return _get_public_url(bucket, storage_path)
+
+
+def upload_recap_video(video_bytes: bytes, chapter_id: str) -> str | None:
+    """Upload a rendered chapter recap .mp4. Returns a signed URL or None."""
+    bucket = settings.NARRATION_BUCKET
+    storage_path = f"chapters/{chapter_id}/recap.mp4"
+    try:
+        get_supabase().storage.from_(bucket).upload(
+            path=storage_path,
+            file=video_bytes,
+            file_options={"content-type": "video/mp4", "upsert": "true"},
+        )
+        logger.info("Uploaded recap video to %s/%s", bucket, storage_path)
+    except Exception as exc:
+        logger.warning("Recap video upload failed for chapter %s: %s", chapter_id, exc)
+        return None
+    return _get_signed_url(bucket, storage_path) or _get_public_url(bucket, storage_path)
+
+
 def _make_avatar(image_bytes: bytes, size: int = 512) -> tuple[bytes, str]:
     """Normalize an avatar image: square-cropped, max `size`px, WebP."""
     img = Image.open(io.BytesIO(image_bytes))

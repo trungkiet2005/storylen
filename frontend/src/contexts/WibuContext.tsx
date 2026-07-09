@@ -239,7 +239,7 @@ export function WibuProvider({ children }: { children: ReactNode }) {
 
   const todayPages = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
-    return stats.dailyHistory[today] ?? 0;
+    return stats.dailyHistory?.[today] ?? 0;
   }, [stats]);
 
   const weekPages = useMemo(() => {
@@ -250,7 +250,7 @@ export function WibuProvider({ children }: { children: ReactNode }) {
     for (let i = 0; i < 7; i++) {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
-      total += stats.dailyHistory[d.toISOString().slice(0, 10)] ?? 0;
+      total += stats.dailyHistory?.[d.toISOString().slice(0, 10)] ?? 0;
     }
     return total;
   }, [stats]);
