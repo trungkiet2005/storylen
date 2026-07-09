@@ -952,12 +952,23 @@ function ReaderContent() {
   useEffect(() => {
     const update = () => {
       const vw = window.innerWidth;
-      setCanvasW(vw < 480 ? vw - 16 : vw < 768 ? vw - 32 : 520);
+      const vh = window.innerHeight;
+      const defaultW = vw < 480 ? vw - 16 : vw < 768 ? vw - 32 : 520;
+      if (fullscreen) {
+        // Fill the screen: grow by available height (toolbar + padding) using the
+        // page's own aspect ratio once known, but never shrink below the default
+        // reading width, capped to the viewport width.
+        const availH = vh - 180;
+        const byHeight = imgNaturalSize ? Math.floor(availH * (imgNaturalSize.w / imgNaturalSize.h)) : defaultW;
+        setCanvasW(Math.max(defaultW, Math.min(byHeight, vw - 64)));
+        return;
+      }
+      setCanvasW(defaultW);
     };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, []);
+  }, [fullscreen, imgNaturalSize]);
   const CANVAS_W = canvasW;
   const computedHeight = imgNaturalSize ? CANVAS_W * (imgNaturalSize.h / imgNaturalSize.w) : 740;
 
