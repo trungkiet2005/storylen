@@ -989,6 +989,8 @@ export interface TTSEngineInfo {
 export interface VoicesResponse {
   default_engine: string;
   engines: TTSEngineInfo[];
+  credit_cost_per_page: number;
+  max_chapter_pages: number;
 }
 
 export interface NarrationResponse {
@@ -1059,6 +1061,24 @@ export async function getChapterNarrationStatus(
   jobId: string,
 ): Promise<ChapterNarrationStatus> {
   return request<ChapterNarrationStatus>(`/narrate/chapter/status/${jobId}`);
+}
+
+export interface RecapVideoResponse {
+  chapter_id: string;
+  video_url: string;
+}
+
+/** Render a narrated recap video (.mp4) for a whole chapter. Synchronous —
+ * may take a while for long chapters; the caller should show a spinner. */
+export async function getChapterRecapVideo(
+  chapterId: string,
+  options: NarrateOptions = {},
+): Promise<RecapVideoResponse> {
+  return request<RecapVideoResponse>(`/narrate/recap/${chapterId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
 }
 
 // ─── History ─────────────────────────────────────────────────────────────────
