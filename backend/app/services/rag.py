@@ -613,8 +613,13 @@ Tóm tắt:"""
 _RECAP_CONTEXT_MAX_CHARS = 8000
 
 
-def _chapter_translation_context(supabase, chapter_id: str) -> str:
-    """Ordered translated text for every page of a chapter (position order)."""
+def _chapter_translation_context(supabase, chapter_id: str) -> str | None:
+    """Ordered translated text for every page of a chapter (position order).
+
+    Returns None specifically when a DB fetch fails (transient — caller must
+    NOT cache), and "" only when the fetch succeeded cleanly but there is
+    genuinely no content (no pages, or no translated bubbles).
+    """
     try:
         pages_res = (
             supabase.table("manga_pages")
@@ -625,7 +630,7 @@ def _chapter_translation_context(supabase, chapter_id: str) -> str:
         )
     except Exception as exc:
         logger.error("Recap: failed to list pages for chapter %s: %s", chapter_id, exc)
-        return ""
+        return None
 
     page_ids = [p["page_id"] for p in (pages_res.data or []) if isinstance(p, dict) and p.get("page_id")]
     if not page_ids:
@@ -640,7 +645,7 @@ def _chapter_translation_context(supabase, chapter_id: str) -> str:
         )
     except Exception as exc:
         logger.error("Recap: failed to load bubbles for chapter %s: %s", chapter_id, exc)
-        return ""
+        return None
 
     page_order = {pid: i for i, pid in enumerate(page_ids)}
     rows = [r for r in (bubbles_res.data or []) if isinstance(r, dict)]
@@ -680,19 +685,30 @@ def _generate_recap_text(context: str) -> str | None:
     if not _pool.available:
         logger.warning("Recap generation skipped: Gemini pool unavailable.")
         return None
-    client = _pool.next_client()
-    if client is None:
-        return None
-    try:
-        response = client.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=_RECAP_PROMPT.format(context=context),
-        )
-        text = (response.text or "").strip()
-        return text or None
-    except Exception as exc:
-        logger.warning("Recap generation failed: %s", exc)
-        return None
+
+    last_error: Exception | None = None
+
+    for _ in range(_pool.client_count()):
+        client = _pool.next_client()
+        if client is None:
+            break
+        try:
+            response = client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=_RECAP_PROMPT.format(context=context),
+            )
+            text = (response.text or "").strip()
+            return text or None
+        except Exception as exc:
+            last_error = exc
+            if _is_retryable_gemini_key_error(exc):
+                logger.warning("Recap generation: Gemini key failed, rotating to next key. Error: %s", exc)
+                continue
+            logger.warning("Recap generation failed: %s", exc)
+            break
+
+    logger.error("Recap generation failed for all attempted keys: %s", last_error)
+    return None
 
 
 def _cache_recap(supabase, chapter_id: str, recap_vi: str) -> None:
@@ -732,6 +748,8 @@ def get_or_generate_chapter_recap(chapter_id: str) -> str | None:
         return None
 
     context = _chapter_translation_context(supabase, chapter_id)
+    if context is None:
+        return None  # transient DB failure while fetching content — do not cache, allow retry
     if not context.strip():
         _cache_recap(supabase, chapter_id, "")
         return None

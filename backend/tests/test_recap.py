@@ -15,10 +15,11 @@ from app.services import rag  # noqa: E402
 
 
 class _FakeQuery:
-    def __init__(self, data, on_update=None):
+    def __init__(self, data, on_update=None, raise_on_execute=None):
         self._data = data
         self._on_update = on_update
         self._single = False
+        self._raise_on_execute = raise_on_execute
 
     def select(self, *a, **k):
         return self
@@ -42,16 +43,19 @@ class _FakeQuery:
         return self
 
     def execute(self):
+        if self._raise_on_execute:
+            raise self._raise_on_execute
         if self._single:
             return SimpleNamespace(data=self._data[0] if self._data else None)
         return SimpleNamespace(data=self._data)
 
 
 class FakeSupabase:
-    def __init__(self, *, chapters=None, pages=None, bubbles=None):
+    def __init__(self, *, chapters=None, pages=None, bubbles=None, bubbles_raise=None):
         self.chapters = chapters or []
         self.pages = pages or []
         self.bubbles = bubbles or []
+        self.bubbles_raise = bubbles_raise
         self.updates: list[tuple[str, dict]] = []
 
     def table(self, name):
@@ -63,7 +67,7 @@ class FakeSupabase:
         if name == "manga_pages":
             return _FakeQuery(self.pages)
         if name == "bubble_data":
-            return _FakeQuery(self.bubbles)
+            return _FakeQuery(self.bubbles, raise_on_execute=self.bubbles_raise)
         return _FakeQuery([])
 
 
@@ -158,3 +162,21 @@ def test_generation_failure_does_not_cache(monkeypatch):
 
     assert rag.get_or_generate_chapter_recap("c1") is None
     assert fake.updates == []  # transient failure — must be retryable, so no cache write
+
+
+def test_db_failure_fetching_bubbles_does_not_cache(monkeypatch):
+    """A transient DB outage while fetching bubble_data (e.g. Supabase blip)
+    must not be conflated with the legitimate "no translated content" case —
+    it must NOT permanently cache recap_vi="" and block future retries."""
+    fake = FakeSupabase(
+        chapters=[{"chapter_id": "c1", "recap_vi": None}],
+        pages=[{"page_id": "p1", "status": "completed"}],
+        bubbles_raise=RuntimeError("supabase connection reset"),
+    )
+    monkeypatch.setattr(rag, "get_supabase", lambda: fake)
+    monkeypatch.setattr(
+        rag, "_generate_recap_text", lambda ctx: (_ for _ in ()).throw(AssertionError("must not call Gemini"))
+    )
+
+    assert rag.get_or_generate_chapter_recap("c1") is None
+    assert fake.updates == []
