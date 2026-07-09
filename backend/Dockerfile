@@ -6,9 +6,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Only Pillow needs a system lib (libz for PNG)
+# Pillow needs libzbar0 (PNG); ffmpeg powers the optional chapter recap
+# video export (services/recap_video.py) — hidden via ffmpeg_available()
+# when absent, so this is safe to skip on constrained hosts if ever needed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libzbar0 \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
