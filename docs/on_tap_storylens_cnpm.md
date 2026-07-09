@@ -13,6 +13,8 @@
 6. [Chủ đề 6: Thiết kế Giao diện (UI/UX Design)](#chủ-đề-6-thiết-kế-giao-diện-uiux-design)
 7. [Chủ đề 7: Quy trình Kiểm thử & Báo cáo chất lượng (Testing & QA)](#chủ-đề-7-quy-trình-kiểm-thử--báo-cáo-chất-lượng-testing--qa)
 8. [Chủ đề 8: Bảo mật & Đạo đức AI (Security & AI Ethics)](#chủ-đề-8-bảo-mật--đạo-đức-ai-security--ai-ethics)
+9. [Chủ đề 9: Vận hành & Giám sát hệ thống (DevOps Monitoring — LN11)](#chủ-đề-9-vận-hành--giám-sát-hệ-thống-devops-monitoring--ln11)
+10. [Chủ đề 10: Đạo đức AI chuyên sâu (AI Ethics — LN12)](#chủ-đề-10-đạo-đức-ai-chuyên-sâu-ai-ethics--ln12)
 
 ---
 
@@ -200,3 +202,82 @@
   * Bản quyền là vấn đề nhạy cảm nhất đối với các ứng dụng dịch thuật. StoryLens giải quyết bằng hai cơ chế:
     1. *Cô lập thư viện đọc:* Mặc định các chương truyện do người dùng tải lên dịch đều ở chế độ **riêng tư (Private)**, chỉ tài khoản đó được đọc và hỏi đáp RAG. Hệ thống không tự động chia sẻ công khai.
     2. *Quy trình DMCA/Copyright Take-down:* Nhóm xây dựng trang chính sách bản quyền công khai. Các tác giả hoặc nhà phát hành có bản quyền có thể gửi yêu cầu gỡ bỏ trực tiếp qua biểu mẫu báo cáo. Admin hệ thống có quyền khóa/xóa ngay lập tức các chương truyện vi phạm bản quyền khỏi thư viện công cộng.
+
+---
+
+## Chủ đề 9: Vận hành & Giám sát hệ thống (DevOps Monitoring — LN11)
+
+> *Tương ứng LN11 — Test Automation & DevOps. Vòng lặp DevOps không dừng ở bước "Deploy" mà tiếp tục sang **Operate → Monitor** rồi quay lại Develop. Đây là phần StoryLens thực thi đầy đủ nhưng chưa được đề cập trong các câu hỏi trước.*
+
+### 💬 Câu 22: Vòng lặp DevOps của StoryLens trông như thế nào? Sau khi Deploy lên Vercel/Render, nhóm giám sát hệ thống bằng cách nào?
+* **Trả lời:**
+  * Vòng lặp DevOps của nhóm: **Develop → Build → Test → Deploy → Operate → Monitor → (quay lại Develop)**.
+  * Sau khi code được merge và CI báo xanh, Vercel (Frontend) và Render (Backend) tự động deploy phiên bản mới. Đây là bước **Operate**.
+  * Ở bước **Monitor**, nhóm triển khai 3 tầng giám sát song song:
+    1. **Sentry (Error Monitoring):** Tự động bắt mọi exception runtime trên cả Frontend (Next.js server, browser, Edge runtime) và Backend (FastAPI). Khi người dùng gặp lỗi crash màn hình, Sentry gửi alert ngay về dashboard của nhóm kèm stack trace đầy đủ, giúp dev debug mà không cần tái hiện lỗi thủ công.
+    2. **OpenTelemetry (Distributed Tracing):** Theo dõi toàn bộ luồng xử lý của một request từ khi vào Backend → gọi AI Module → truy vấn Supabase → trả kết quả. Khi một request xử lý ảnh chậm bất thường, PM có thể dùng OTel để xác định cổ chai (bottleneck) nằm ở đoạn nào trong pipeline.
+    3. **Structured Logging + Request ID:** Mỗi HTTP request được middleware gán một UUID duy nhất (`X-Request-ID`). UUID này xuất hiện trong mọi dòng log liên quan → khi cần debug một request cụ thể của người dùng, chỉ cần filter log theo Request ID là ra toàn bộ trace.
+
+### 💬 Câu 23: Audit Log là gì? Tại sao StoryLens cần lưu Audit Log riêng cho admin?
+* **Trả lời:**
+  * **Audit Log (Nhật ký kiểm toán)** là bản ghi cấu trúc ghi lại *ai đã làm gì, lúc mấy giờ, trên dữ liệu nào* — thường dùng để điều tra sự cố bảo mật và chứng minh tuân thủ quy định (compliance).
+  * **Trong StoryLens:** Module `backend/app/routers/admin/` có router `audit.py` và hàm `audit()` trong `deps.py`. Mỗi khi admin thực hiện hành động nhạy cảm (khóa tài khoản, xóa nội dung vi phạm, điều chỉnh credits), một row được ghi vào bảng **`admin_audit_log`** trong Supabase Postgres bao gồm: `admin_user_id`, `action`, `target_id`, `timestamp`.
+  * **Tại sao cần?** Vì admin có quyền năng rất cao (xóa dữ liệu người dùng, thay đổi số credits). Audit Log đảm bảo nếu có tranh chấp ("Ai đã xóa chương truyện của tôi?"), nhóm phát triển có bằng chứng điều tra cụ thể theo từng hành động và thời điểm thực hiện.
+
+### 💬 Câu 24: Sentry và OpenTelemetry đều nói về "giám sát hệ thống". Hai công cụ này khác nhau thế nào?
+* **Trả lời:**
+
+  | Tiêu chí | Sentry (Error Monitoring) | OpenTelemetry (Distributed Tracing) |
+  |---|---|---|
+  | **Tập trung vào** | *Lỗi (Errors & Exceptions)* — bắt khi hệ thống bị crash | *Hiệu năng (Performance)* — theo dõi luồng xử lý bình thường |
+  | **Câu hỏi trả lời** | "Hệ thống đang bị lỗi gì? Ở dòng code nào?" | "Request này chạy mất bao lâu? Chậm ở bước nào?" |
+  | **Dữ liệu sinh ra** | Stack trace, breadcrumb, context người dùng | Span (đoạn thời gian), Trace (chuỗi span), Metrics |
+  | **Trong StoryLens** | Frontend: 3 config (server/client/edge). Backend: `observability.py` | Backend: `observability.py` dùng `FastAPIInstrumentor` và `HTTPXClientInstrumentor` |
+  | **Bật khi nào** | Có `SENTRY_DSN` env var | Có `OTEL_EXPORTER_OTLP_ENDPOINT` env var |
+
+  * **Tóm lại:** Sentry là "bác sĩ cấp cứu" — bắt sự cố ngay khi xảy ra. OpenTelemetry là "bác sĩ chẩn đoán" — phân tích hiệu năng hệ thống tổng thể.
+
+---
+
+## Chủ đề 10: Đạo đức AI chuyên sâu (AI Ethics — LN12)
+
+> *Tương ứng LN12 — AI Ethics. Môn học đặt ra 11 vấn đề đạo đức của AI. Câu hỏi phản biện thường yêu cầu nhóm liên hệ từng vấn đề đạo đức vào sản phẩm cụ thể của nhóm.*
+
+### 💬 Câu 25: Liệt kê 11 vấn đề đạo đức AI theo LN12 và cho biết StoryLens liên quan đến những vấn đề nào? Nhóm đã giải quyết chúng ra sao?
+* **Trả lời — 11 vấn đề đạo đức AI (theo Sommerville & slide LN12):**
+
+  | # | Vấn đề | Liên quan StoryLens? | Giải pháp nhóm |
+  |---|---|---|---|
+  | 1 | **Privacy & Surveillance** (Riêng tư & Giám sát) | ✅ **Có** | Trang `privacy/page.tsx` công khai rõ data nào được thu. Sentry cấu hình `send_default_pii=False` — không log thông tin cá nhân. Thư viện mặc định **Private**. |
+  | 2 | **Unemployment** (Thất nghiệp) | ⚠️ Tiềm năng | Dịch tự động có thể ảnh hưởng dịch giả cộng đồng. Nhóm định vị StoryLens là **công cụ hỗ trợ dịch giả** (assistive tool), không phải thay thế. Studio QC cho phép dịch giả chỉnh sửa tay. |
+  | 3 | **Inequality** (Bất bình đẳng) | ⚠️ Nhẹ | Hệ thống credits trả phí có thể tạo bất bình đẳng. Nhóm có gói free tier và giới hạn credits miễn phí cho người dùng mới. |
+  | 4 | **Manipulation of Human Behavior** (Thao túng) | ✅ **Có** | AI dịch tự động không chèn quảng cáo hay nội dung lệch hướng vào bản dịch. RAG chỉ trả lời câu hỏi về nội dung truyện, không gợi ý mua hàng. |
+  | 5 | **Artificial Stupidity** (Sự "ngu" của máy) | ✅ **Có** | OCR (manga-ocr) có CER 6.1%, có thể đọc sai chữ. Nhóm dùng Gemini LLM để tự sửa lỗi theo ngữ cảnh. Giao diện Studio QC cho dịch giả kiểm tra và chỉnh sửa thủ công. |
+  | 6 | **Opacity** (Mờ đục/Hộp đen) | ✅ **Có** | Pipeline AI (YOLO → OCR → LaMa → Gemini) là hộp đen với người dùng. Nhóm giải quyết bằng **transparency**: mỗi bước xử lý đều có status log rõ ràng trả về frontend, hiển thị cho người dùng theo dõi tiến trình. |
+  | 7 | **AI Bias** (Thiên lệch AI) | ✅ **Có** | Dữ liệu huấn luyện YOLO chủ yếu là manga Nhật bản và Manga109. Có thể hoạt động kém hơn với manhwa Hàn hoặc manhua Trung. Nhóm ghi nhận đây là hạn chế và hướng cải thiện trong tương lai (fine-tune thêm dataset đa dạng). |
+  | 8 | **Security** (An ninh) | ✅ **Có** | HttpOnly Cookie chống XSS, CSRF middleware, RLS chống data leak, SSRF Domain Allowlist, Security Headers middleware. |
+  | 9 | **Evil Genies** (Hậu quả ngoài ý muốn) | ⚠️ Nhẹ | Tính năng dịch có thể bị lạm dụng để dịch và phát tán nội dung vi phạm bản quyền hàng loạt. Nhóm phòng chống bằng rate limiting, credits system và quy trình DMCA take-down. |
+  | 10 | **Robot Rights** (Quyền của Robot) | ❌ Không áp dụng | Không liên quan trực tiếp đến đồ án này. |
+  | 11 | **Singularity & Superintelligence** | ❌ Không áp dụng | Không liên quan trực tiếp đến đồ án này. |
+
+### 💬 Câu 26: Vấn đề "Opacity" (mờ đục) của AI là gì? StoryLens giải quyết thế nào để người dùng tin tưởng vào kết quả dịch của hệ thống?
+* **Trả lời:**
+  * **Opacity (Sự mờ đục):** AI, đặc biệt là Deep Learning, hoạt động như "hộp đen" — người dùng đưa ảnh vào, nhận bản dịch ra nhưng không biết tại sao hệ thống dịch như vậy, không biết bước nào gặp vấn đề nếu kết quả sai. Điều này gây ra thiếu **transparency** và **accountability** — không ai chịu trách nhiệm nếu bản dịch sai nghĩa.
+  * **StoryLens giải quyết bằng 3 cơ chế:**
+    1. **Progress Tracking (Theo dõi tiến trình):** Frontend hiển thị rõ trạng thái từng bước pipeline: "Đang phát hiện bong bóng thoại...", "Đang nhận diện ký tự...", "Đang dịch bằng AI..." — người dùng biết hệ thống đang làm gì, không bị mù thông tin.
+    2. **Studio QC (Kiểm soát chất lượng thủ công):** Toàn bộ kết quả dịch của AI đều có thể được dịch giả xem lại và chỉnh sửa trực tiếp trong giao diện Studio trước khi lưu. AI không có quyền phán quyết cuối cùng — con người mới là người quyết định.
+    3. **Structured Logging:** Mọi hành động của hệ thống đều được ghi log có cấu trúc. Nếu kết quả sai, dev có thể trace lại chính xác bước nào trong pipeline AI đã gặp vấn đề.
+
+### 💬 Câu 27: Vấn đề AI Bias (thiên lệch AI) trong StoryLens là gì? Nhóm nhận ra và xử lý thế nào?
+* **Trả lời:**
+  * **Bias xuất hiện ở đâu:** Mô hình YOLOv8 được fine-tune chủ yếu trên dataset **Manga109** — một bộ dữ liệu manga Nhật Bản. Điều này tạo ra **historical bias / distribution bias** trong dữ liệu huấn luyện: hệ thống giỏi phát hiện bong bóng thoại kiểu Nhật (thường tròn, nét rõ, nền trắng) nhưng hoạt động kém hơn với phong cách bong bóng thoại kiểu Hàn (manhwa) hoặc Trung (manhua) có thiết kế bố cục khác biệt.
+  * **Hậu quả thực tế:** Người dùng manhwa Hàn Quốc sẽ thấy hệ thống bỏ sót nhiều hộp thoại hoặc phát hiện sai vùng, dẫn đến bản dịch thiếu sót — đây là bất bình đẳng dịch vụ dựa trên nguồn gốc nội dung.
+  * **Cách nhóm xử lý:**
+    * *Ngắn hạn:* Ghi nhận giới hạn rõ ràng trong tài liệu và trang sản phẩm để người dùng biết trước.
+    * *Dài hạn:* Hướng phát triển tương lai là bổ sung thêm dữ liệu manhwa và manhua vào tập huấn luyện để giảm bias phân phối, hướng đến mô hình đa ngôn ngữ và đa phong cách thực sự công bằng.
+  * **Nguyên tắc:** Theo LN12, nguyên tắc "Principles alone cannot guarantee ethical AI" — nhóm không chỉ nói "chúng tôi cố gắng công bằng" mà phải có **thiết kế kỹ thuật** (ghi nhận bias, đo lường kết quả trên tập test đa dạng) để thực sự kiểm soát bias.
+
+---
+
+*Tài liệu được tổng hợp và bổ sung bởi team StoryLens — phục vụ ôn tập bảo vệ đồ án môn CSC13002 (VNUHCM-US).*
+
