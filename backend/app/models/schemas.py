@@ -188,6 +188,14 @@ class QAStreamRequest(BaseModel):
     history: list[QAMessage] = Field(default_factory=list)
 
 
+class ChapterRecapResponse(BaseModel):
+    """Cached, auto-generated Vietnamese summary of the PREVIOUS chapter,
+    shown when a reader opens the next one. `recap` is None when there is
+    nothing to show (not yet generated, previous chapter incomplete, or
+    generation failed)."""
+    recap: Optional[str] = None
+
+
 # ─── History ───────────────────────────────────────────────────────────────────
 
 class HistoryItem(BaseModel):
