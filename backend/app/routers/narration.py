@@ -24,11 +24,12 @@ from app.models.schemas import (
     ChapterNarrationStatusResponse,
     NarrateRequest,
     NarrationResponse,
+    RecapVideoResponse,
     VoicesResponse,
 )
 from app.rate_limit import limiter
 from app.routers.auth import AuthUser, get_current_user
-from app.services import narration
+from app.services import narration, recap_video
 from app.services.credit_service import check_has_credits, deduct
 from app.services.tts import registry as tts_registry
 
@@ -59,9 +60,12 @@ def _get_owned_page(supabase, page_id: str, user: AuthUser) -> dict:
 @router.get("/voices", response_model=VoicesResponse)
 def list_voices(user: AuthUser = Depends(get_current_user)):
     """List available TTS engines and their voices so the reader can offer a picker."""
+    settings = get_settings()
     return VoicesResponse(
         default_engine=tts_registry.default_engine(),
         engines=tts_registry.describe_engines(),
+        credit_cost_per_page=settings.NARRATION_CREDIT_COST,
+        max_chapter_pages=settings.NARRATION_MAX_CHAPTER_PAGES,
     )
 
 
@@ -172,7 +176,7 @@ def chapter_status(job_id: str, user: AuthUser = Depends(get_current_user)):
     )
 
 
-@router.post("/recap/{chapter_id}")
+@router.post("/recap/{chapter_id}", response_model=RecapVideoResponse)
 @limiter.limit(lambda: get_settings().RATE_LIMIT_NARRATE)
 def recap_chapter(
     request: Request,
@@ -185,8 +189,6 @@ def recap_chapter(
     payload = payload or NarrateRequest()
     supabase = get_supabase()
     settings = get_settings()
-
-    from app.services import recap_video
 
     if not recap_video.ffmpeg_available():
         raise HTTPException(
@@ -219,4 +221,4 @@ def recap_chapter(
         except Exception as exc:  # noqa: BLE001
             logger.warning("Credit deduction failed for recap %s: %s", user.id, exc)
 
-    return {"chapter_id": chapter_id, "video_url": video_url}
+    return RecapVideoResponse(chapter_id=chapter_id, video_url=video_url)
