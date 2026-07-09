@@ -22,6 +22,7 @@ import {
 } from "@/lib/api";
 import {
   chooseSeriesReaderImages,
+  getLoadedImageNaturalSize,
   type SeriesTranslationMode,
 } from "@/lib/seriesReader";
 
@@ -71,7 +72,7 @@ function SeriesBubbleLayer({
   if (!dims?.w || !dims.h || bubbles.length === 0) return null;
 
   return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 4 }}>
       {bubbles.map((bubble, index) => {
         const [x, y, w, h] = bubble.bbox;
         const boxStyle: React.CSSProperties = {
@@ -126,30 +127,44 @@ function SeriesBubbleLayer({
         );
       })}
 
-      {mode === "tap" && selected !== null && bubbles[selected] && (
-        <div
-          style={{
-            position: "absolute",
-            left: "50%",
-            bottom: 16,
-            transform: "translateX(-50%)",
-            width: "min(520px, calc(100% - 32px))",
-            background: "#fffde8",
-            border: "2px solid #111",
-            boxShadow: "4px 4px 0 #111",
-            color: "#111",
-            padding: "10px 12px",
-            pointerEvents: "auto",
-            zIndex: 6,
-          }}
-        >
-          <div className="caps-xs" style={{ color: "#c8102e", marginBottom: 6 }}>Ngữ cảnh bong bóng</div>
-          <div style={{ fontSize: 12, marginBottom: 4, opacity: 0.75 }}>{bubbles[selected].original_text}</div>
-          <div style={{ fontFamily: "var(--font-serif)", fontWeight: 700, lineHeight: 1.35 }}>
-            {bubbles[selected].translated_text}
+      {mode === "tap" && selected !== null && bubbles[selected] && (() => {
+        const bubble = bubbles[selected];
+        const [x, y, w, h] = bubble.bbox;
+        const centerX = ((x + w / 2) / dims.w) * 100;
+        const topY = (y / dims.h) * 100;
+        const bottomY = ((y + h) / dims.h) * 100;
+        const showBelow = bottomY < 72;
+
+        return (
+          <div
+            style={{
+              position: "absolute",
+              left: `${centerX}%`,
+              top: showBelow ? `${bottomY}%` : undefined,
+              bottom: showBelow ? undefined : `${100 - topY}%`,
+              transform: showBelow ? "translate(-50%, 10px)" : "translate(-50%, -10px)",
+              width: "min(360px, calc(100% - 32px))",
+              maxWidth: "calc(100% - 32px)",
+              background: "#fffde8",
+              border: "2px solid #111",
+              boxShadow: "4px 4px 0 #111",
+              color: "#111",
+              padding: "10px 12px",
+              pointerEvents: "auto",
+              zIndex: 6,
+            }}
+          >
+            {bubble.original_text && (
+              <div style={{ fontSize: 11, marginBottom: 5, opacity: 0.68, lineHeight: 1.35 }}>
+                {bubble.original_text}
+              </div>
+            )}
+            <div style={{ fontFamily: "var(--font-serif)", fontWeight: 800, lineHeight: 1.35 }}>
+              {bubble.translated_text}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -400,6 +415,12 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
     const t = e.currentTarget;
     if (!t.naturalWidth) return;
     setImgDims(d => (d[pid]?.w === t.naturalWidth ? d : { ...d, [pid]: { w: t.naturalWidth, h: t.naturalHeight } }));
+  };
+
+  const captureLoadedImageDims = (pid: string) => (image: HTMLImageElement | null) => {
+    const size = getLoadedImageNaturalSize(image);
+    if (!size) return;
+    setImgDims(d => (d[pid]?.w === size.w && d[pid]?.h === size.h ? d : { ...d, [pid]: size }));
   };
 
   // Keyboard navigation
@@ -748,6 +769,7 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
                                     src={item.url}
                                     alt={`${item.label} trang ${current.page_number ?? index + 1}`}
                                     draggable={false}
+                                    ref={captureLoadedImageDims(current.page_id)}
                                     onLoad={captureDims(current.page_id)}
                                     style={{
                                       maxWidth: "100%",
@@ -769,6 +791,7 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
                               src={imageUrl}
                               alt={`Trang ${current.page_number ?? index + 1}`}
                               draggable={false}
+                              ref={captureLoadedImageDims(current.page_id)}
                               onLoad={captureDims(current.page_id)}
                               style={{
                                 maxWidth: "100%",
@@ -933,6 +956,7 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
                             alt={`Trang ${p.page_number ?? i + 1}`}
                             loading="lazy"
                             decoding="async"
+                            ref={captureLoadedImageDims(p.page_id)}
                             onLoad={captureDims(p.page_id)}
                             style={{
                               maxWidth: "100%",

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSeriesReadPageHref,
   chooseSeriesReaderImages,
+  getLoadedImageNaturalSize,
 } from "@/lib/seriesReader";
 
 describe("series reader helpers", () => {
@@ -30,5 +31,15 @@ describe("series reader helpers", () => {
         translatedImageUrl: "translated.png",
       }),
     ).toEqual({ primary: "original.png", secondary: "translated.png" });
+  });
+
+  it("reads natural size from an already-loaded image", () => {
+    expect(
+      getLoadedImageNaturalSize({
+        complete: true,
+        naturalWidth: 1200,
+        naturalHeight: 1800,
+      }),
+    ).toEqual({ w: 1200, h: 1800 });
   });
 });

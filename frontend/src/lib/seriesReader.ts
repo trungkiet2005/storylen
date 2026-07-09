@@ -26,3 +26,10 @@ export function chooseSeriesReaderImages({
 
   return { primary: translatedImageUrl ?? originalImageUrl ?? null, secondary: null };
 }
+
+export function getLoadedImageNaturalSize(
+  image: Pick<HTMLImageElement, "complete" | "naturalWidth" | "naturalHeight"> | null,
+): { w: number; h: number } | null {
+  if (!image?.complete || !image.naturalWidth || !image.naturalHeight) return null;
+  return { w: image.naturalWidth, h: image.naturalHeight };
+}
