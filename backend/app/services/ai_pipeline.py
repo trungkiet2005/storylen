@@ -305,7 +305,7 @@ def process_page(
                     type="translation",
                     title="Dịch xong rồi!",
                     body="Một trang truyện vừa được dịch thành công.",
-                    url=f"/reader/{page_id}",
+                    url=f"/reader?page={page_id}",
                 )
                 try:
                     from app.services.achievements import check_and_unlock
