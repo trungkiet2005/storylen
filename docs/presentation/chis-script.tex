@@ -1,0 +1,29 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[a4paper,margin=1.7cm]{geometry}
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage[pipeTables=true,tableCaptions=false]{markdown}
+
+\setmainlanguage{vietnamese}
+\setmainfont{Times New Roman}
+\setsansfont{Arial}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.45em}
+\renewcommand{\arraystretch}{1.18}
+\sloppy
+
+\begin{document}
+\markdownInput{chis-script.md}
+\end{document}
