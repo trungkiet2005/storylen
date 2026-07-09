@@ -23,6 +23,7 @@ from app.models.schemas import (
     AddPagesRequest,
     ChapterCreate,
     ChapterPage,
+    ChapterRecapResponse,
     ChapterResponse,
     ChapterUpdate,
     ProcessingStatus,
@@ -34,6 +35,7 @@ from app.models.schemas import (
     SeriesUpdate,
 )
 from app.routers.auth import AuthUser, get_current_user
+from app.services.rag import get_or_generate_chapter_recap
 
 router = APIRouter(tags=["series"])
 logger = logging.getLogger(__name__)
@@ -1195,3 +1197,17 @@ def export_chapter_zip(
             "X-Pages-Skipped": str(skipped),
         },
     )
+
+
+@router.get("/chapters/{chapter_id}/recap", response_model=ChapterRecapResponse)
+def get_chapter_recap(chapter_id: str, user: AuthUser = Depends(get_current_user)):
+    """
+    Auto-generated, cached Vietnamese summary of THIS chapter — the frontend
+    calls this for the PREVIOUS chapter when a reader opens the next one
+    ("Trước đó trong truyện..."). Returns {"recap": null} if not ready yet
+    (chapter incomplete, nothing translated, or generation failed) — this is
+    a best-effort reading aid, not an error condition.
+    """
+    _require_chapter(chapter_id, user.id)
+    recap = get_or_generate_chapter_recap(chapter_id)
+    return ChapterRecapResponse(recap=recap)
