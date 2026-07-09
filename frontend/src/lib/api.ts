@@ -1199,6 +1199,14 @@ export async function getSeriesFull(seriesId: string): Promise<SeriesDetail> {
   return request<SeriesDetail>(`/series/${seriesId}/full`);
 }
 
+export interface ChapterRecapResponse {
+  recap: string | null;
+}
+
+export async function getChapterRecap(chapterId: string): Promise<ChapterRecapResponse> {
+  return request<ChapterRecapResponse>(`/chapters/${chapterId}/recap`);
+}
+
 // ─── Glossary auto-suggest (Tier A #4) ────────────────────────────────────────
 
 export interface GlossarySuggestion {
