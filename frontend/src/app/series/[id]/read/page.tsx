@@ -10,6 +10,7 @@ import { useToast } from "@/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { AnimatedPage } from "@/components/Animations";
 import { QAChatPanel } from "@/components/QAChatPanel";
+import { ListenMode } from "@/components/ListenMode";
 import {
   APIError,
   getPage,
@@ -676,6 +677,15 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
                 >
                   <Icon name="settings" size={11} /> Chỉnh sửa
                 </button>
+              )}
+
+              {current && (
+                <ListenMode
+                  pageId={current.page_id}
+                  chapterId={current.chapter_id}
+                  chapterPageCount={series?.chapters.find(c => c.chapter_id === current.chapter_id)?.page_count}
+                  compact
+                />
               )}
 
               <button
