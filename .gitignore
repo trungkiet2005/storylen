@@ -150,3 +150,6 @@ docs/slides/
 docs/slides_markdown/
 
 docs/PA/PA6-Group01-final-report.zip
+
+# Claude Code agent worktrees (scratch, per-feature isolated checkouts)
+.claude/worktrees/
