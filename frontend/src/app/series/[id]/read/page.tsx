@@ -338,7 +338,9 @@ function SeriesReadInner({ params }: { params: Promise<{ id: string }> }) {
           [current.page_id]: {
             ...detail,
             processed_data: detail.processed_data.map(item =>
-              item.bubble_id === bubble.bubble_id ? saved : item,
+              item.bubble_id === bubble.bubble_id
+                ? { ...item, translated_text: saved.translated_text }
+                : item,
             ),
           },
         };
