@@ -73,7 +73,7 @@
 \newpage
 
 \begin{tcolorbox}[colback=gold!8,colframe=gold,sharp corners,boxrule=0.6pt]
-\small\textbf{Cách dùng tài liệu.} Mỗi câu là một tình huống thầy có thể hỏi khi bảo vệ, kèm gợi ý trả lời ngắn gọn, đúng trọng tâm. Người phụ trách mảng nào nên nắm chắc mảng đó (xem phân công trong file \textit{Script\_Thuyet\_Trinh}). Đặc biệt lưu ý \textbf{Mục 10 --- khác biệt giữa tài liệu PA và sản phẩm hiện tại}: đây là nhóm câu hỏi dễ bị hỏi nhất và cần trả lời trung thực theo tinh thần \textit{phát triển lặp (iterative)} của RUP.
+\small\textbf{Cách dùng tài liệu.} Mỗi câu là một tình huống thầy có thể hỏi khi bảo vệ, kèm gợi ý trả lời ngắn gọn, đúng trọng tâm. Người phụ trách mảng nào nên nắm chắc mảng đó (xem phân công trong file \textit{Script\_Thuyet\_Trinh}). Đặc biệt lưu ý \textbf{Mục 10 --- Giám sát mô hình (bổ sung mới)} và \textbf{Mục 11 --- khác biệt giữa tài liệu PA và sản phẩm hiện tại}: đây là nhóm câu hỏi dễ bị hỏi nhất và cần trả lời trung thực theo tinh thần \textit{phát triển lặp (iterative)} của RUP.
 \end{tcolorbox}
 
 % ══════════════════════════════════════════════════════════════
@@ -142,7 +142,7 @@
 \end{qa}
 
 \begin{qa}{15. Vì sao dùng pgvector thay vì một vector database riêng (ChromaDB/FAISS)? \tagBoth}
-\A Supabase đã cung cấp sẵn PostgreSQL, nên bật extension pgvector là có ngay tìm kiếm vector --- \textbf{không phải vận hành thêm một dịch vụ}. Điều này giảm chi phí hạ tầng và độ phức tạp cho một MVP. Tài liệu PA ban đầu dự kiến ChromaDB; nhóm đã đổi sang pgvector khi hiện thực (xem Mục 10).
+\A Supabase đã cung cấp sẵn PostgreSQL, nên bật extension pgvector là có ngay tìm kiếm vector --- \textbf{không phải vận hành thêm một dịch vụ}. Điều này giảm chi phí hạ tầng và độ phức tạp cho một MVP. Tài liệu PA ban đầu dự kiến ChromaDB; nhóm đã đổi sang pgvector khi hiện thực (xem Mục 11).
 \end{qa}
 
 \begin{qa}{16. Vì sao lưu token trong cookie HttpOnly thay vì localStorage? \tagSP}
@@ -158,7 +158,7 @@
 \end{qa}
 
 \begin{qa}{19. Các bảng dữ liệu chính? \tagSP}
-\A \texttt{profiles}, \texttt{manga\_series}, \texttt{manga\_chapters} (cờ \texttt{published\_at} cho thư viện), \texttt{manga\_pages}, \texttt{bubble\_data} (bbox, text, review\_status), \texttt{embeddings} (pgvector), \texttt{qa\_history}, \texttt{credit\_transactions}; cùng các bảng cộng đồng (forum, comments), thông báo, share links. Quan hệ: series \arr\ chapters \arr\ pages \arr\ bubbles/embeddings.
+\A \texttt{profiles}, \texttt{manga\_series}, \texttt{manga\_chapters} (cờ \texttt{published\_at} cho thư viện), \texttt{manga\_pages}, \texttt{bubble\_data} (bbox, text, review\_status), \texttt{embeddings} (pgvector), \texttt{qa\_history}, \texttt{credit\_transactions}, \texttt{model\_metrics} (chỉ số chất lượng AI cho MLOps monitoring); cùng các bảng cộng đồng (forum, comments), thông báo, share links. Quan hệ: series \arr\ chapters \arr\ pages \arr\ bubbles/embeddings/model\_metrics.
 \end{qa}
 
 % ══════════════════════════════════════════════════════════════
@@ -208,7 +208,7 @@
 \end{qa}
 
 \begin{qa}{30. Embedding bao nhiêu chiều, dùng mô hình gì? \tagBoth}
-\A Sản phẩm hiện tại dùng \texttt{gemini-embedding-001} với \textbf{768 chiều}, lưu ở cột \texttt{vector(768)} (migration v7). Tài liệu/PA ban đầu ghi all-MiniLM-L6-v2 384 chiều --- nhóm đã đổi khi hiện thực để đồng bộ chất lượng embedding với chính nhà cung cấp Gemini (xem Mục 10).
+\A Sản phẩm hiện tại dùng \texttt{gemini-embedding-001} với \textbf{768 chiều}, lưu ở cột \texttt{vector(768)} (migration v7 --- schema mới nhất là v8, bổ sung bảng \texttt{model\_metrics} cho MLOps monitoring). Tài liệu/PA ban đầu ghi all-MiniLM-L6-v2 384 chiều --- nhóm đã đổi khi hiện thực để đồng bộ chất lượng embedding với chính nhà cung cấp Gemini (xem Mục 11).
 \end{qa}
 
 \begin{qa}{31. Làm sao RAG tránh trả lời bịa (hallucinate)? \tagSP}
@@ -300,75 +300,102 @@
 \end{qa}
 
 % ══════════════════════════════════════════════════════════════
+\section{Giám sát mô hình (MLOps Model Monitoring)}
+
+\begin{qa}{50. Hệ thống có giám sát chất lượng mô hình AI sau khi triển khai không? \tagSP}
+\A Có --- đây là bổ sung mới nhất: \textbf{module Model Monitor} (\texttt{services/model\_monitor.py}) tự động ghi lại chỉ số chất lượng cho \textit{mỗi trang} ngay sau khi pipeline xử lý xong: số bong bóng phát hiện, độ tin cậy OCR trung bình, số bong bóng dịch thành công, độ trễ (ms), và tên bộ dịch dùng. Dữ liệu lưu ở bảng \texttt{model\_metrics} (migration v8), hiển thị trên \textbf{Admin Dashboard} (\texttt{/admin/model-monitor}) dưới dạng KPI và biểu đồ theo ngày.
+\end{qa}
+
+\begin{qa}{51. Cơ chế phát hiện model drift hoạt động thế nào? \tagSP}
+\A So sánh \textbf{cửa sổ trượt 50 trang gần nhất} với 50 trang liền trước (baseline) trên ba chỉ số: độ tin cậy OCR trung bình, tỉ lệ trang có phát hiện bong bóng, và tỉ lệ dịch thành công. Có ngưỡng tuyệt đối (ví dụ OCR confidence dưới 55\% \arr\ \texttt{critical}) và ngưỡng suy giảm tương đối (tụt hơn 5--10 điểm phần trăm so với baseline \arr\ \texttt{warning}). Trạng thái trả về: \texttt{ok / warning / critical / insufficient\_data}, hiển thị ngay trên dashboard admin để cảnh báo sớm khi mô hình xuống cấp (data/concept drift) trên dữ liệu thật.
+\end{qa}
+
+\begin{qa}{52. A/B testing mô hình được thực hiện ra sao? \tagSP}
+\A Admin bật cờ \texttt{ab\_test\_variant} trong \texttt{app\_settings} (\texttt{off} hoặc \texttt{experiment\_50}). Khi bật, người dùng được chia \textbf{50/50 theo hash của user\_id} vào nhóm \textit{control} (cấu hình mặc định) hoặc \textit{experiment} (cấu hình mô hình thay thế, ví dụ OCR/YOLO bản khác). Kết quả hai nhóm được so sánh qua endpoint \texttt{/admin/model-monitor/ab-results} --- gộp theo tên bộ dịch (\texttt{translator}), so \textit{success rate}, độ trễ và độ tin cậy OCR, rồi đề xuất phương án thắng.
+\end{qa}
+
+\begin{qa}{53. Vì sao chọn tự xây module giám sát thay vì dùng công cụ MLOps có sẵn (MLflow, Evidently...)? \tagSP}
+\A Ở quy mô đồ án/MVP, việc vận hành thêm một dịch vụ MLOps riêng (cần hạ tầng, lưu trữ, học cách dùng) không tương xứng với lợi ích. Nhóm chọn cách nhẹ: ghi metric trực tiếp vào Postgres đã có sẵn (Supabase), tính drift bằng thống kê đơn giản (so sánh trung bình cửa sổ trượt) ngay trong backend, và hiển thị trên dashboard admin đã có. Đây là bài học MLOps thực dụng: \textit{giám sát tối thiểu khả thi (minimal viable monitoring)} vẫn tốt hơn không giám sát, và dễ nâng cấp lên công cụ chuyên dụng sau nếu cần.
+\end{qa}
+
+\begin{qa}{54. Giám sát hạ tầng (Sentry/OpenTelemetry) khác gì giám sát mô hình AI (Model Monitor)? \tagBoth}
+\A Hai tầng bổ sung nhau, không thay thế nhau. \textbf{Giám sát hạ tầng} (Sentry, OpenTelemetry, \texttt{/health}) trả lời câu hỏi ``hệ thống có đang chạy không'' --- lỗi 500, latency API, service có sống không. \textbf{Giám sát mô hình} (Model Monitor) trả lời câu hỏi khó hơn: ``mô hình có đang \textit{dịch/đọc đúng} không'' --- hệ thống có thể trả về HTTP 200 nhưng OCR đọc sai be bét hoặc YOLO bỏ sót bong bóng, mà giám sát hạ tầng không bao giờ phát hiện được vì không có exception nào xảy ra. Đây chính là khoảng trống (MLOps gap) mà môn học nhấn mạnh và module này được xây để lấp vào.
+\end{qa}
+
+\begin{qa}{55. Ghi log metric có ảnh hưởng tới hiệu năng hay độ tin cậy pipeline dịch không? \tagSP}
+\A Không. \texttt{log\_pipeline\_metrics()} chạy \textbf{best-effort}: bọc toàn bộ trong \texttt{try/except}, chỉ log cảnh báo nếu lỗi chứ \textbf{không bao giờ raise} --- nếu ghi metric thất bại (ví dụ Supabase tạm gián đoạn), pipeline dịch chính vẫn hoàn tất bình thường. Đây là nguyên tắc thiết kế bắt buộc với mọi observability code: không được để tính năng phụ (giám sát) làm sập tính năng chính (dịch trang).
+\end{qa}
+
+% ══════════════════════════════════════════════════════════════
 \section{Khác biệt giữa tài liệu PA và sản phẩm hiện tại}
 
 \begin{tcolorbox}[colback=crimson!5,colframe=crimson,sharp corners,boxrule=0.6pt]
 \small\textbf{Tinh thần trả lời:} RUP là quy trình \textit{lặp}. Tài liệu PA là bản đặc tả ban đầu; khi hiện thực qua các sprint, một số lựa chọn kỹ thuật được \textbf{cải tiến có chủ đích} dựa trên ràng buộc thực tế (chi phí, hạ tầng, chất lượng). Trả lời trung thực + nêu \textit{lý do} là điểm cộng, không phải điểm trừ.
 \end{tcolorbox}
 
-\begin{qa}{50. PA ghi dùng ChromaDB + hybrid search (BM25 + semantic), nhưng sản phẩm dùng pgvector cosine. Vì sao đổi? \tagBoth}
+\begin{qa}{56. PA ghi dùng ChromaDB + hybrid search (BM25 + semantic), nhưng sản phẩm dùng pgvector cosine. Vì sao đổi? \tagBoth}
 \A Khi hiện thực, nhóm đã có sẵn PostgreSQL trên Supabase, nên bật pgvector là có tìm kiếm vector \textbf{mà không phải vận hành thêm ChromaDB}. Với quy mô hiện tại, cosine trên pgvector đủ tốt và đơn giản hơn; bớt một dịch vụ giúp giảm chi phí và điểm hỏng. Hybrid BM25 có thể bổ sung sau nếu cần recall cao hơn.
 \end{qa}
 
-\begin{qa}{51. PA nói dùng all-MiniLM-L6-v2 (384 chiều), nhưng code dùng gemini-embedding-001 (768 chiều). Vì sao? \tagBoth}
+\begin{qa}{57. PA nói dùng all-MiniLM-L6-v2 (384 chiều), nhưng code dùng gemini-embedding-001 (768 chiều). Vì sao? \tagBoth}
 \A Vì phần dịch và Q\&A đã dùng hệ sinh thái Gemini, nên nhóm thống nhất luôn embedding bằng \texttt{gemini-embedding-001} để chất lượng vector đồng bộ với mô hình sinh câu trả lời, và bớt một phụ thuộc nặng (sentence-transformers/torch) ở backend. Migration v7 tạo lại cột \texttt{vector(768)} cho khớp.
 \end{qa}
 
-\begin{qa}{52. PA mô tả người dùng ẩn danh theo session\_id và lưu 30 ngày, nhưng sản phẩm có tài khoản đầy đủ. Vì sao? \tagBoth}
+\begin{qa}{58. PA mô tả người dùng ẩn danh theo session\_id và lưu 30 ngày, nhưng sản phẩm có tài khoản đầy đủ. Vì sao? \tagBoth}
 \A Khi mở rộng phạm vi (lịch sử, thư viện công khai, credit, cộng đồng), nhóm cần định danh bền vững \arr\ chuyển sang \textbf{Supabase Auth} với cookie HttpOnly, kèm quên/đặt lại mật khẩu, Google OAuth và GDPR. Ý tưởng ẩn danh ban đầu vẫn còn ở phần đọc thư viện công khai (không cần đăng nhập).
 \end{qa}
 
-\begin{qa}{53. PA từng ghi ``Cloud-OCR'', nhưng sản phẩm dùng manga-ocr fine-tune. Vì sao? \tagBoth}
+\begin{qa}{59. PA từng ghi ``Cloud-OCR'', nhưng sản phẩm dùng manga-ocr fine-tune. Vì sao? \tagBoth}
 \A manga-ocr chuyên cho chữ trong manga tiếng Nhật; sau khi fine-tune trên Manga109-s đạt CER 6,1\% --- tốt và \textbf{không phụ thuộc chi phí/giới hạn của Cloud Vision}. Vì thế nhóm chọn manga-ocr cho bản chạy thật.
 \end{qa}
 
-\begin{qa}{54. PA nói fallback dịch bằng Google Translate/NLLB-200, còn hiện tại là M2M100/NLLB. Có mâu thuẫn không? \tagBoth}
+\begin{qa}{60. PA nói fallback dịch bằng Google Translate/NLLB-200, còn hiện tại là M2M100/NLLB. Có mâu thuẫn không? \tagBoth}
 \A Ý tưởng bất biến là \textit{có bản dịch dự phòng khi LLM lỗi/timeout}; nhóm chọn mô hình dịch mã nguồn mở (M2M100/NLLB) để chủ động và không phụ thuộc API trả phí. Đây là tinh chỉnh lựa chọn kỹ thuật, không đổi mục tiêu.
 \end{qa}
 
-\begin{qa}{55. Phạm vi sản phẩm hiện tại rộng hơn nhiều so với 5 use case trong PA. Vì sao? \tagBoth}
+\begin{qa}{61. Phạm vi sản phẩm hiện tại rộng hơn nhiều so với 5 use case trong PA. Vì sao? \tagBoth}
 \A Đúng theo tinh thần RUP lặp: 5 use case là lõi ban đầu; qua các sprint Construction, nhóm bổ sung series/chương, credit \& Stripe, thư viện, diễn đàn, thông báo, chia sẻ, gamification và admin --- để sản phẩm đủ ``production''. Các bổ sung này đều phục vụ cùng nhóm người dùng mục tiêu.
 \end{qa}
 
 % ══════════════════════════════════════════════════════════════
 \section{Hạn chế, Lỗi \& Hướng phát triển}
 
-\begin{qa}{56. Hạn chế lớn nhất của hệ thống hiện tại? \tagSP}
+\begin{qa}{62. Hạn chế lớn nhất của hệ thống hiện tại? \tagSP}
 \A Ba hạn chế chính: \textbf{cold start} do tier free; \textbf{quota Gemini} lúc cao điểm; và \textbf{OCR với chữ hiệu ứng/viết tay (SFX)} độ chính xác giảm. Ngoài ra bố cục chữ Việt dài đôi khi phải thu nhỏ/cắt, và thứ tự đọc phải-sang-trái ở vài bố cục phức tạp chưa tối ưu.
 \end{qa}
 
-\begin{qa}{57. Lỗi đã biết (known defects) là gì? \tagSP}
+\begin{qa}{63. Lỗi đã biết (known defects) là gì? \tagSP}
 \A Token phiên hết hạn giữa chừng đôi khi cần tải lại trang (đang làm auto-refresh); WebSocket có thể mất gói khi mạng chập chờn (đã có fallback polling); signed URL ảnh có thể hết hạn với phiên đọc rất dài (đã thêm retry); và nền động có thể tụt FPS trên mobile cũ (tắt được trong cài đặt).
 \end{qa}
 
-\begin{qa}{58. Hướng phát triển tiếp theo? \tagSP}
+\begin{qa}{64. Hướng phát triển tiếp theo? \tagSP}
 \A Fine-tune thêm cho SFX/chữ viết tay và thêm cặp ngôn ngữ; cải thiện thứ tự đọc phải-sang-trái; nâng tier để giảm cold start + hàng đợi tác vụ chuyên dụng; cá nhân hoá gợi ý; bổ sung quy trình bản quyền/DMCA; và đóng gói ứng dụng di động.
 \end{qa}
 
-\begin{qa}{59. Nếu scale lên hàng chục nghìn người dùng thì kiến trúc chịu được không? \tagSP}
+\begin{qa}{65. Nếu scale lên hàng chục nghìn người dùng thì kiến trúc chịu được không? \tagSP}
 \A Frontend đã ở CDN nên co giãn tốt. Backend đóng gói Docker có thể chạy nhiều instance; nút thắt là AI Module (GPU/CPU nặng) --- cần chuyển sang tier trả phí, thêm hàng đợi (queue) và nhiều worker. Database Supabase có thể nâng gói và thêm index (ivfflat) cho pgvector. Tức kiến trúc đã tách đúng chỗ để scale từng phần.
 \end{qa}
 
 % ══════════════════════════════════════════════════════════════
 \section{Câu hỏi phản biện \& đóng góp cá nhân}
 
-\begin{qa}{60. Vấn đề bản quyền manga thì sao? \tagSP}
+\begin{qa}{66. Vấn đề bản quyền manga thì sao? \tagSP}
 \A StoryLens là \textbf{công cụ hỗ trợ đọc/dịch}, không phải nơi phát tán trái phép; có điều khoản sử dụng và công cụ kiểm duyệt trong admin. Người dùng chịu trách nhiệm với nội dung tự upload. Hướng phát triển sẽ bổ sung quy trình gỡ nội dung theo DMCA --- đây là rủi ro đã ghi nhận trong SDP.
 \end{qa}
 
-\begin{qa}{61. Chi phí vận hành hiện tại bao nhiêu? \tagSP}
+\begin{qa}{67. Chi phí vận hành hiện tại bao nhiêu? \tagSP}
 \A Gần như \textbf{bằng 0} vì chạy trên tier miễn phí: Vercel Hobby, Render Free, HuggingFace Spaces free, Supabase Free, và Gemini free tier (xoay vòng key). Đánh đổi là cold start và giới hạn quota --- chấp nhận được cho phạm vi đồ án/MVP.
 \end{qa}
 
-\begin{qa}{62. Phần nào của dự án khó nhất? Nhóm học được gì? \tagSP}
+\begin{qa}{68. Phần nào của dự án khó nhất? Nhóm học được gì? \tagSP}
 \A Khó nhất là \textbf{ghép pipeline AI nhiều bước chạy ổn định trên hạ tầng miễn phí hạn chế tài nguyên} --- phải xử lý bất đồng bộ, giới hạn luồng, huỷ tác vụ, cold start và quota. Nhóm học được cách thiết kế hệ thống chịu lỗi và cân bằng giữa chất lượng AI với ràng buộc chi phí thực tế.
 \end{qa}
 
-\begin{qa}{63. Vì sao không dùng một dịch vụ dịch manga có sẵn thay vì tự xây? \tagSP}
+\begin{qa}{69. Vì sao không dùng một dịch vụ dịch manga có sẵn thay vì tự xây? \tagSP}
 \A Các dịch vụ có sẵn thường không mở API, không cho tuỳ biến ngữ cảnh tiếng Việt, và \textbf{không có RAG Q\&A}. Tự xây cho phép nhóm kiểm soát toàn bộ pipeline, tối ưu cho tiếng Việt, tích hợp cộng đồng/thư viện, và quan trọng là \textit{học trọn vòng đời một hệ thống AND}.
 \end{qa}
 
-\begin{qa}{64. Mỗi thành viên đóng góp cụ thể gì? \tagPA}
+\begin{qa}{70. Mỗi thành viên đóng góp cụ thể gì? \tagPA}
 \A \textit{(Mỗi bạn tự trả lời phần mình theo vai trò đã phân công.)} Gợi ý khung: nêu vai trò (PM/BA/Designer/Implementer/Tester), 2--3 hạng mục chính đã làm (ví dụ: hiện thực pipeline AI, dựng RAG, viết test E2E, thiết kế UI reader\ldots), và một khó khăn đã vượt qua. Trả lời cụ thể, có dẫn chứng phần code/tài liệu mình phụ trách.
 \end{qa}
 
