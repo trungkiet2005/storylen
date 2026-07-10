@@ -94,13 +94,18 @@ jobs:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/v1
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: e2e-placeholder
-      - name: Upload Playwright report on failure
+      - name: Upload Playwright traces on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: frontend/playwright-report/
+          # traces/videos/screenshots live in test-results/ (the html report dir
+          # isn't produced by the github/list reporters used in CI).
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
           retention-days: 14
+          if-no-files-found: ignore
 
   backend:
     name: Backend pytest
