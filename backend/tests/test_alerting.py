@@ -1,6 +1,8 @@
 """Unit tests for the alerting sink."""
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import httpx
 import pytest
 import respx
@@ -18,7 +20,12 @@ def _reset():
 
 
 def _set_hook(monkeypatch, url: str):
-    monkeypatch.setattr(alerting.get_settings(), "ALERT_WEBHOOK_URL", url, raising=False)
+    # Patch the get_settings() that alerting resolves, rather than mutating the
+    # cached Settings singleton in place: attribute assignment on a pydantic
+    # BaseSettings instance is not reliably read back on pydantic >= 2.13.
+    monkeypatch.setattr(
+        alerting, "get_settings", lambda: SimpleNamespace(ALERT_WEBHOOK_URL=url)
+    )
 
 
 def test_no_webhook_configured_returns_false(monkeypatch):
