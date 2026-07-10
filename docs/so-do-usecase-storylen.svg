@@ -1,0 +1,106 @@
+<svg viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+  <rect x="0" y="0" width="1280" height="800" fill="#ffffff"/>
+
+  <!-- ============ system boundary: HỆ THỐNG STORYLENS ============ -->
+  <rect x="300" y="90" width="720" height="630" fill="#ffffff" stroke="#191512" stroke-width="3"/>
+  <text x="660" y="122" text-anchor="middle" font-size="15" font-weight="700" letter-spacing="1.5" fill="#6E665D">HỆ THỐNG STORYLENS</text>
+
+  <!-- ============ use case ellipses ============ -->
+  <!-- UC02 · Đọc overlay -->
+  <g>
+    <ellipse cx="490" cy="210" rx="155" ry="48" fill="#ffffff" stroke="#191512" stroke-width="2.5"/>
+    <text x="490" y="204" text-anchor="middle" font-size="16" font-weight="700" fill="#191512">UC02</text>
+    <text x="490" y="226" text-anchor="middle" font-size="15" fill="#222">Đọc overlay</text>
+  </g>
+
+  <!-- UC01 · Upload & Dịch trang -->
+  <g>
+    <ellipse cx="830" cy="210" rx="155" ry="48" fill="#ffffff" stroke="#D0311E" stroke-width="2.5"/>
+    <text x="830" y="204" text-anchor="middle" font-size="16" font-weight="700" fill="#D0311E">UC01</text>
+    <text x="830" y="226" text-anchor="middle" font-size="15" fill="#222">Upload &amp; Dịch trang</text>
+  </g>
+
+  <!-- UC03 · Batch cả chương -->
+  <g>
+    <ellipse cx="490" cy="410" rx="155" ry="48" fill="#ffffff" stroke="#285B7A" stroke-width="2.5"/>
+    <text x="490" y="404" text-anchor="middle" font-size="16" font-weight="700" fill="#285B7A">UC03</text>
+    <text x="490" y="426" text-anchor="middle" font-size="15" fill="#222">Batch cả chương</text>
+  </g>
+
+  <!-- UC04 · Hỏi-đáp RAG -->
+  <g>
+    <ellipse cx="830" cy="410" rx="155" ry="48" fill="#ffffff" stroke="#2E7D4F" stroke-width="2.5"/>
+    <text x="830" y="404" text-anchor="middle" font-size="16" font-weight="700" fill="#2E7D4F">UC04</text>
+    <text x="830" y="426" text-anchor="middle" font-size="15" fill="#222">Hỏi–đáp RAG</text>
+  </g>
+
+  <!-- UC05 · Xuất bản & chia sẻ -->
+  <g>
+    <ellipse cx="490" cy="610" rx="155" ry="48" fill="#ffffff" stroke="#E0A32E" stroke-width="2.5"/>
+    <text x="490" y="604" text-anchor="middle" font-size="16" font-weight="700" fill="#B87F16">UC05</text>
+    <text x="490" y="626" text-anchor="middle" font-size="15" fill="#222">Xuất bản &amp; chia sẻ</text>
+  </g>
+
+  <!-- UC06 · Quản trị hệ thống -->
+  <g>
+    <ellipse cx="830" cy="610" rx="155" ry="48" fill="#ffffff" stroke="#3A332C" stroke-width="2.5"/>
+    <text x="830" y="604" text-anchor="middle" font-size="16" font-weight="700" fill="#3A332C">UC06</text>
+    <text x="830" y="626" text-anchor="middle" font-size="15" fill="#222">Quản trị hệ thống</text>
+  </g>
+
+  <!-- ============ primary actor: Người đọc (User) ============ -->
+  <g stroke="#191512" stroke-width="2" fill="none">
+    <circle cx="110" cy="378" r="18"/>
+    <line x1="110" y1="396" x2="110" y2="452"/>
+    <line x1="84" y1="418" x2="136" y2="418"/>
+    <line x1="110" y1="452" x2="82" y2="498"/>
+    <line x1="110" y1="452" x2="138" y2="498"/>
+  </g>
+  <text x="110" y="528" text-anchor="middle" font-size="15" font-weight="700" fill="#191512">Người đọc</text>
+  <text x="110" y="548" text-anchor="middle" font-size="15" font-weight="700" fill="#191512">(User)</text>
+
+  <!-- ============ primary actor: Quản trị viên (Admin) ============ -->
+  <g stroke="#D0311E" stroke-width="2" fill="none">
+    <circle cx="1170" cy="558" r="18"/>
+    <line x1="1170" y1="576" x2="1170" y2="632"/>
+    <line x1="1144" y1="598" x2="1196" y2="598"/>
+    <line x1="1170" y1="632" x2="1142" y2="678"/>
+    <line x1="1170" y1="632" x2="1198" y2="678"/>
+  </g>
+  <text x="1170" y="708" text-anchor="middle" font-size="15" font-weight="700" fill="#191512">Quản trị viên</text>
+  <text x="1170" y="728" text-anchor="middle" font-size="15" font-weight="700" fill="#191512">(Admin)</text>
+
+  <!-- ============ secondary system: AI Module + Gemini ============ -->
+  <g>
+    <rect x="1046" y="136" width="200" height="94" fill="#141414" transform="translate(6,6)"/>
+    <rect x="1046" y="136" width="200" height="94" fill="#F4EEE3" stroke="#191512" stroke-width="2"/>
+    <text x="1146" y="162" text-anchor="middle" font-size="12" font-style="italic" fill="#6E665D">«hệ phụ»</text>
+    <text x="1146" y="188" text-anchor="middle" font-size="16" font-weight="700" fill="#191512">AI Module</text>
+    <text x="1146" y="210" text-anchor="middle" font-size="16" font-weight="700" fill="#191512">+ Gemini</text>
+  </g>
+
+  <!-- ============ associations (Người đọc) ============ -->
+  <g stroke="#6E665D" stroke-width="1.5">
+    <line x1="128" y1="405" x2="335" y2="216"/>
+    <line x1="110" y1="440" x2="335" y2="220"/>
+    <line x1="110" y1="440" x2="675" y2="220"/>
+    <line x1="110" y1="440" x2="335" y2="410"/>
+    <line x1="110" y1="440" x2="675" y2="418"/>
+    <line x1="110" y1="440" x2="335" y2="608"/>
+  </g>
+
+  <!-- ============ association (Quản trị viên -> UC06) ============ -->
+  <line x1="1170" y1="612" x2="985" y2="612" stroke="#6E665D" stroke-width="1.5"/>
+
+  <!-- ============ secondary dependencies (dashed gold) ============ -->
+  <g stroke="#E0A32E" stroke-width="1.5" stroke-dasharray="6 5" fill="none">
+    <line x1="1046" y1="205" x2="985" y2="213"/>
+    <polyline points="1046,175 940,175 940,375 985,405"/>
+  </g>
+
+  <!-- ============ legend ============ -->
+  <text x="300" y="768" font-size="14.5" fill="#3a3a3a">
+    <tspan font-weight="700" fill="#D0311E">Tác nhân chính:</tspan><tspan> Người đọc, Quản trị viên.</tspan>
+    <tspan dx="18" font-weight="700" fill="#B87F16">Tác nhân phụ:</tspan><tspan> AI Module + Gemini (hỗ trợ UC01 dịch &amp; UC04 Q&amp;A).</tspan>
+  </text>
+</svg>

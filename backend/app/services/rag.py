@@ -520,6 +520,8 @@ def _history_block(history: list | None, max_turns: int = 6) -> str:
 def _stream_answer(question: str, context: str, history: list | None) -> Iterator[dict]:
     """Yield {'type':'token','text':...} from Gemini streaming. Rotates keys only
     BEFORE the first token — rotating mid-stream would duplicate the answer."""
+    from app.services import ai_telemetry
+
     if not _pool.available:
         yield {"type": "token", "text": _context_fallback_answer(context)}
         return
@@ -527,38 +529,46 @@ def _stream_answer(question: str, context: str, history: list | None) -> Iterato
     prompt = _STREAM_PROMPT.format(
         context=context, question=question, history_block=_history_block(history)
     )
-    last_error: Exception | None = None
-    for _ in range(_pool.client_count()):
-        client = _pool.next_client()
-        if client is None:
-            break
-        produced = False
-        try:
-            stream = client.models.generate_content_stream(
-                model=settings.GEMINI_MODEL, contents=prompt
-            )
-            for chunk in stream:
-                text = getattr(chunk, "text", None)
-                if text:
-                    produced = True
-                    yield {"type": "token", "text": text}
-            if produced:
+    with ai_telemetry.track("gemini", settings.GEMINI_MODEL, "qa.stream") as tel:
+        last_error: Exception | None = None
+        for _ in range(_pool.client_count()):
+            client = _pool.next_client()
+            if client is None:
+                break
+            produced = False
+            try:
+                stream = client.models.generate_content_stream(
+                    model=settings.GEMINI_MODEL, contents=prompt
+                )
+                for chunk in stream:
+                    um = getattr(chunk, "usage_metadata", None)
+                    if um is not None:
+                        tel.prompt_tokens = int(getattr(um, "prompt_token_count", 0) or 0)
+                        tel.completion_tokens = int(getattr(um, "candidates_token_count", 0) or 0)
+                    text = getattr(chunk, "text", None)
+                    if text:
+                        produced = True
+                        yield {"type": "token", "text": text}
+                if produced:
+                    return
+                tel.success = False
+                yield {"type": "token", "text": _context_fallback_answer(context)}
                 return
-            yield {"type": "token", "text": _context_fallback_answer(context)}
-            return
-        except Exception as exc:  # noqa: BLE001
-            if produced:
-                logger.warning("Gemini stream failed mid-answer: %s", exc)
-                return
-            last_error = exc
-            if _is_retryable_gemini_key_error(exc):
-                logger.warning("Gemini stream key failed, rotating. Error: %s", exc)
-                continue
-            logger.error("Unexpected Gemini stream failure: %s", exc)
-            break
+            except Exception as exc:  # noqa: BLE001
+                if produced:
+                    logger.warning("Gemini stream failed mid-answer: %s", exc)
+                    tel.success = False
+                    return
+                last_error = exc
+                if _is_retryable_gemini_key_error(exc):
+                    logger.warning("Gemini stream key failed, rotating. Error: %s", exc)
+                    continue
+                logger.error("Unexpected Gemini stream failure: %s", exc)
+                break
 
-    logger.error("Gemini streaming failed for all keys: %s", last_error)
-    yield {"type": "token", "text": _context_fallback_answer(context)}
+        logger.error("Gemini streaming failed for all keys: %s", last_error)
+        tel.success = False
+        yield {"type": "token", "text": _context_fallback_answer(context)}
 
 
 def answer_question_stream(
@@ -695,29 +705,39 @@ def _generate_recap_text(context: str) -> str | None:
         logger.warning("Recap generation skipped: Gemini pool unavailable.")
         return None
 
-    last_error: Exception | None = None
+    from app.services import ai_telemetry
 
-    for _ in range(_pool.client_count()):
-        client = _pool.next_client()
-        if client is None:
-            break
-        try:
-            response = client.models.generate_content(
-                model=settings.GEMINI_MODEL,
-                contents=_RECAP_PROMPT.format(context=context),
-            )
-            text = (response.text or "").strip()
-            return text or None
-        except Exception as exc:
-            last_error = exc
-            if _is_retryable_gemini_key_error(exc):
-                logger.warning("Recap generation: Gemini key failed, rotating to next key. Error: %s", exc)
-                continue
-            logger.warning("Recap generation failed: %s", exc)
-            break
+    with ai_telemetry.track("gemini", settings.GEMINI_MODEL, "qa.recap") as tel:
+        last_error: Exception | None = None
 
-    logger.error("Recap generation failed for all attempted keys: %s", last_error)
-    return None
+        for _ in range(_pool.client_count()):
+            client = _pool.next_client()
+            if client is None:
+                break
+            try:
+                response = client.models.generate_content(
+                    model=settings.GEMINI_MODEL,
+                    contents=_RECAP_PROMPT.format(context=context),
+                )
+                um = getattr(response, "usage_metadata", None)
+                if um is not None:
+                    tel.prompt_tokens = int(getattr(um, "prompt_token_count", 0) or 0)
+                    tel.completion_tokens = int(getattr(um, "candidates_token_count", 0) or 0)
+                text = (response.text or "").strip()
+                if not text:
+                    tel.success = False
+                return text or None
+            except Exception as exc:
+                last_error = exc
+                if _is_retryable_gemini_key_error(exc):
+                    logger.warning("Recap generation: Gemini key failed, rotating to next key. Error: %s", exc)
+                    continue
+                logger.warning("Recap generation failed: %s", exc)
+                break
+
+        logger.error("Recap generation failed for all attempted keys: %s", last_error)
+        tel.success = False
+        return None
 
 
 def _cache_recap(supabase, chapter_id: str, recap_vi: str) -> None:

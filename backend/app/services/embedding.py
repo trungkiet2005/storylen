@@ -111,9 +111,9 @@ def _normalize(vec: list[float], dim: int) -> list[float]:
     return [x / norm for x in v]
 
 
-def _raw_embed(client: genai.Client, contents: list[str], task_type: str) -> list[list[float]]:
+def _raw_embed(client: genai.Client, contents: list[str], task_type: str) -> tuple[list[list[float]], int]:
     """One embed_content call. Tries with output_dimensionality, falls back if the
-    installed SDK doesn't accept that config field."""
+    installed SDK doesn't accept that config field. Returns (vectors, prompt_tokens)."""
     model = settings.GEMINI_EMBED_MODEL
     try:
         resp = client.models.embed_content(
@@ -133,7 +133,9 @@ def _raw_embed(client: genai.Client, contents: list[str], task_type: str) -> lis
             contents=contents,
             config=types.EmbedContentConfig(task_type=task_type),
         )
-    return [list(e.values or []) for e in (resp.embeddings or [])]
+    um = getattr(resp, "usage_metadata", None)
+    prompt_tokens = int(getattr(um, "prompt_token_count", 0) or 0) if um is not None else 0
+    return [list(e.values or []) for e in (resp.embeddings or [])], prompt_tokens
 
 
 def _embed(contents: list[str], task_type: str) -> list[list[float]]:
@@ -142,28 +144,35 @@ def _embed(contents: list[str], task_type: str) -> list[list[float]]:
     if not _pool.available:
         raise RuntimeError("GEMINI_API_KEY is not configured; cannot embed.")
 
-    last_error: Exception | None = None
-    # Try each key once (round-robin) before giving up.
-    for _ in range(_pool.client_count()):
-        client = _pool.next_client()
-        if client is None:
-            break
-        try:
-            raw = _raw_embed(client, contents, task_type)
-            if len(raw) != len(contents):
-                raise RuntimeError(
-                    f"embed returned {len(raw)} vectors for {len(contents)} inputs"
-                )
-            return [_normalize(v, settings.EMBED_DIM) for v in raw]
-        except Exception as exc:  # noqa: BLE001 — rotate on key/rate errors
-            last_error = exc
-            if _is_retryable(exc):
-                logger.warning("Embedding key failed, rotating. Error: %s", exc)
-                continue
-            logger.error("Non-retryable embedding failure: %s", exc)
-            break
+    from app.services import ai_telemetry
 
-    raise RuntimeError(f"Embedding failed for all keys: {last_error}") from last_error
+    operation = "embed.document" if task_type == "RETRIEVAL_DOCUMENT" else "embed.query"
+    with ai_telemetry.track(
+        "gemini", settings.GEMINI_EMBED_MODEL, operation, meta={"inputs": len(contents)}
+    ) as tel:
+        last_error: Exception | None = None
+        # Try each key once (round-robin) before giving up.
+        for _ in range(_pool.client_count()):
+            client = _pool.next_client()
+            if client is None:
+                break
+            try:
+                raw, prompt_tokens = _raw_embed(client, contents, task_type)
+                if len(raw) != len(contents):
+                    raise RuntimeError(
+                        f"embed returned {len(raw)} vectors for {len(contents)} inputs"
+                    )
+                tel.prompt_tokens = prompt_tokens
+                return [_normalize(v, settings.EMBED_DIM) for v in raw]
+            except Exception as exc:  # noqa: BLE001 — rotate on key/rate errors
+                last_error = exc
+                if _is_retryable(exc):
+                    logger.warning("Embedding key failed, rotating. Error: %s", exc)
+                    continue
+                logger.error("Non-retryable embedding failure: %s", exc)
+                break
+
+        raise RuntimeError(f"Embedding failed for all keys: {last_error}") from last_error
 
 
 def embed_documents(texts: list[str]) -> list[list[float]]:

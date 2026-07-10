@@ -1,0 +1,97 @@
+<svg viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg" font-family="'Segoe UI', Arial, sans-serif">
+  <rect x="0" y="0" width="1280" height="800" fill="#ffffff"/>
+
+  <!-- ============ helpers: styles inline ============ -->
+  <!-- User pill -->
+  <g>
+    <rect x="185" y="24" width="250" height="42" fill="#efe9dc" stroke="#111" stroke-width="2"/>
+    <text x="310" y="51" text-anchor="middle" font-size="17" font-weight="600" fill="#111">Người dùng · Trình duyệt</text>
+  </g>
+
+  <!-- ============ FRONTEND ============ -->
+  <g>
+    <rect x="126" y="106" width="368" height="96" fill="#141414"/>
+    <rect x="120" y="100" width="368" height="96" fill="#ffffff" stroke="#111" stroke-width="2"/>
+    <rect x="120" y="100" width="368" height="40" fill="#141414"/>
+    <text x="140" y="127" font-size="19" font-weight="700" fill="#ffffff">FRONTEND — Next.js 16</text>
+    <text x="140" y="162" font-size="13" font-style="italic" fill="#666">Vercel · React 19 · TypeScript</text>
+    <text x="140" y="184" font-size="14" fill="#222">Upload · Reader · Q&amp;A · Library · Admin</text>
+  </g>
+
+  <!-- ============ BACKEND ============ -->
+  <g>
+    <rect x="126" y="272" width="368" height="140" fill="#141414"/>
+    <rect x="120" y="266" width="368" height="140" fill="#ffffff" stroke="#111" stroke-width="2"/>
+    <rect x="120" y="266" width="368" height="40" fill="#e0342a"/>
+    <text x="140" y="293" font-size="19" font-weight="700" fill="#ffffff">BACKEND API — FastAPI</text>
+    <text x="140" y="328" font-size="13" font-style="italic" fill="#666">Render · Docker · Singapore</text>
+    <text x="140" y="352" font-size="14" fill="#222">Routers: auth · upload · qa · series · admin</text>
+    <text x="140" y="376" font-size="14" fill="#222">Services: ai_pipeline · rag ·</text>
+    <text x="140" y="396" font-size="14" fill="#222"><tspan font-weight="700" fill="#c0271e">embedding</tspan> · credit · captcha</text>
+  </g>
+
+  <!-- ============ SUPABASE ============ -->
+  <g>
+    <rect x="126" y="612" width="368" height="128" fill="#141414"/>
+    <rect x="120" y="606" width="368" height="128" fill="#ffffff" stroke="#111" stroke-width="2"/>
+    <rect x="120" y="606" width="368" height="40" fill="#2c5b7a"/>
+    <text x="140" y="633" font-size="19" font-weight="700" fill="#ffffff">SUPABASE — PostgreSQL</text>
+    <text x="140" y="668" font-size="13" font-style="italic" fill="#666">AWS</text>
+    <text x="140" y="692" font-size="14" fill="#222">pgvector (RAG) · pg_trgm</text>
+    <text x="140" y="716" font-size="14" fill="#222">Auth · Storage (originals / thumbnails)</text>
+  </g>
+
+  <!-- ============ AI MODULE ============ -->
+  <g>
+    <rect x="806" y="272" width="420" height="118" fill="#141414"/>
+    <rect x="800" y="266" width="420" height="118" fill="#ffffff" stroke="#111" stroke-width="2"/>
+    <rect x="800" y="266" width="420" height="40" fill="#2e7d4f"/>
+    <text x="820" y="293" font-size="19" font-weight="700" fill="#ffffff">AI MODULE — FastAPI</text>
+    <text x="820" y="328" font-size="13" font-style="italic" fill="#666">HuggingFace Spaces · ~4GB</text>
+    <text x="820" y="352" font-size="14" fill="#222">YOLOv8 → manga-ocr → LaMa</text>
+    <text x="820" y="374" font-size="14" fill="#222">→ trả ảnh đã dịch + toạ độ bóng thoại</text>
+  </g>
+
+  <!-- ============ GEMINI ============ -->
+  <g>
+    <rect x="806" y="452" width="420" height="104" fill="#141414"/>
+    <rect x="800" y="446" width="420" height="104" fill="#f3ecde" stroke="#c2ac82" stroke-width="2"/>
+    <text x="820" y="480" font-size="18" font-weight="700" fill="#111">GOOGLE GEMINI API</text>
+    <text x="820" y="508" font-size="14" fill="#3a3a3a">dịch ngữ cảnh · <tspan font-weight="700" fill="#8a6d1f">sinh embedding</tspan> · trả lời RAG</text>
+    <text x="820" y="532" font-size="14" fill="#3a3a3a">xoay vòng nhiều API key</text>
+  </g>
+
+  <!-- ============ ARROWS ============ -->
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#111"/>
+    </marker>
+  </defs>
+
+  <!-- User -> Frontend -->
+  <line x1="310" y1="66" x2="310" y2="98" stroke="#111" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="322" y="88" font-size="12" font-style="italic" fill="#555">HTTPS · cookie HttpOnly</text>
+
+  <!-- Frontend -> Backend -->
+  <line x1="310" y1="196" x2="310" y2="264" stroke="#111" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="322" y="238" font-size="12" font-style="italic" fill="#555">REST · api.ts (retry cold-start)</text>
+
+  <!-- Backend -> AI Module -->
+  <line x1="488" y1="308" x2="798" y2="308" stroke="#111" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="560" y="300" font-size="12" font-style="italic" fill="#555">gửi ảnh gốc</text>
+  <!-- AI Module -> Backend (return) -->
+  <line x1="798" y1="348" x2="490" y2="348" stroke="#111" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="560" y="366" font-size="12" font-style="italic" fill="#555">ảnh đã dịch</text>
+
+  <!-- Backend -> Gemini (stepped) -->
+  <polyline points="494,388 650,388 650,498 798,498" fill="none" stroke="#111" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="664" y="470" font-size="12" font-style="italic" fill="#555">dịch · embedding · RAG</text>
+
+  <!-- Backend -> Supabase -->
+  <line x1="310" y1="406" x2="310" y2="604" stroke="#111" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="310" y1="604" x2="310" y2="500" stroke="#111" stroke-width="2"/>
+  <text x="322" y="500" font-size="12" font-style="italic" fill="#555">đọc / ghi · SQL · vector · file</text>
+
+  <!-- footnote -->
+  <text x="120" y="770" font-size="12.5" font-style="italic" fill="#8a6d1f">★ Embedding được sinh ở Backend qua Gemini API — AI Module KHÔNG sinh embedding.</text>
+</svg>

@@ -399,6 +399,41 @@
 \A \textit{(Mỗi bạn tự trả lời phần mình theo vai trò đã phân công.)} Gợi ý khung: nêu vai trò (PM/BA/Designer/Implementer/Tester), 2--3 hạng mục chính đã làm (ví dụ: hiện thực pipeline AI, dựng RAG, viết test E2E, thiết kế UI reader\ldots), và một khó khăn đã vượt qua. Trả lời cụ thể, có dẫn chứng phần code/tài liệu mình phụ trách.
 \end{qa}
 
+% ══════════════════════════════════════════════════════════════
+\section{Phụ lục: Bảy lớp bảo mật --- giải thích chi tiết từ code}
+
+\begin{tcolorbox}[colback=steel!8,colframe=steel,sharp corners,boxrule=0.6pt]
+\small\textbf{Mục đích.} Đào sâu 7 lớp bảo mật đã liệt kê ở Câu 42, kèm \textbf{con số cấu hình cụ thể} và \textbf{vị trí trong mã nguồn} để trả lời khi thầy hỏi ``chỗ nào trong code?'' hay ``giới hạn đặt bao nhiêu?''. Tất cả trích từ backend đang chạy thật.
+\end{tcolorbox}
+
+\begin{qa}{71. (1) Xác thực cookie HttpOnly --- cài đặt cụ thể ra sao? \tagSP}
+\A Sau khi Supabase Auth xác thực, backend ghi token vào 2 cookie qua \texttt{\_set\_session\_cookies} (\texttt{routers/auth.py}): \texttt{httponly=True} (JS không đọc được \arr\ chống XSS đánh cắp phiên), \texttt{secure=True}, \texttt{samesite="none"} (bắt buộc cho cross-domain Vercel\arr Render). Tên cookie: \texttt{sl\_access\_token} (sống theo \texttt{expires\_in}, mặc định \textbf{3600s}) và \texttt{sl\_refresh\_token} (\textbf{30 ngày} = \texttt{60*60*24*30}). Mỗi request, \texttt{get\_current\_user} gọi Supabase \texttt{GET /auth/v1/user} để verify; access hết hạn \arr\ tự dùng refresh token cấp cookie mới; hết cả hai \arr\ 401 và xoá cookie. Bổ sung một \texttt{CSRFMiddleware} double-submit token (header \texttt{X-CSRF-Token} phải khớp cookie \texttt{csrf\_token} 64 hex) cho các request thay đổi dữ liệu.
+\end{qa}
+
+\begin{qa}{72. (2) RBAC (user/admin) + RLS --- kiểm soát ở đâu? \tagSP}
+\A \textbf{Hai tầng.} Tầng ứng dụng: role nằm ở \texttt{profiles.role}, chỉ nhận \texttt{\{user, admin\}}, role lạ bị ép về \texttt{user}. Dependency \texttt{get\_current\_admin} chặn 403 nếu \texttt{role != "admin"} --- gắn vào \textbf{toàn bộ} endpoint quản trị (users, credits, content, health, audit, app\_settings, model\_monitor) và cả pin/lock forum. Tầng database: bật \textbf{RLS} trên \texttt{manga\_pages}, \texttt{bubble\_data}, \texttt{embeddings}, \texttt{qa\_history} với policy owner-scoped \texttt{USING (auth.uid() = user\_id)}; bubble/embedding kế thừa quyền qua page cha. RAG dùng RPC \texttt{match\_embeddings} có tham số \texttt{filter\_user\_id} \arr\ chỉ tìm vector của chính người hỏi (đóng lỗ IDOR). Backend chạy service-role (bypass RLS) nên còn tự kiểm \texttt{user\_id} trong code trước mỗi thao tác.
+\end{qa}
+
+\begin{qa}{73. (3) Rate-limit theo endpoint (SlowAPI) --- mức giới hạn là bao nhiêu? \tagSP}
+\A Khoá phân biệt theo người: đã đăng nhập \arr\ \texttt{"u:"+sha256(access\_token)} (băm token, không lưu thô); ẩn danh \arr\ \texttt{"ip:"+client\_ip} (tôn trọng \texttt{X-Forwarded-For}). Lưu ở Redis nếu có \texttt{REDIS\_URL}, không thì in-memory. Các mức (\texttt{config.py}): đăng nhập \textbf{10/phút}, đăng ký \textbf{5/phút}, upload \textbf{30/phút}, Q\&A \textbf{30/phút}, tạo thread forum \textbf{5/phút}, trả lời \textbf{20/phút}, vote \textbf{60/phút}, đính kèm forum \textbf{30/phút}, narration \textbf{20/phút}. Mức hardcode: gửi lại email xác thực \textbf{3/phút}, OAuth callback \textbf{20/phút}, export GDPR \textbf{3/giờ}, \texttt{/scrape/preview} \textbf{20/phút}, \texttt{/scrape} \textbf{5/phút}. Vượt ngưỡng trả \textbf{HTTP 429}.
+\end{qa}
+
+\begin{qa}{74. (4) Captcha Turnstile ở đăng ký / quên mật khẩu --- chặn thế nào? \tagSP}
+\A \texttt{services/captcha.py} verify token \texttt{cf-turnstile-token} với Cloudflare (\texttt{.../siteverify}, timeout \textbf{5s}, gửi kèm \texttt{remoteip}). Là bước \textbf{đầu tiên} trong \texttt{register} và \texttt{forgot\_password}. Ba hành vi đáng lưu ý: (a) \textbf{tự tắt} khi \texttt{TURNSTILE\_SECRET\_KEY} rỗng \arr\ dev/free-tier không bị chặn; (b) thiếu token \arr\ chặn ngay \textbf{403} trước khi handler làm việc; (c) \textbf{fail-open} khi lỗi mạng tới Cloudflare (log warning rồi cho qua) để không phạt user vì upstream chập chờn. Hai endpoint này còn chống dò email (luôn trả 200 ``nếu email tồn tại\ldots'').
+\end{qa}
+
+\begin{qa}{75. (5) Security headers + CSP chặt trên mọi response --- gồm những gì? \tagSP}
+\A \texttt{SecurityHeadersMiddleware} thêm header cho \textbf{mọi} response --- được đăng ký \textit{cuối cùng} nên bọc luôn cả lỗi 4xx/5xx do rate-limit/body-size sinh ra, và cả trang \texttt{/docs}. Header: \texttt{X-Content-Type-Options: nosniff}; \texttt{X-Frame-Options: DENY}; \texttt{Referrer-Policy: strict-origin-when-cross-origin}; \texttt{Permissions-Policy} tắt camera/mic/geolocation/payment/usb; \texttt{Strict-Transport-Security max-age=63072000} (\textbf{2 năm}, includeSubDomains, preload). \textbf{CSP} rất chặt vì API không render HTML: \texttt{default-src 'none'} + \texttt{frame-ancestors 'none'} + \texttt{base-uri 'none'}, chỉ whitelist \texttt{cdn.jsdelivr.net} (assets Swagger UI) cho script/style/font. Dùng \texttt{setdefault} nên không đè header route tự đặt.
+\end{qa}
+
+\begin{qa}{76. (6) Kiểm tra ảnh upload --- chống MIME-spoof ra sao? \tagSP}
+\A \texttt{services/image\_validation.verify\_image\_bytes} \textbf{giải mã lại bytes} bằng Pillow \texttt{verify()} rồi kiểm \texttt{format} thuộc \texttt{\{JPEG, PNG, WEBP\}} --- một file script đổi đuôi \texttt{.jpg} sẽ bị bác vì không decode ra ảnh thật. Ở \texttt{/upload}, hệ thống validate \textbf{tất cả} file trước khi xử lý file nào (fail-fast) qua 4 bước: kiểm MIME header (fallback theo đuôi file), chặn file rỗng, chặn quá cỡ (\textbf{\texttt{MAX\_FILE\_SIZE\_MB}=20MB}/ảnh), rồi \texttt{verify\_image\_bytes}. Tổng body request chặn riêng ở \texttt{BodySizeLimitMiddleware} (\textbf{\texttt{MAX\_REQUEST\_SIZE\_MB}=200MB} \arr\ trả \textbf{413} trước khi đọc byte). Cùng hàm này tái dùng cho avatar (giới hạn \textbf{5MB}) và ảnh scrape.
+\end{qa}
+
+\begin{qa}{77. (7) Chống SSRF ở đường nhập từ nguồn ngoài --- allowlist gồm gì? \tagSP}
+\A Rủi ro: \texttt{/scrape} nhận URL tuỳ ý có thể bị ép gọi vào địa chỉ nội bộ (ví dụ endpoint metadata cloud \texttt{169.254.169.254}). \texttt{services/scraper.validate\_scrape\_url} kiểm 3 lớp: (a) scheme chỉ \texttt{http/https} (loại \texttt{file://}, \texttt{gopher://}\ldots); (b) phải có \texttt{netloc}; (c) \texttt{netloc} phải nằm \textbf{chính xác} trong \texttt{SUPPORTED\_DOMAINS} (mangaread.org, mangakakalot.com, chapmanganato.to, readmanganato.com, mangahere.cc\ldots --- các site Madara/WordPress đã biết). So khớp tuyệt đối nên \texttt{mangaread.org.evil.com} bị loại. Là bước \textbf{đầu tiên} ở cả \texttt{/scrape/preview} và \texttt{/scrape} trước mọi side-effect. Cùng nhóm: \texttt{routers/mangadex.py} là proxy tới đúng MangaDex API (đích cố định).
+\end{qa}
+
 \vspace{1em}
 \begin{center}\color{soft}\small --- Hết --- \\ Chúc nhóm bảo vệ tốt!\end{center}
 

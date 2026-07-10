@@ -144,37 +144,45 @@ def lookup_bubble_dictionary(
 
     prompt = _PROMPT.format(original=original_text, translation=translation or "(chưa có bản dịch)")
 
-    last_error: Exception | None = None
-    for _ in range(_pool.client_count() or 1):
-        client = _pool.next_client()
-        if client is None:
-            break
-        try:
-            response = client.models.generate_content(
-                model=settings.GEMINI_MODEL,
-                contents=prompt,
-            )
-            parsed = _extract_json(response.text or "")
-            if not parsed:
-                last_error = ValueError("Empty or unparseable Gemini response")
-                continue
+    from app.services import ai_telemetry
 
-            payload = {
-                "language": str(parsed.get("language") or _detect_language(original_text)),
-                "romaji": parsed.get("romaji") or None,
-                "tokens": parsed.get("tokens") or [],
-                "alternatives": [str(a) for a in (parsed.get("alternatives") or []) if a][:3],
-                "note": parsed.get("note") or None,
-            }
-            _cache_put(key, payload)
-            return payload, False
-        except Exception as exc:
-            last_error = exc
-            if _is_retryable_gemini_key_error(exc):
-                logger.warning("Dictionary lookup: Gemini key failed, rotating. Error: %s", exc)
-                continue
-            logger.error("Dictionary lookup failed: %s", exc)
-            break
+    with ai_telemetry.track("gemini", settings.GEMINI_MODEL, "dictionary.lookup") as tel:
+        last_error: Exception | None = None
+        for _ in range(_pool.client_count() or 1):
+            client = _pool.next_client()
+            if client is None:
+                break
+            try:
+                response = client.models.generate_content(
+                    model=settings.GEMINI_MODEL,
+                    contents=prompt,
+                )
+                um = getattr(response, "usage_metadata", None)
+                if um is not None:
+                    tel.prompt_tokens = int(getattr(um, "prompt_token_count", 0) or 0)
+                    tel.completion_tokens = int(getattr(um, "candidates_token_count", 0) or 0)
+                parsed = _extract_json(response.text or "")
+                if not parsed:
+                    last_error = ValueError("Empty or unparseable Gemini response")
+                    continue
 
-    logger.warning("Dictionary lookup exhausted: %s", last_error)
-    return _fallback_payload(original_text, translation), False
+                payload = {
+                    "language": str(parsed.get("language") or _detect_language(original_text)),
+                    "romaji": parsed.get("romaji") or None,
+                    "tokens": parsed.get("tokens") or [],
+                    "alternatives": [str(a) for a in (parsed.get("alternatives") or []) if a][:3],
+                    "note": parsed.get("note") or None,
+                }
+                _cache_put(key, payload)
+                return payload, False
+            except Exception as exc:
+                last_error = exc
+                if _is_retryable_gemini_key_error(exc):
+                    logger.warning("Dictionary lookup: Gemini key failed, rotating. Error: %s", exc)
+                    continue
+                logger.error("Dictionary lookup failed: %s", exc)
+                break
+
+        logger.warning("Dictionary lookup exhausted: %s", last_error)
+        tel.success = False
+        return _fallback_payload(original_text, translation), False
