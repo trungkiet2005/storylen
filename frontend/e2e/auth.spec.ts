@@ -46,8 +46,15 @@ test.describe("Auth flow", () => {
     await gotoApp(page, "/forgot-password");
     await expect(page.getByRole("heading", { name: /quên mật khẩu/i })).toBeVisible();
     await page.getByPlaceholder("name@example.com").fill("test@x.com");
-    await page.getByRole("button", { name: /gửi liên kết/i }).click();
-    await expect(page.getByText(/đã gửi email/i)).toBeVisible();
+    const submit = page.getByRole("button", { name: /gửi liên kết/i });
+    // Under `next dev` the route hydrates on demand, so the very first click can
+    // land before React wires the form's submit handler (the click then no-ops
+    // without firing a request). Retry click+assert until it takes — submitting
+    // a forgot-password request is idempotent, so re-clicking is safe.
+    await expect(async () => {
+      await submit.click();
+      await expect(page.getByText(/đã gửi email/i)).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 15000 });
   });
 
   test("register page renders form + link back to login", async ({ page }) => {
