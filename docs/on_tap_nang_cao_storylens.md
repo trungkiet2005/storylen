@@ -22,7 +22,8 @@
 * **Trả lời:**
   * **Hạn chế của COCOMO:** Mô hình COCOMO (Constructive Cost Model) đòi hỏi PM phải ước lượng được tương đối chính xác quy mô dự án thông qua số dòng code (KLOC - Kilo Lines of Code). Trong một dự án tích hợp nhiều công nghệ mới như AI, RAG và UI tương tác đè chữ, số lượng dòng code thực tế dao động rất lớn và không phản ánh đúng độ phức tạp của công việc (ví dụ: viết 10 dòng prompt cho Gemini API hoặc cấu hình 1 file DB schema có độ khó cao hơn hàng trăm dòng code HTML thuần túy).
   * **Giải pháp Agile (Story Points):** Nhóm sử dụng **Planning Poker** để cả 6 thành viên cùng thảo luận và thống nhất số **Story Points** (điểm câu chuyện) cho mỗi tính năng dựa trên 3 yếu tố: *độ phức tạp, độ bất định (rủi ro), và nỗ lực cần bỏ ra*.
-  * **Cách lập lịch biểu:** Sau 2 Sprint đầu tiên, nhóm đo được **Velocity (Vận tốc trung bình)** là **20 Story Points/Sprint**. Dựa vào tổng số điểm của Product Backlog, PM (Duy Minh) dễ dàng lập kế hoạch phát hành và chia Sprint Backlog một cách thực tế và khoa học hơn rất nhiều so với COCOMO.
+  * **Cách lập lịch biểu:** Nhóm chia Product Backlog thành **tổng 135 Story Points / 31 task** (xem `docs/management/StoryLens_Project_Plan.xlsx`, sheet WBS + Burndown). Sau 2 Sprint đầu, nhóm đo được **Velocity (Vận tốc trung bình) khoảng 22–23 Story Points/Sprint** (số thật từ Burndown: 23 / 24 / 23 / 26 / 22 / 17 điểm qua 6 sprint, trung bình ≈ 22,5). Dựa vào tổng điểm Backlog và velocity đo được, PM (Duy Minh) dễ dàng lập kế hoạch phát hành và chia Sprint Backlog thực tế hơn nhiều so với COCOMO.
+  * **⚠️ Lưu ý khi bảo vệ:** trả lời velocity là **"~22–23 SP/sprint, tổng 135 điểm"** — KHÔNG nói cứng "20", vì hội đồng có thể mở sheet Burndown thấy trung bình 22,5.
 
 ### 💬 Câu 2: Trong vai trò Project Manager, làm thế nào bạn theo dõi được năng suất (Capacity) và kiểm soát tiến độ thực tế của các thành viên?
 * **Trả lời:**
@@ -75,6 +76,21 @@
     *(Với $S$: Ký tự thay thế sai, $D$: Ký tự bị xóa/bỏ sót, $I$: Ký tự chèn thêm, $N$: Tổng số ký tự chuẩn gốc).*
   * **Ảnh hưởng thực tế:** Tỷ lệ lỗi 6.1% nghĩa là khi quét 100 ký tự tiếng Nhật/Trung gốc, có thể có 6 chữ bị đọc sai nét hoặc mất nét. 
   * Tuy nhiên, vì chữ sau khi quét được chuyển qua **Gemini LLM** để dịch, Gemini có khả năng **tự động sửa lỗi chính tả dựa vào ngữ cảnh** của cả câu thoại và mạch truyện. Do đó, ngay cả khi OCR bị sai vài nét chữ gốc, bản dịch tiếng Việt cuối cùng của Gemini vẫn đảm bảo tính tự nhiên và chính xác cao nhờ cơ chế tự sửa sai của mô hình ngôn ngữ lớn.
+
+### 💬 Câu 6b: (BẪY KHÓ) Bạn fine-tune manga-ocr cụ thể như thế nào? Chứng minh fine-tune thật sự tốt hơn model gốc?
+* **Trả lời — có ablation hợp lệ + artifact xác minh (số liệu thật từ `model_evaluation.docx` PA4):**
+  * **Cách fine-tune:** base là **`kha-white/manga-ocr-base`** (kiến trúc VisionEncoderDecoderModel), **fine-tune full** trên **Manga109-s**. Dataset OCR gồm **123.208 cặp** (crop bong bóng + nhãn chữ Nhật), chia **split-by-title (theo đầu truyện, chống rò rỉ dữ liệu), seed = 42** → Train 97.602 / Val 11.476 / **Test 14.130**. Cấu hình: **8 epochs, AdamW, lr = 3e-5, cosine schedule, warmup 5%, label-smoothing = 0.1, weight_decay = 0.01, fp16**, chọn checkpoint tốt nhất theo **CER val nhỏ nhất, early-stop patience 3**, huấn luyện trên **Kaggle Tesla T4**.
+  * **Bằng chứng fine-tune có tác dụng (ablation 2 vòng — CÙNG dataset / CÙNG test split / CÙNG base, chỉ khác cấu hình):**
+
+    | Phiên bản | Char-Acc | CER |
+    |---|---|---|
+    | PA2 (fine-tune sơ bộ, ít epoch) | 87,3% | **12,7%** |
+    | PA3 (fine-tune hoàn chỉnh) | 93,9% | **6,1%** |
+
+    → **CER giảm 12,7% → 6,1% ≈ giảm hơn 50% lỗi ký tự**. Con số này **khớp chính xác 4 chữ số** với artifact thật `ai_module/models/manga_ocr/weights/metadata.json` (test_cer = 0.061090, test_char_acc = 0.938910, test_exact_match = 0.674805) do chính script `03_train_ocr.py` ghi ra khi train → chứng minh đây là **output huấn luyện thật, không phải số gõ tay**.
+  * **⚠️ HAI cái bẫy phải né:**
+    1. **Đừng dùng demo n=1 để khoe fine-tune.** PA4 có 1 thực nghiệm sống base-vs-fine-tune trên **1 ảnh minh hoạ AI-generated ngoài phân phối** — ở mẫu đó bản fine-tune còn đọc sai 2 ký tự đầu. Nếu hội đồng chỉ vào đây, trả lời: *"Đó là 1 mẫu (n=1) ngoài phân phối Manga109-s, chỉ là smoke-test; bằng chứng chuẩn là test split 14.130 mẫu, CER 12,7% → 6,1%."*
+    2. **YOLOv8 KHÔNG có artifact gốc** (chỉ có `best.pt`, không có `results.csv`/PR-curve). Số **mAP@0.5 = 95,3%** lấy từ SAD PA3, chưa đối chiếu độc lập được → thừa nhận thẳng là "giới hạn minh bạch đã ghi nhận, hướng khắc phục là lưu `results.csv` khi train lại". Đừng khẳng định là có artifact.
 
 ---
 

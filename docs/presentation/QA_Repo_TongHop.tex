@@ -1,0 +1,305 @@
+% !TEX program = xelatex
+% StoryLens — ÔN VẤN ĐÁP TOÀN REPO (mọi thứ hội đồng có thể hỏi về repo)
+% Biên dịch: xelatex QA_Repo_TongHop.tex   (chạy 2 lần để có mục lục)
+\documentclass[11pt]{article}
+
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\newfontfamily\headfont{Arial}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{crimson}{HTML}{C0271A}
+\definecolor{ink}{HTML}{1A1712}
+\definecolor{gold}{HTML}{9C6B10}
+\definecolor{steel}{HTML}{285B7A}
+\definecolor{soft}{HTML}{6E665D}
+\definecolor{leaf}{HTML}{2F6B3A}
+
+\newcommand{\arr}{\,\ensuremath{\rightarrow}\,}
+\newcommand{\lte}{\ensuremath{\leq}}
+\newcommand{\gte}{\ensuremath{\geq}}
+\newcommand{\x}{\ensuremath{\times}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\B}[1]{\textbf{#1}}
+
+\newcommand{\tagCore}{\textcolor{steel}{\footnotesize\textbf{[Cốt lõi]}}}
+\newcommand{\tagTrap}{\textcolor{crimson}{\footnotesize\textbf{[BẪY]}}}
+\newcommand{\tagHonest}{\textcolor{gold}{\footnotesize\textbf{[Trung thực]}}}
+
+\titleformat{\section}{\Large\bfseries\headfont\color{crimson}}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries\headfont\color{ink}}{}{0em}{}
+\titlespacing{\section}{0pt}{14pt}{6pt}
+
+\pagestyle{fancy}\fancyhf{}
+\lhead{\footnotesize\headfont\textcolor{soft}{StoryLens · Ôn vấn đáp toàn repo}}
+\rhead{\footnotesize\headfont\textcolor{soft}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newtcolorbox{qa}[1]{breakable,enhanced,sharp corners,
+  boxrule=0.8pt,colframe=crimson,colback=crimson!3,
+  coltitle=white,colbacktitle=crimson,fonttitle=\bfseries\headfont\small,
+  title={#1},left=7pt,right=7pt,top=5pt,bottom=6pt,
+  before skip=7pt,after skip=7pt}
+\newcommand{\A}{\textbf{\textcolor{crimson}{Trả lời. }}}
+
+\newtcolorbox{sohoc}{breakable,enhanced,sharp corners,
+  boxrule=0.8pt,colframe=gold,colback=gold!6,
+  coltitle=white,colbacktitle=gold,fonttitle=\bfseries\headfont\small,
+  title={Số liệu \& sự thật repo phải thuộc},left=7pt,right=7pt,top=5pt,bottom=6pt}
+
+\setlist[itemize]{leftmargin=1.4em,itemsep=1pt,topsep=2pt}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{2.0cm}
+{\headfont\bfseries\fontsize{15}{18}\selectfont\textcolor{soft}{ÔN VẤN ĐÁP BẢO VỆ ĐỒ ÁN}}\\[6pt]
+{\headfont\bfseries\fontsize{34}{38}\selectfont\textcolor{ink}{Toàn bộ Repository}}\\[6pt]
+{\large\headfont\textcolor{crimson}{Mọi thứ hội đồng có thể hỏi về mã nguồn StoryLens}}\\[10pt]
+{\color{crimson}\rule{9cm}{2pt}}\\[10pt]
+{\large Monorepo 3 dịch vụ · Frontend · Backend · AI Module · CI/CD · Test · Deploy}\\[4pt]
+{\color{soft}\large Đọc kèm \texttt{QA\_DuyMinh.pdf} (vai trò cá nhân) + \texttt{QA\_DuyMinh\_ThuatNgu.pdf} (thuật ngữ)}\\[2.0cm]
+\begin{tabular}{rl}
+\textbf{Môn học} & CSC10011 -- Công nghệ phần mềm cho hệ thống Trí tuệ Nhân tạo\\[3pt]
+\textbf{Nhóm} & Nhóm 1 -- StoryLens · HCMUS · 10/07/2026\\
+\end{tabular}
+\vfill
+{\color{soft}\small Nhãn: \tagCore\ phải thuộc · \tagTrap\ câu gài dễ mất điểm · \tagHonest\ trả lời trung thực + định hướng}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ═══════════════════════════════════════════════════════════════
+\section{Tổng quan repository (monorepo)}
+
+\begin{qa}{Repo được tổ chức thế nào? Vì sao gộp 3 dịch vụ trong một repo? \tagCore}
+\A Repo là \B{monorepo} gồm ba dịch vụ triển khai độc lập + tài liệu:
+\begin{itemize}
+  \item \code{frontend/} --- Next.js 16 + React 19 + TypeScript (deploy Vercel).
+  \item \code{backend/} --- FastAPI + Python 3.11, vai trò API Gateway (deploy Render, Docker).
+  \item \code{ai\_module/} --- FastAPI + PyTorch, chứa model nặng $\sim$4GB (deploy HuggingFace Spaces).
+  \item \code{docs/} (SAD/SRS/SDP/PA1--PA5), \code{supabase/} (config), \code{render.yaml} (IaC), \code{.github/workflows/ci.yml}.
+\end{itemize}
+Monorepo giúp một Pull Request thay đổi xuyên frontend + backend cùng lúc, review chung, phiên bản đồng bộ; nhưng mỗi thư mục vẫn \B{build \& deploy độc lập}.
+\end{qa}
+
+\begin{qa}{Ba dịch vụ giao tiếp với nhau ra sao? \tagCore}
+\A Frontend gọi Backend qua REST \code{/v1/*} (+ WebSocket \code{/v1/ws/*}); Backend gọi AI Module qua HTTP và gọi Gemini API; cả ba dùng chung Supabase (Postgres + Auth + Storage). Ảnh không truyền byte thô giữa backend và AI Module --- AI Module tự tải ảnh từ URL Supabase Storage.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Frontend (\texttt{frontend/})}
+
+\begin{qa}{Ngăn xếp frontend là gì? \tagCore}
+\A \B{Next.js 16.2.6} (App Router) + \B{React 19.2.4} + \B{TypeScript} + \B{Tailwind} + \B{Framer Motion} (animation). Kèm \code{@sentry/nextjs} (giám sát lỗi), \code{pdfjs-dist} (đọc PDF), \code{react-easy-crop} (cắt avatar), và hỗ trợ \B{PWA} đọc offline. Không dùng Redux/Zustand --- chỉ React Context.
+\end{qa}
+
+\begin{qa}{App Router là gì? Trang được tổ chức thế nào? \tagCore}
+\A App Router (Next.js) định tuyến theo \B{thư mục}: mỗi \code{page.tsx} trong \code{src/app/<route>/} là một route. Repo có $\sim$24 route: \code{/} (home), \code{/login}, \code{/register}, \code{/upload}, \code{/reader}, \code{/qa}, \code{/library}, \code{/browse}, \code{/series}, \code{/forum}, \code{/history}, \code{/bookmarks}, \code{/plans}, \code{/settings}, \code{/profile/security}, và nhóm \code{/admin/*} (analytics, users, content, health, model-monitor, audit, settings, ai-source).
+\end{qa}
+
+\begin{qa}{Vì sao mọi lời gọi API đều qua \texttt{src/lib/api.ts}? \tagCore}
+\A \code{api.ts} là \B{fetch wrapper tập trung}: gom \code{BASE\_URL}, gắn cookie credentials, \B{retry khi backend cold-start}, gắn \B{Idempotency-Key} cho thao tác ghi, và trả về \B{kiểu TypeScript} rõ ràng (UploadResponse, PageStatus, BubbleData\ldots). Quy ước: \B{cấm gọi \code{fetch()} trực tiếp trong component} --- để mọi request có cùng hành vi retry/lỗi/kiểu.
+\end{qa}
+
+\begin{qa}{State toàn cục quản lý thế nào? \tagCore}
+\A Ba React Context: \B{AuthContext} (phiên đăng nhập, hydrate qua \code{/auth/me}), \B{WibuContext} (gamification: bookmark, rating, goal), \B{I18nContext} (song ngữ VI/EN lưu localStorage). Ba theme \code{light/dark/sepia} qua \code{[data-theme]} trên \code{<html>}.
+\end{qa}
+
+\begin{qa}{Token đăng nhập lưu ở đâu trên frontend? \tagTrap}
+\A \B{Không lưu token trong localStorage.} Frontend không bao giờ thấy token --- backend đặt access/refresh token vào \B{HTTP-only cookie}, JS không đọc được (chống XSS). Frontend chỉ biết ``đã đăng nhập'' qua \code{/auth/me}. (\code{NEXT\_PUBLIC\_SUPABASE\_ANON\_KEY} chỉ dùng cho trang \code{/reset-password}.)
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Backend (\texttt{backend/}) --- tóm tắt}
+
+\begin{qa}{Vai trò backend trong kiến trúc? \tagCore}
+\A \B{API Gateway điều phối, KHÔNG chứa model ML.} Chạy Render free tier 512MB nên không thể nạp model vài GB --- toàn bộ việc nặng ủy thác cho AI Module qua HTTP. Backend: nhận request, gọi AI Module + Gemini, lưu Supabase, đẩy tiến trình qua WebSocket. Gồm \B{24 router} + \B{26 service}; router chỉ validate, business logic nằm ở \code{services/} (Layered Architecture).
+\end{qa}
+
+\begin{qa}{Luồng upload-dịch một trang đi qua backend thế nào? \tagCore}
+\A \code{POST /v1/upload} \arr\ (1) kiểm Idempotency-Key; (2) kiểm credit + batch size; (3) validate từng ảnh (Pillow \code{verify()} chống giả MIME); (4) lưu Storage + tạo record \code{manga\_pages}; (5) trừ 1 credit; (6) chạy \B{thread nền} giới hạn bởi \B{semaphore (tối đa 10 luồng)}. Thread gọi AI Module \arr\ lưu \code{bubble\_data} + \code{translation\_history} + \code{embeddings} (vector 768 chiều) \arr\ cập nhật status + đẩy WebSocket.
+\end{qa}
+
+\begin{qa}{RAG Q\&A chống rò rỉ dữ liệu chéo ở đâu trong code? \tagCore}
+\A Trong \code{services/rag.py}, hàm \code{answer\_question} gọi RPC \code{match\_embeddings} với tham số \B{\code{filter\_user\_id}} --- pgvector chỉ tìm trong truyện của đúng người dùng đó (đóng lỗ hổng IDOR), kèm ngưỡng cosine \code{RAG\_MIN\_SIMILARITY = 0.55}. Câu trả lời kèm nguồn trích; Gemini chết thì trả extractive, \B{không bịa}.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{AI Module (\texttt{ai\_module/}) --- lõi ML}
+
+\begin{qa}{AI Module là gì? Chứa những gì? \tagCore}
+\A Dịch vụ FastAPI \B{tự chứa} (self-contained): \code{main.py} nạp \code{server.main}, in ra một \B{nonce} (khoá phiên) và expose \code{/health}. Bên trong \code{manga\_translator/} là pipeline 5 bước, mặc định: detector \code{manga\_yolo} \arr\ OCR \code{mocr} (manga-ocr) \arr\ inpainter \code{lama\_large} \arr\ translator \code{gemini} \arr\ renderer \code{manga2eng\_pillow}. Ảnh Docker $\sim$4GB, chạy \B{CPU-only} trên HF Spaces free tier.
+\end{qa}
+
+\begin{qa}{Pipeline dịch 5--6 bước cụ thể? \tagCore}
+\A (1) \B{YOLOv8} phát hiện bong bóng \arr\ bbox; (2) \B{manga-ocr} đọc chữ Nhật trong từng bbox; (3) \B{LaMa} inpaint xoá chữ gốc khỏi ảnh; (4) \B{Gemini} dịch có ngữ cảnh sang tiếng Việt; (5) \B{renderer} vẽ chữ Việt vào đúng khung (binary-search chọn cỡ chữ vừa khít); (6) backend sinh \B{embedding} lưu pgvector cho RAG.
+\end{qa}
+
+\begin{qa}{Vì sao AI Module tách riêng, không nhét vào backend? \tagCore}
+\A Model (YOLOv8, manga-ocr, LaMa) nặng vài GB, cần RAM lớn; backend Render free tier chỉ 512MB không tải nổi. Tách riêng \arr\ cô lập lỗi (AI Module sập, người dùng vẫn đọc truyện đã dịch + forum), và scale độc lập (đem AI Module lên GPU khi cần). Đánh đổi: thêm latency HTTP --- khắc phục bằng WebSocket báo tiến trình thời gian thực.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Huấn luyện \& Mô hình (\texttt{ai\_module/training/})}
+
+\begin{qa}{Code huấn luyện nằm ở đâu? Có phải nhóm tự train thật không? \tagCore}
+\A Có, code thật trong \code{ai\_module/training/manga109/}: \code{01\_parse\_visualize.py} (đọc annotation Manga109-s), \code{02\_convert\_to\_yolo.py} (chuyển bbox \code{<text>} sang nhãn YOLO 1 lớp), \code{03\_train\_ocr.py} (fine-tune OCR end-to-end). Chạy trên \B{Kaggle GPU T4}.
+\end{qa}
+
+\begin{qa}{Fine-tune OCR cụ thể trong code làm gì? \tagCore}
+\A \code{03\_train\_ocr.py}: [1] trích cặp (crop + text) từ XML Manga109-s, \B{split theo title 80/10/10} chống leak, lọc bbox nhỏ/text rỗng/quá dài; [2] fine-tune \B{VisionEncoderDecoderModel} (\code{kha-white/manga-ocr-base}) bằng HuggingFace \B{Seq2SeqTrainer}, \B{AdamW + cosine LR + label smoothing + fp16}; [3] đánh giá \B{CER + char-acc + exact-match} trên test; [5] lưu model + \code{metadata.json}; [6] tùy chọn push lên HuggingFace Hub cho production.
+\end{qa}
+
+\begin{qa}{Kết quả huấn luyện? \tagCore}
+\A OCR: \B{CER 6,1\%} (char-acc 93,9\%, exact-match 67,5\%); ablation \B{PA2 12,7\% \arr\ PA3 6,1\%}, xác minh bằng \code{metadata.json} (test\_cer = 0.061090). YOLOv8: \B{mAP@0.5 = 95,3\%}, mAP@0.5:0.95 = 84,4\%, Precision 97,3\%, Recall 93,8\%, ngưỡng 85\% --- đều vượt. Test split: 956 ảnh / 14.130 vùng chữ.
+\end{qa}
+
+\begin{qa}{Điểm yếu về artifact mô hình? \tagHonest}
+\A YOLOv8 \B{không còn artifact gốc} (\code{results.csv}/PR-curve), chỉ có \code{best.pt}; số mAP dựa vào SAD PA3 --- giới hạn minh bạch đã ghi nhận. OCR thì có \code{metadata.json} đối chiếu được. Hướng khắc phục: lưu \code{results.csv} khi train lại.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Database \& Migrations (\texttt{backend/*.sql})}
+
+\begin{qa}{Cơ sở dữ liệu dùng gì? Có extension gì đặc biệt? \tagCore}
+\A \B{Supabase PostgreSQL} + extension \B{pgvector} (lưu/tìm vector RAG 768 chiều) + \B{pg\_trgm} (tìm kiếm mờ theo chuỗi). Kèm Supabase Auth + Storage (4 bucket: \code{manga-originals}, \code{manga-thumbnails} private; \code{avatars} public read; \code{manga-audio} narration).
+\end{qa}
+
+\begin{qa}{Quản lý thay đổi schema thế nào? \tagCore}
+\A $\sim$18 file migration \B{đánh số phiên bản} chạy tuần tự: base \arr\ credits \arr\ series \arr\ wibu \arr\ admin \arr\ v2\ldots v9. Mọi migration \B{idempotent} (\code{IF NOT EXISTS}) nên chạy lại an toàn. Đáng chú ý: \code{v7\_rag} (cột \code{vector(768)} + RPC \code{match\_embeddings} owner-scoped), \code{v8\_model\_monitor}, \code{v9\_ai\_call\_metrics}. Render free tier không có pre-deploy hook nên \B{migration chạy tay} trước khi push (\code{python -m app.scripts.apply\_migrations}).
+\end{qa}
+
+\begin{qa}{Bảo mật mức dữ liệu (RLS) hoạt động thế nào? \tagCore}
+\A \B{Row Level Security} trên Supabase: mỗi bảng dữ liệu người dùng có \code{owner\_id}/\code{user\_id}; policy tự thêm điều kiện \code{= auth.uid()} vào mọi truy vấn \arr\ user A không đọc được dữ liệu user B ngay ở tầng DB, kể cả nếu tầng ứng dụng có sơ hở.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{CI/CD \& Quy trình Git}
+
+\begin{qa}{CI chạy những gì? \tagCore}
+\A \code{.github/workflows/ci.yml} chạy \B{5 job song song} trên GitHub Actions: (1) \B{test} = \code{tsc --noEmit} + \code{vitest}; (2) \B{lint} = ESLint; (3) \B{build} = \code{next build}; (4) \B{e2e} = Playwright (chromium + mobile); (5) \B{backend} = \code{pytest}. Chỉ khi tất cả xanh + có review thì mới merge \code{main}.
+\end{qa}
+
+\begin{qa}{(BẪY) CI có chạy khi CHỈ sửa backend không? \tagTrap}
+\A Trung thực: workflow cấu hình \code{paths: frontend/**} nên \B{CI chỉ trigger khi có thay đổi trong \code{frontend/}} (hoặc chính file workflow). Thay đổi \B{chỉ ở backend} hiện KHÔNG tự kích hoạt CI. Job \code{backend pytest} nằm trong cùng workflow nên chạy kèm khi frontend đổi. \B{Nếu bị hỏi}: thừa nhận đây là điểm cần cải thiện --- nên thêm \code{backend/**} vào \code{paths} để bảo vệ backend độc lập. (Đừng khẳng định ``mọi push backend đều chạy CI''.)
+\end{qa}
+
+\begin{qa}{Nhóm dùng chiến lược nhánh (branch) nào? \tagCore}
+\A Nhánh chính \code{main} (production, auto-deploy). CI trigger trên \code{main}, \code{dev}, và nhánh tính năng cá nhân (vd \code{duong}). Mọi thay đổi vào \code{main} phải qua \B{Pull Request + review + CI xanh} --- không push thẳng. Đây là thực hành XP (Continuous Integration + code review).
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Kiểm thử (Testing)}
+
+\begin{qa}{Nhóm kiểm thử ở những tầng nào? (test pyramid) \tagCore}
+\A Theo hình chóp kiểm thử --- nhiều unit, ít E2E:
+\begin{itemize}
+  \item \B{Frontend unit/component:} Vitest + React Testing Library (\code{frontend/\_\_tests\_\_/}: unit, components, integration).
+  \item \B{Frontend E2E:} Playwright (\code{frontend/e2e/}): \code{auth}, \code{home}, \code{protected-pages}, \code{edge-cases}, \code{mobile}, \code{forum}, \code{narration}.
+  \item \B{Backend:} pytest 14 file (\code{test\_rag}, \code{test\_recap}, \code{test\_idempotency}, \code{test\_scraper}, \code{test\_forum}, narration $\times$3, \code{test\_tts\_registry}, \code{test\_vlm\_client}, \code{test\_ai\_telemetry}, \code{test\_alerting}, \code{test\_migration\_contract}\ldots), dùng \code{respx} giả lập HTTP.
+  \item \B{Katalon Studio (PA5):} kịch bản record\&playback cho UC01, UC02 --- báo cáo học thuật.
+\end{itemize}
+\end{qa}
+
+\begin{qa}{Verification vs Validation trong repo? \tagCore}
+\A \B{Verification} (đúng đặc tả): tsc + vitest + pytest tự động trong CI. \B{Validation} (đúng cái người dùng cần): Playwright mô phỏng hành trình thật + UAT beta mời người đọc manga thử.
+\end{qa}
+
+\begin{qa}{Defect log trống (0 defect) --- có đáng ngờ không? \tagTrap}
+\A Thừa nhận: test report ghi 61/61 Pass, defect log rỗng. Nếu bị hỏi ``test cho có?'' \arr\ giải thích test bắt lỗi \B{trong lúc phát triển} (CI báo đỏ là fix ngay, không lọt vào report cuối); và có thể \B{trích 1--2 bug thật từ git history} (vd bug HTTP/2 broken pipe ở \code{database.py}, bug ``trang ma'' khi restart) làm ví dụ found\arr fixed\arr retested.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Triển khai \& Vận hành}
+
+\begin{qa}{Bốn nền tảng triển khai? \tagCore}
+\A \B{Vercel} (frontend, CDN toàn cầu); \B{Render} (backend Docker, free 512MB, Singapore, auto-deploy \code{main}, healthcheck \code{/health}); \B{HuggingFace Spaces} (AI Module $\sim$4GB, deploy thủ công); \B{Supabase} (Postgres + pgvector + Auth + Storage, AWS us-east-1). Ba dịch vụ đầu auto-deploy khi push \code{main}.
+\end{qa}
+
+\begin{qa}{Cold start là gì? Nhóm xử lý ra sao? \tagCore}
+\A Render/HF Spaces free tier \B{ngủ sau $\sim$15 phút nhàn rỗi}; request đầu tiên chậm $\sim$30--60s (cold start). Giảm bằng \B{keep-alive} (GitHub Action ping định kỳ) + \code{api.ts} \B{retry khi cold-start} + backend degrade an toàn (health báo \code{degraded} thay vì sập).
+\end{qa}
+
+\begin{qa}{Có backup/khôi phục không? \tagCore}
+\A Supabase \B{PITR (Point-in-Time Recovery) 7 ngày} (WAL liên tục); \code{pg\_dump} thủ công trước mỗi migration rủi ro; Storage bật versioning; ảnh gốc soft-delete 30 ngày. Có runbook sự cố (rollback Render, restart pool, xoay key Gemini).
+\end{qa}
+
+\begin{qa}{Scale nhiều replica thế nào (nếu tải tăng)? \tagHonest}
+\A Hiện chạy 1 replica (free tier); cancel + event-bus + rate-limit lưu trong RAM. Đã có sẵn đường \B{\code{REDIS\_URL}}: set biến này thì state chuyển sang Redis, cancel/event-bus/rate-limit hoạt động xuyên nhiều replica --- cùng API, chỉ khác chỗ lưu. Đây là điểm thiết kế trưởng thành đáng khoe.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Bảo mật toàn repo (tổng hợp)}
+
+\begin{qa}{Kể các lớp bảo mật trong mã nguồn. \tagCore}
+\begin{center}\small
+\begin{tabular}{l l}
+\toprule
+Mối đe doạ & Phòng thủ (file) \\
+\midrule
+XSS đánh cắp token & HTTP-only cookie (\code{auth.py}) \\
+CSRF & Double-submit token + SameSite (\code{middleware.py}) \\
+Rò rỉ chéo (IDOR) & \code{filter\_user\_id} RAG + RLS (\code{rag.py}) \\
+SSRF (import ảnh) & Domain allowlist (\code{scraper.py}) \\
+Giả mạo MIME & Pillow \code{verify()} (\code{image\_validation.py}) \\
+Spam/abuse & Rate limit SlowAPI (\code{rate\_limit.py}) \\
+Bot & Turnstile CAPTCHA (\code{captcha.py}) \\
+Header attack & CSP/HSTS/nosniff/X-Frame (\code{middleware.py}) \\
+Quá tải/OOM & Semaphore + BodySizeLimit \\
+Double-charge & Idempotency key (\code{idempotency.py}) \\
+\bottomrule
+\end{tabular}
+\end{center}
+Đây là \B{Defense in Depth} --- nhiều lớp, thủng lớp này còn lớp khác. Nguyên tắc LN12: enforce bằng code, không chỉ hứa.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Câu bẫy toàn repo \& điểm yếu phải thủ}
+
+\begin{enumerate}[leftmargin=1.6em,itemsep=3pt]
+  \item \B{Backend chạy đa luồng nhưng Render 1 process?} \arr\ semaphore giới hạn 10 luồng; có đường Redis để scale replica.
+  \item \B{CI không chạy khi chỉ sửa backend} (\code{paths: frontend/**}) \arr\ thừa nhận, hướng thêm \code{backend/**}.
+  \item \B{Embedding sinh ở backend gọi Gemini (tốn quota)} \arr\ đổi lấy đồng bộ 1 nhà cung cấp + không nạp thêm model vào AI Module; có key rotation + cache.
+  \item \B{YOLO thiếu artifact gốc} \arr\ chỉ có \code{best.pt}; hướng lưu \code{results.csv}.
+  \item \B{CER 6,1\% chỉ đo in-distribution} \arr\ OOD chưa đo số; bù bằng Gemini self-correction + Studio QC.
+  \item \B{Defect log rỗng} \arr\ trích bug thật từ git history nếu bị hỏi.
+  \item \B{Migration chạy tay} (free tier không có pre-deploy hook) \arr\ mọi migration idempotent nên an toàn; nâng Starter \$7 để tự động.
+  \item \B{Tài liệu PA ghi ChromaDB/GPT-4} \arr\ tiến hoá RUP; sản phẩm cuối pgvector/Gemini tốt hơn; Risk R4 ghi rõ.
+  \item \B{Model monitoring đầy đủ (MLOps)?} \arr\ có nền \code{model\_monitor} + \code{/metrics} Prometheus; drift dashboard là roadmap W\&B/MLflow.
+  \item \B{Bản quyền} \arr\ train Manga109-s (license nghiên cứu); user content Private + kiểm duyệt + DMCA roadmap; Risk R5.
+\end{enumerate}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Phụ lục --- Cheat-sheet số liệu repo}
+
+\begin{sohoc}
+\begin{itemize}
+  \item \B{Cấu trúc:} 3 dịch vụ (frontend Vercel / backend Render 512MB / AI Module HF $\sim$4GB) + Supabase.
+  \item \B{Backend:} 24 router, 26 service; API prefix \code{/v1}; semaphore 10 luồng; embedding 768 chiều; RAG top-k=5, min-sim=0.55.
+  \item \B{Frontend:} Next.js 16.2.6, React 19.2.4; $\sim$24 route; 3 context; 3 theme; PWA.
+  \item \B{CI:} 5 job (test/lint/build/e2e/backend); Playwright chromium+mobile; branch main/dev/duong.
+  \item \B{Test:} pyramid --- Vitest+RTL, Playwright 7 spec, pytest 14 file, Katalon (PA5 UC01/UC02).
+  \item \B{Mô hình:} OCR CER 6,1\% (12,7\%\arr6,1\%); YOLO mAP@0.5 95,3\%; test 956 ảnh/14.130 vùng chữ; Kaggle T4.
+  \item \B{DB:} Supabase Postgres + pgvector + pg\_trgm; $\sim$18 migration v1--v9; 4 storage bucket; RLS.
+  \item \B{Deploy:} auto-deploy \code{main}; healthcheck \code{/health}; PITR 7 ngày; keep-alive chống cold start.
+\end{itemize}
+\end{sohoc}
+
+\vspace{6pt}
+\begin{center}\small\color{soft}
+Ôn vấn đáp toàn repo --- StoryLens · CSC10011 (HCMUS) · đọc kèm QA\_DuyMinh + Từ điển thuật ngữ.
+\end{center}
+
+\end{document}

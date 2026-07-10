@@ -51,7 +51,7 @@
 * **Trả lời:**
   * Do dự án là phi thương mại và phát triển theo mô hình Agile, nhóm sử dụng kỹ thuật **Planning Poker** kết hợp với **Story Points** để ước lượng nỗ lực một cách tương đối thay vì dùng COCOMO thuần túy (vì COCOMO yêu cầu biết trước số dòng code KLOC, thứ cực kỳ khó đoán định ở giai đoạn đầu của dự án AI).
   * Nhóm lấy tính năng "Auth (Đăng nhập/Đăng ký)" làm mốc chuẩn (độ khó = 2 Story Points). Sau đó các thành viên so sánh tính năng khác với mốc này để gán điểm (ví dụ: "Pipeline AI" có độ khó gấp nhiều lần $\to$ 8 Story Points).
-  * Sau Sprint 1 và 2, nhóm đo được **Velocity (Vận tốc của nhóm)** khoảng 20 Story Points/Sprint, từ đó PM dễ dàng dự báo được các tính năng trong Product Backlog cần bao nhiêu Sprint để hoàn thành và lập lịch biểu thực tế.
+  * Sau Sprint 1 và 2, nhóm đo được **Velocity (Vận tốc của nhóm) khoảng 22–23 Story Points/Sprint** (tổng backlog **135 điểm / 31 task**; Burndown thật: 23 / 24 / 23 / 26 / 22 / 17 qua 6 sprint), từ đó PM dễ dàng dự báo các tính năng trong Product Backlog cần bao nhiêu Sprint để hoàn thành và lập lịch biểu thực tế. *(Khi bị hỏi, nói "~22–23 SP/sprint, tổng 135 điểm" cho khớp file Burndown, đừng nói "20".)*
 
 ---
 

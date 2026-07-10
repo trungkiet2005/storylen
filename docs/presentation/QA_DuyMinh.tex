@@ -1,0 +1,370 @@
+% !TEX program = xelatex
+% StoryLens — Bộ câu hỏi & trả lời VẤN ĐÁP dành riêng cho Đào Sỹ Duy Minh (PM & AI/ML)
+% Biên dịch: xelatex QA_DuyMinh.tex   (chạy 2 lần để có mục lục)
+\documentclass[11pt]{article}
+
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\newfontfamily\headfont{Arial}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{crimson}{HTML}{C0271A}
+\definecolor{ink}{HTML}{1A1712}
+\definecolor{gold}{HTML}{9C6B10}
+\definecolor{steel}{HTML}{285B7A}
+\definecolor{soft}{HTML}{6E665D}
+\definecolor{leaf}{HTML}{2F6B3A}
+
+\newcommand{\arr}{\,\ensuremath{\rightarrow}\,}
+\newcommand{\lte}{\ensuremath{\leq}}
+\newcommand{\gte}{\ensuremath{\geq}}
+\newcommand{\x}{\ensuremath{\times}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+% Nhãn mức độ / loại câu
+\newcommand{\tagCore}{\textcolor{steel}{\footnotesize\textbf{[Cốt lõi]}}}
+\newcommand{\tagTrap}{\textcolor{crimson}{\footnotesize\textbf{[BẪY]}}}
+\newcommand{\tagHonest}{\textcolor{gold}{\footnotesize\textbf{[Trung thực]}}}
+
+\titleformat{\section}{\Large\bfseries\headfont\color{crimson}}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\large\bfseries\headfont\color{ink}}{}{0em}{}
+\titlespacing{\section}{0pt}{14pt}{6pt}
+
+\pagestyle{fancy}\fancyhf{}
+\lhead{\footnotesize\headfont\textcolor{soft}{StoryLens · Ôn vấn đáp — Đào Sỹ Duy Minh}}
+\rhead{\footnotesize\headfont\textcolor{soft}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Khối câu hỏi–trả lời
+\newtcolorbox{qa}[1]{breakable,enhanced,sharp corners,
+  boxrule=0.8pt,colframe=crimson,colback=crimson!3,
+  coltitle=white,colbacktitle=crimson,fonttitle=\bfseries\headfont\small,
+  title={#1},left=7pt,right=7pt,top=5pt,bottom=6pt,
+  before skip=7pt,after skip=7pt}
+\newcommand{\A}{\textbf{\textcolor{crimson}{Trả lời. }}}
+
+% Khối "số liệu phải thuộc" / mẹo
+\newtcolorbox{sohoc}{breakable,enhanced,sharp corners,
+  boxrule=0.8pt,colframe=gold,colback=gold!6,
+  coltitle=white,colbacktitle=gold,fonttitle=\bfseries\headfont\small,
+  title={Số liệu \& mẹo phải thuộc},left=7pt,right=7pt,top=5pt,bottom=6pt}
+
+\setlist[itemize]{leftmargin=1.4em,itemsep=1pt,topsep=2pt}
+
+\begin{document}
+
+% ─────────── Bìa ───────────
+\begin{titlepage}
+\centering
+\vspace*{2.0cm}
+{\headfont\bfseries\fontsize{15}{18}\selectfont\textcolor{soft}{ÔN VẤN ĐÁP BẢO VỆ ĐỒ ÁN — SỔ TAY CÁ NHÂN}}\\[6pt]
+{\headfont\bfseries\fontsize{40}{44}\selectfont\textcolor{ink}{Đào Sỹ Duy Minh}}\\[6pt]
+{\large\headfont\textcolor{crimson}{Project Manager \& AI/ML Engineer · MSSV 23122041}}\\[10pt]
+{\color{crimson}\rule{9cm}{2pt}}\\[10pt]
+{\large Dự án \textbf{StoryLens} — Nền tảng AI dịch \& hỏi--đáp Manga theo ngữ cảnh}\\[4pt]
+{\color{soft}\large Trình bày slide 1--5 · phụ trách Q\&A: Quản lý dự án, AI/ML, chất lượng dịch, bản quyền}\\[2.2cm]
+\begin{tabular}{rl}
+\textbf{Môn học} & CSC10011 -- Công nghệ phần mềm cho hệ thống Trí tuệ Nhân tạo\\[3pt]
+\textbf{GVHD} & GS.TS Nguyễn Văn Vũ, ThS. Trương Phước Lộc, ThS. Ngô Ngọc Đăng Khoa\\[3pt]
+\textbf{Nhóm} & Nhóm 1 -- StoryLens · Ngày báo cáo 10/07/2026\\[3pt]
+\textbf{Vai trò Q\&A} & PM (LN03) · Fine-tune OCR + Prompt dịch (LN07) · Bản quyền/Đạo đức (LN12)\\
+\end{tabular}
+\vfill
+{\color{soft}\small Nhãn: \tagCore\ câu nền tảng phải thuộc · \tagTrap\ câu gài dễ mất điểm · \tagHonest\ phải trả lời trung thực, có định hướng}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ═══════════════════════════════════════════════════════════════
+\section{Chốt trong 30 giây: ``Minh đã làm gì?''}
+
+\begin{qa}{Nếu hội đồng hỏi thẳng: bạn đóng góp cụ thể gì trong dự án?}
+\A Em giữ \textbf{hai vai}: điều phối dự án và trực tiếp làm hai mắt xích AI quyết định chất lượng bản dịch.
+\begin{itemize}
+  \item \textbf{Quản lý (PM):} chọn quy trình \textbf{RUP rút gọn + Scrum} (sprint 2 tuần, 4 pha Inception\arr Elaboration\arr Construction\arr Transition); lập \& duy trì \textbf{Product/Sprint Backlog, WBS 31 task (135 story point), Gantt, Staff allocation, Risk register RE = P\x L, RTM, Burndown, Scrum log}; ước lượng bằng \textbf{Planning Poker + Story Points}; và bắt buộc \textbf{mọi Pull Request phải được review + CI xanh} mới merge vào \code{main}.
+  \item \textbf{AI/ML (code thật):} \textbf{fine-tune manga-ocr} cho manga tiếng Nhật (\textbf{CER 6,1\%}, độ chính xác ký tự 93,9\%); \textbf{prompt engineering} cho \textbf{Gemini 2.5 Flash} dịch \textbf{theo cả trang} để giữ ngữ cảnh, xưng hô; và tối ưu quota API (caching, batch, xoay vòng key).
+  \item \textbf{Task cụ thể trong WBS:} T1.2 (setup repo/board), \textbf{T2.1 fine-tune OCR trên Kaggle T4 (8 điểm)}, T4.1 (embedding pipeline / vector store), T5.3 (fix bug), T5.4 (tối ưu quota RPD), T6.5 (final deploy \& smoke test).
+\end{itemize}
+\textit{Câu nói mạnh:} ``Em vừa giữ nhịp dự án, vừa chịu trách nhiệm trực tiếp cho hai bước AI quyết định chất lượng: đọc chữ (OCR) và dịch có ngữ cảnh (prompt LLM).''
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Phần Minh thuyết trình (slide 1--5) --- kể như một câu chuyện}
+
+\begin{qa}{Slide 3 --- Vấn đề: vì sao thị trường cần StoryLens? \tagCore}
+\A Cộng đồng đọc manga Việt (chủ yếu \textbf{15--28 tuổi}) rất lớn nhưng gặp \textbf{ba rào cản}:
+\begin{itemize}
+  \item \textbf{Fan-sub} ra chậm, chất lượng không đều, nhiều bộ bỏ dở vì thiếu nhân lực.
+  \item Công cụ tự động (\textbf{Google Lens}) dịch \textbf{từng câu, mất ngữ cảnh} --- không giữ xưng hô/mạch truyện; DeepL/ChatGPT phải thao tác thủ công từng ảnh.
+  \item Người đọc \textbf{không có cách hỏi ngay} về nội dung truyện.
+\end{itemize}
+Gói gọn: thị trường \textbf{thiếu một nền tảng dịch manga tự động vừa hiểu ngữ cảnh, vừa hỏi--đáp thông minh}.
+\end{qa}
+
+\begin{qa}{Slide 4--5 --- Định vị \& khác biệt (product position statement) \tagCore}
+\A \textbf{Tuyên ngôn định vị (thuộc lòng):} ``Cho \textbf{người đọc manga Việt 15--28 tuổi} muốn đọc truyện Nhật chưa có bản dịch chính thức, StoryLens cho phép \textbf{tải trang lên, tự động dịch sang tiếng Việt có ngữ cảnh, và hỏi AI bất cứ điều gì về nội dung}.''
+\begin{itemize}
+  \item \textbf{Bốn giá trị cốt lõi:} (1) dịch giữ ngữ cảnh cả trang; (2) đọc overlay bật/tắt so sánh bản gốc; (3) hỏi--đáp \textbf{RAG có nguồn trích}; (4) hệ sinh thái cộng đồng (thư viện/share/forum).
+  \item \textbf{Ma trận 4 tiêu chí:} dịch tự động · hiểu ngữ cảnh cả trang · RAG hỏi--đáp · overlay. Google Lens/DeepL/ChatGPT/fan-sub mỗi cái chỉ đạt 1--2 tiêu chí --- \textbf{chỉ StoryLens đủ cả bốn}.
+\end{itemize}
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Khối Quản lý dự án (LN03) --- Minh dễ bị hỏi nhất}
+
+\begin{qa}{Vì sao chọn Agile/Scrum mà không dùng Waterfall? \tagCore}
+\A Dự án \textbf{bất định công nghệ cao} (pipeline AI). Waterfall bắt chốt toàn bộ yêu cầu/kiến trúc từ đầu; nếu đến tuần 10 mới phát hiện OCR sai hoặc pipeline quá chậm thì sửa kiến trúc cực đắt, dễ sập tiến độ. Scrum cho phép \textbf{lặp \& tăng dần}: ngay từ Sprint 2 đã có pipeline AI thô chạy được để thử tích hợp \arr\ giảm rủi ro sớm, luôn có \textit{shippable increment} cuối mỗi sprint.
+\end{qa}
+
+\begin{qa}{Vì sao KHÔNG dùng COCOMO để ước lượng nỗ lực? \tagCore}
+\A COCOMO cần ước lượng \textbf{KLOC} (nghìn dòng code) từ đầu --- với dự án AI/RAG, số dòng code \textbf{không phản ánh độ khó} (10 dòng prompt Gemini khó hơn hàng trăm dòng HTML). Nhóm dùng \textbf{Planning Poker + Story Points}, đánh giá theo \textit{độ phức tạp \x\ độ bất định (rủi ro) \x\ nỗ lực}. Mốc chuẩn: tính năng \textbf{Auth = 2 điểm}; \textbf{Pipeline AI = 8 điểm}. Các tính năng khác so với mốc để gán điểm.
+\end{qa}
+
+\begin{qa}{Velocity của nhóm là bao nhiêu? Tổng effort? \tagTrap}
+\A \textbf{Trả lời đúng số thật trong file, KHÔNG nói ``20'':}
+\begin{itemize}
+  \item Tổng backlog \textbf{135 story point / 31 task}.
+  \item \textbf{Velocity trung bình $\approx$ 22--23 điểm/sprint} (Burndown thật: 23 / 24 / 23 / 26 / 22 / 17 qua 6 sprint; trung bình 22,5).
+\end{itemize}
+\begin{center}\small
+\begin{tabular}{lccc}
+\toprule
+Mốc & Điểm hoàn thành & Còn lại (actual) & \% \\
+\midrule
+End S1 & 23 & 112 & 17\% \\
+End S2 & 24 & 88  & 35\% \\
+End S3 & 23 & 65  & 52\% \\
+End S4 & 26 & 39  & 71\% \\
+End S5 & 22 & 17  & 87\% \\
+End S6 & 17 & 0   & 100\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+\textbf{Bẫy:} nếu nói cứng ``20 điểm'' rồi hội đồng mở sheet Burndown thấy 22,5 là lệch \arr\ mất uy tín số liệu.
+\end{qa}
+
+\begin{qa}{Là PM, bạn theo dõi tiến độ \& kiểm soát chất lượng thế nào? \tagCore}
+\A Bốn cơ chế:
+\begin{itemize}
+  \item \textbf{Kanban} (To Do \arr\ In Progress \arr\ Reviewing \arr\ Done), thẻ chia nhỏ \lte\ 8 giờ.
+  \item \textbf{Burndown chart} theo sprint (còn lại vs lý tưởng) để phát hiện chậm sớm.
+  \item \textbf{Weekly Scrum} 3 câu hỏi (tuần qua làm gì / đang vướng gì / tuần tới làm gì) --- có \textbf{Scrum log 12 tuần} trong file kế hoạch.
+  \item \textbf{Code review chéo:} không ai push thẳng \code{main}; mọi PR \gte\ 1 reviewer + CI xanh mới merge.
+\end{itemize}
+\end{qa}
+
+\begin{qa}{Cho xem bằng chứng quản lý dự án thật (không phải nói miệng)? \tagCore}
+\A Mở \code{docs/management/StoryLens\_Project\_Plan.xlsx} (10 sheet):
+\begin{itemize}
+  \item Sheet WBS: 31 task T1.1--T6.5, người phụ trách, output, điểm, trạng thái.
+  \item Sheet \textbf{Risk Register}: RE = Probability \x\ Loss số hoá theo bảng LN03, có rank.
+  \item Sheet Gantt (task \x\ 12 tuần + mốc Build), Staff Allocation (6 người \x\ 12 tuần), RTM, Burndown, Scrum log.
+\end{itemize}
+\end{qa}
+
+\begin{qa}{Rủi ro lớn nhất của dự án và cách ứng phó? (Risk register) \tagCore}
+\A RE = Probability \x\ Loss (thang LN03). Top rủi ro:
+\begin{center}\small
+\begin{tabular}{clcc p{4.6cm}}
+\toprule
+ID & Rủi ro & RE & Rank & Ứng phó \\
+\midrule
+R2 & Quota/chi phí LLM API vượt budget & 5625 & 1 & Cache; key-pool 4 key ($\sim$2000 RPD); fallback free tier \\
+R5 & Dữ liệu manga vướng bản quyền & 5625 & 2 & Dùng dataset public (Manga109-s); nội dung do user đăng \\
+R1 & OCR accuracy $<$ 95\% (CER cao) & 3750 & 3 & Thêm dữ liệu; fine-tune manga-ocr \\
+R4 & ChromaDB không scale & 3750 & 4 & \textbf{Đã chuyển sang pgvector} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{qa}
+
+\begin{qa}{Bạn là PM nhưng slide nói ``flat team không phân cấp'' --- có mâu thuẫn? \tagTrap}
+\A Không. \textbf{Flat team} nói về việc \textit{quyết định kỹ thuật được thảo luận tập thể}, không có cấp trên áp đặt giải pháp. Vai trò PM của em là \textbf{điều phối tiến độ, quản lý backlog, quản trị rủi ro, và giữ cổng chất lượng (PR review + CI)} --- là trách nhiệm quy trình, không phải quyền lực ra lệnh kỹ thuật. Hai điều này không xung đột.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Khối AI/ML của Minh (LN07) --- OCR + prompt dịch}
+
+\begin{qa}{Nêu 8 bước ML Workflow nhóm áp dụng. \tagCore}
+\A Requirements \arr\ Data collection \& preparation \arr\ Feature engineering \arr\ Model training \arr\ \textbf{Model evaluation} \arr\ Model deployment \arr\ Operating \& monitoring \arr\ Maintenance (retrain từ ca lỗi khó: chữ SFX, viết tay).
+\end{qa}
+
+\begin{qa}{(BẪY LỚN NHẤT) Bạn fine-tune manga-ocr thế nào? Chứng minh nó tốt hơn model gốc? \tagTrap}
+\A \textbf{Có ablation hợp lệ + artifact xác minh} --- số liệu thật trong \code{model\_evaluation.docx} (PA4):
+\begin{itemize}
+  \item \textbf{Cách làm:} base \code{kha-white/manga-ocr-base} (VisionEncoderDecoderModel), \textbf{fine-tune full} trên \textbf{Manga109-s}. Dataset OCR \textbf{123.208 cặp} (crop bong bóng + nhãn chữ Nhật), chia \textbf{split-by-title, seed = 42} (chống rò rỉ) \arr\ Train 97.602 / Val 11.476 / \textbf{Test 14.130}.
+  \item \textbf{Cấu hình:} 8 epochs, AdamW, lr = 3e-5, cosine schedule, warmup 5\%, label-smoothing = 0.1, weight\_decay = 0.01, fp16; chọn best theo \textbf{CER val nhỏ nhất}, early-stop patience 3; train trên \textbf{Kaggle Tesla T4}.
+  \item \textbf{Bằng chứng fine-tune hiệu quả (ablation 2 vòng, cùng dataset/test-split/base):}
+\end{itemize}
+\begin{center}\small
+\begin{tabular}{lcc}
+\toprule
+Phiên bản & Char-Acc & CER \\
+\midrule
+PA2 (fine-tune sơ bộ, ít epoch) & 87,3\% & \textbf{12,7\%} \\
+PA3 (fine-tune hoàn chỉnh) & 93,9\% & \textbf{6,1\%} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{itemize}
+  \item \textbf{CER giảm 12,7\% \arr\ 6,1\% ($\approx$ giảm hơn 50\% lỗi)}. Khớp \textbf{chính xác 4 chữ số} với artifact thật \code{ai\_module/models/manga\_ocr/weights/metadata.json} (test\_cer = 0.061090) \arr\ chứng minh là output huấn luyện thật, không phải số gõ tay.
+\end{itemize}
+\end{qa}
+
+\begin{qa}{Demo sống n=1 cho thấy fine-tune đọc SAI chữ đầu --- vậy nó tệ hơn base? \tagTrap}
+\A Đó là \textbf{1 mẫu (n=1) trên ảnh minh hoạ AI-generated ngoài phân phối} Manga109-s --- chỉ là smoke-test định tính, \textbf{không dùng để kết luận}. Bằng chứng chuẩn là \textbf{test split 14.130 mẫu}: CER 12,7\% \arr\ 6,1\%. Kết quả n=1 chỉ phản ánh: mô hình được tối ưu cho \textbf{phong cách line-art Manga109-s}, chưa tổng quát hoá hoàn hảo sang mọi phong cách vẽ --- đúng như giới hạn đã ghi nhận trong SAD.
+\end{qa}
+
+\begin{qa}{Giải thích công thức \& ý nghĩa CER, mAP@0.5, IoU, Precision. \tagCore}
+\A
+\begin{itemize}
+  \item \textbf{CER} (đánh giá OCR --- phần của Minh): $CER = \dfrac{S+D+I}{N}$ ($S$ thay thế sai, $D$ xoá/bỏ sót, $I$ chèn thừa, $N$ tổng ký tự chuẩn). \textbf{6,1\%} = trong 100 chữ chỉ sai $\sim$6.
+  \item \textbf{IoU} = diện tích giao / diện tích hợp giữa khung dự đoán \& khung thật; ngưỡng \gte\ 0.5 tính là đúng.
+  \item \textbf{Precision} $= \dfrac{TP}{TP+FP} = \textbf{97,3\%}$ --- rất ít vẽ nhầm khung dịch vào chi tiết phong cảnh.
+  \item \textbf{mAP@0.5} = trung bình Average Precision (diện tích dưới PR-curve) tại IoU \gte\ 0.5 $= \textbf{95,3\%}$; Recall 93,8\%; mAP@0.5:0.95 = 84,4\%.
+  \item \textbf{Dữ liệu đánh giá:} Manga109-s, test \textbf{956 ảnh / $>$14.130 vùng chữ}, ngưỡng đặt 85\% \arr\ đều vượt.
+\end{itemize}
+\end{qa}
+
+\begin{qa}{Vì sao chọn YOLOv8n (nano) chứ không model lớn hơn cho chính xác hơn? \tagCore}
+\A YOLOv8n chỉ \textbf{$\sim$3M tham số}, chạy được \textbf{CPU-only} trên HuggingFace Spaces free tier (không GPU), độ trễ detection $\sim$\textbf{0,13 giây/ảnh}; vẫn đạt \textbf{mAP@0.5 = 95,3\% $>$ ngưỡng 85\%}. Chọn nano là cân bằng chính xác/chi phí hợp lý cho hạ tầng miễn phí --- dùng model lớn hơn sẽ tràn RAM và chậm mà lợi ích biên không đáng kể.
+\end{qa}
+
+\begin{qa}{Prompt dịch của bạn cụ thể là gì? ``Context injection'' nghĩa là gì? \tagCore}
+\A Module dịch (task T3.2: \code{GlossaryManager} + \code{LLMClient} gọi Gemini) đưa \textbf{cả trang + glossary xưng hô} vào prompt thay vì dịch từng bong bóng rời. Nhờ ``\textbf{context injection}'' này, Gemini giữ \textbf{nhất quán xưng hô, mạch truyện, sắc thái} trên toàn trang. Kèm \textbf{xoay vòng nhiều API key} chống hết quota và \textbf{fallback M2M100/NLLB} khi Gemini lỗi.
+\end{qa}
+
+\begin{qa}{OCR sai thì Gemini tự sửa --- nhưng nếu OCR sai nặng, Gemini bịa (hallucinate) thì sao? \tagTrap}
+\A Đúng, đây là rủi ro ``Artificial Stupidity''. Nhóm giảm bằng ba lớp: (1) dịch \textbf{cả trang có ngữ cảnh} nên Gemini có nhiều tín hiệu để suy đoán đúng; (2) \textbf{cảnh báo khi độ tin cậy OCR thấp} ngay trên reader; (3) \textbf{Studio QC} cho dịch giả sửa tay từng bong bóng, lưu lịch sử hiệu đính. \textbf{AI không có tiếng nói cuối cùng --- con người mới quyết định} (human-in-the-loop).
+\end{qa}
+
+\begin{qa}{CER 6,1\% đo trên Manga109-s. User upload manga phong cách khác thì CER thật bao nhiêu? \tagHonest}
+\A Trung thực: 6,1\% là \textbf{in-distribution} (đúng phân phối huấn luyện). Out-of-distribution \textbf{chưa đo bằng số} (mới có 1 mẫu định tính) --- đây là giới hạn đã ghi rõ trong báo cáo. Nhóm bù bằng \textbf{Gemini self-correction} và \textbf{Studio QC}. Hướng phát triển: chạy đánh giá trên vài chục mẫu chữ Nhật ngoài phân phối để có ước lượng CER thô.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Các câu Q\&A Minh được phân công (từ phụ lục kịch bản)}
+
+\begin{qa}{Làm sao đảm bảo chất lượng bản dịch? (Minh / Phú Hòa) \tagCore}
+\A Gemini dịch \textbf{theo cả trang} nên giữ ngữ cảnh, xưng hô; cộng \textbf{human-in-the-loop}: Studio QC cho duyệt/sửa từng bong bóng và cơ chế phản hồi tốt/xấu (endpoint \code{/v1/pages/\{id\}/feedback}) để cải thiện dần. Ngưỡng chấp nhận theo SAD: tỉ lệ 👍 \gte\ 80\%.
+\end{qa}
+
+\begin{qa}{Vấn đề bản quyền manga thì sao? (Minh / Quý) \tagHonest}
+\A StoryLens là \textbf{công cụ hỗ trợ đọc/dịch}, không phải nơi phát tán. Ba lớp: (1) mô hình huấn luyện trên \textbf{dataset học thuật Manga109-s} (giấy phép nghiên cứu); (2) nội dung người dùng upload mặc định \textbf{Private}, có \textbf{điều khoản sử dụng + công cụ kiểm duyệt admin}; (3) roadmap có \textbf{quy trình DMCA take-down}. Đã ghi nhận là \textbf{Risk R5} trong risk register.
+\end{qa}
+
+\begin{qa}{Điểm khác biệt lớn nhất so với ChatGPT / Google Lens? (Minh) \tagCore}
+\A \textbf{Ba-trong-một chuyên biệt} mà công cụ chung không có: (1) dịch \textbf{cả trang giữ ngữ cảnh}; (2) \textbf{render overlay đúng bong bóng} (binary-search chọn cỡ chữ vừa khít); (3) \textbf{RAG hỏi--đáp giới hạn theo đúng thư viện riêng của từng người dùng, có nguồn trích}. ChatGPT/Lens chỉ làm một phần, không render vào bong bóng, không hỏi--đáp trên đúng nội dung truyện của bạn.
+\end{qa}
+
+\begin{qa}{Vì sao tài liệu PA ghi ChromaDB / all-MiniLM / GPT-4 mà sản phẩm là pgvector / Gemini? (Phú Hòa / Minh) \tagTrap}
+\A Đây là \textbf{sự tiến hoá qua các vòng lặp RUP} --- điểm mạnh về kỹ năng ra quyết định, không phải lỗi:
+\begin{itemize}
+  \item Kế hoạch ban đầu: ChromaDB + embedding all-MiniLM + GPT-4.
+  \item Khi hiện thực: hợp nhất về \textbf{pgvector ngay trong Supabase} (bớt một dịch vụ, đỡ vận hành --- \textbf{Risk R4} ghi rõ ``ChromaDB không scale \arr\ đã đổi pgvector''); chọn \textbf{Gemini} để đồng bộ (vừa dịch, vừa embedding \textbf{768 chiều}, vừa RAG, xoay vòng key rẻ).
+  \item \textbf{Sản phẩm cuối phản ánh quyết định kỹ thuật tốt hơn bản kế hoạch.}
+\end{itemize}
+\end{qa}
+
+\begin{qa}{Đóng góp từng thành viên / cách làm việc nhóm? (Minh) \tagCore}
+\A \textbf{Flat team 6 người}, RUP rút gọn + Scrum, sprint 2 tuần, weekly scrum, mọi PR review:
+\begin{itemize}
+  \item \textbf{Minh (23122041)} --- PM \& AI/ML: quản lý tiến độ, fine-tune OCR, prompt dịch.
+  \item \textbf{Hà Dương (23122002)} --- AI/ML (OCR): dataset, hỗ trợ fine-tune, đánh giá accuracy.
+  \item \textbf{Kiệt (23122039)} --- Backend: FastAPI, DB schema, tích hợp pipeline.
+  \item \textbf{Phú Hòa (23122030)} --- AI/ML (RAG): Gemini, pgvector, pipeline hỏi--đáp.
+  \item \textbf{Nguyên (23122044)} --- Frontend: Next.js Upload/Reader/Q\&A.
+  \item \textbf{Phú Quý (23122048)} --- QA \& BA: SDP/Vision/Use case, test case, UAT.
+\end{itemize}
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Bẫy mâu thuẫn tài liệu (câu ``bắt lỗi'')}
+
+\begin{qa}{WBS ghi task ChromaDB/FAISS (T2.3, T4.1) nhưng sản phẩm dùng pgvector --- giải thích? \tagTrap}
+\A WBS là \textbf{kế hoạch ở thời điểm lập}; kiến trúc tiến hoá qua các sprint là chuyện bình thường trong RUP/Agile. Bằng chứng nhóm \textit{chủ động} ra quyết định nằm ngay trong \textbf{Risk register R4} (``ChromaDB không scale \arr\ chuyển pgvector''). Không phải sai lệch tài liệu mà là \textbf{quản trị thay đổi có ghi vết}.
+\end{qa}
+
+\begin{qa}{Vì sao chọn embedding 768 chiều? Có phải tuỳ tiện? \tagCore}
+\A 768 chiều là kích thước vector chuẩn của \code{gemini-embedding-001}. Chọn nó để \textbf{đồng bộ toàn hệ Gemini} (một nhà cung cấp cho cả dịch, embedding, RAG \arr\ đơn giản vận hành, chung cơ chế xoay vòng key), và pgvector index thẳng vector 768 chiều với cosine similarity.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Đạo đức AI \& bản quyền (LN12) --- vùng của Minh}
+
+\begin{qa}{Train trên Manga109-s và cho user dịch truyện có bản quyền --- có vi phạm? \tagHonest}
+\A Tách hai chuyện: (1) \textbf{huấn luyện} dùng \textbf{Manga109-s} --- dataset học thuật có giấy phép nghiên cứu, hợp lệ cho mục đích nghiên cứu/giáo dục; (2) \textbf{nội dung người dùng upload} do người dùng tự chịu trách nhiệm, mặc định \textbf{Private}, có điều khoản + kiểm duyệt admin + roadmap DMCA. Đây là \textbf{Risk R5} đã nhận diện và có chiến lược ứng phó.
+\end{qa}
+
+\begin{qa}{AI Bias trong hệ thống là gì? \tagHonest}
+\A YOLOv8 \& OCR huấn luyện chủ yếu trên \textbf{Manga109-s (manga Nhật)} \arr\ \textbf{distribution bias}: giỏi với phong cách Nhật (bong bóng tròn, line-art), \textbf{kém hơn với manhwa Hàn / manhua Trung}. Nhóm \textbf{ghi nhận rõ giới hạn} trong tài liệu; hướng khắc phục = bổ sung dataset đa dạng để giảm bias. Theo LN12: ``Principles alone cannot guarantee ethical AI'' --- nên nhóm \textbf{đo và công bố giới hạn}, không chỉ hứa ``cố gắng công bằng''.
+\end{qa}
+
+\begin{qa}{Hệ thống có theo dõi chất lượng mô hình AI sau deploy không (MLOps)? \tagHonest}
+\A Có đủ \textbf{giám sát hạ tầng} (Sentry bắt lỗi, OpenTelemetry theo dõi latency, Admin health dashboard, \code{/health/deep}). \textbf{Model monitoring} (theo dõi drift mAP/CER theo thời gian) \textbf{chưa có} --- vì đang ở giai đoạn MVP, model chạy tĩnh (update thủ công). Hướng phát triển: tích hợp \textbf{W\&B / MLflow} để theo dõi drift và trigger retrain tự động.
+\end{qa}
+
+% ═══════════════════════════════════════════════════════════════
+\section{15 câu bẫy khó nhất --- luyện phản xạ nhanh}
+
+\begin{enumerate}[leftmargin=1.6em,itemsep=3pt]
+  \item \textbf{Fine-tune OCR thế nào?} \arr\ base \code{manga-ocr-base}, fine-tune full Manga109-s (123k cặp, split-by-title seed 42), 8 epochs AdamW lr=3e-5 cosine, T4 Kaggle. CER 12,7\% \arr\ 6,1\%, xác minh bằng \code{metadata.json}.
+  \item \textbf{Demo n=1 fine-tune đọc sai --- tệ hơn base?} \arr\ n=1 ảnh ngoài phân phối, smoke-test; chuẩn là test split 14.130 mẫu.
+  \item \textbf{CER thực khi manga khác phong cách?} \arr\ Trung thực: chỉ đo in-distribution; OOD chưa đo; bù bằng Gemini + Studio QC.
+  \item \textbf{OCR sai \arr\ Gemini bịa?} \arr\ Rủi ro có thật; giảm bằng dịch cả trang + cảnh báo confidence + human-in-the-loop.
+  \item \textbf{Prompt dịch \& context injection?} \arr\ \code{GlossaryManager}+\code{LLMClient}, đưa cả trang + glossary xưng hô vào prompt; fallback M2M100/NLLB.
+  \item \textbf{Vì sao YOLOv8n nano?} \arr\ 3M tham số, CPU-only free tier, 0,13s/ảnh, vẫn mAP 95,3\% $>$ 85\%.
+  \item \textbf{Velocity? Tổng effort?} \arr\ $\sim$22--23 SP/sprint, tổng 135 SP / 31 task. (KHÔNG nói ``20''.)
+  \item \textbf{Vì sao không COCOMO?} \arr\ Cần KLOC, không đo được độ khó AI; dùng Planning Poker + Story Points.
+  \item \textbf{PM mà flat team --- mâu thuẫn?} \arr\ Flat = quyết định kỹ thuật tập thể; PM lo tiến độ/backlog/rủi ro/PR gate.
+  \item \textbf{Bằng chứng PM thật?} \arr\ \code{StoryLens\_Project\_Plan.xlsx}: WBS, Gantt, Risk RE=P\x L, RTM, Burndown, Scrum log.
+  \item \textbf{ChromaDB trong WBS vs pgvector?} \arr\ Tiến hoá RUP; Risk R4 ghi rõ ``đã đổi pgvector''.
+  \item \textbf{GPT-4/all-MiniLM vs Gemini?} \arr\ Cùng lý do tiến hoá; Gemini đồng bộ dịch+embedding 768+RAG, xoay vòng key rẻ.
+  \item \textbf{Bản quyền?} \arr\ Train Manga109-s (license nghiên cứu); user content Private + kiểm duyệt + DMCA roadmap; Risk R5.
+  \item \textbf{Khác ChatGPT/Lens?} \arr\ 3-trong-1: dịch cả trang + overlay render + RAG scoped có nguồn trích.
+  \item \textbf{Model monitoring sau deploy?} \arr\ Có infra monitoring (Sentry/OTel/health); model drift chưa có, roadmap W\&B/MLflow.
+\end{enumerate}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Phụ lục --- Số liệu \& điểm yếu phải thủ sẵn}
+
+\begin{sohoc}
+\textbf{Số phải bật ra ngay khi bị hỏi:}
+\begin{itemize}
+  \item OCR: \textbf{CER 6,1\%} (Char-Acc 93,9\%, exact-match 67,5\%); ablation \textbf{12,7\% \arr\ 6,1\%}.
+  \item Detection: \textbf{mAP@0.5 = 95,3\%}, mAP@0.5:0.95 = 84,4\%, Precision 97,3\%, Recall 93,8\% (ngưỡng 85\%).
+  \item Dataset: Manga109-s, OCR \textbf{123.208 cặp} (80/10/10, seed 42); detection test \textbf{956 ảnh / 14.130 vùng chữ}.
+  \item PM: \textbf{135 SP / 31 task}, velocity \textbf{$\sim$22--23 SP/sprint}, 6 sprint \x\ 2 tuần, 3 mốc Build.
+  \item Kiến trúc: \textbf{3 dịch vụ} (Vercel / Render 512MB / HF Spaces $\sim$4GB), embedding \textbf{768 chiều}, CI \textbf{5 job}.
+  \item Rủi ro top: R2 quota \& R5 bản quyền (RE = 5625).
+\end{itemize}
+\end{sohoc}
+
+\begin{tcolorbox}[breakable,enhanced,sharp corners,boxrule=0.8pt,colframe=leaf,colback=leaf!5,
+  coltitle=white,colbacktitle=leaf,fonttitle=\bfseries\headfont\small,
+  title={Điểm yếu phải thừa nhận trung thực (kèm định hướng) --- đừng để reviewer bắt trước}]
+\begin{itemize}
+  \item \textbf{YOLO thiếu artifact gốc} (chỉ có \code{best.pt}, không có \code{results.csv}/PR-curve) \arr\ số mAP dựa vào SAD PA3; hướng khắc phục: lưu \code{results.csv} khi train lại.
+  \item \textbf{CER out-of-distribution chưa đo} (mới n=1 định tính) \arr\ hướng: đánh giá vài chục mẫu OOD.
+  \item \textbf{Không có Model Monitoring} (drift) \arr\ đang MVP, roadmap W\&B/MLflow.
+  \item \textbf{Defect log rỗng} (61/61 Pass, 0 defect) \arr\ nếu bị nghi ``test cho có'', trích 1--2 bug thật từ git history.
+  \item \textbf{Chưa có dữ liệu feedback dịch sống} (không truy cập Supabase production) \arr\ mô tả đúng cơ chế đã hiện thực, không suy diễn số.
+\end{itemize}
+\end{tcolorbox}
+
+\vspace{6pt}
+\begin{center}\small\color{soft}
+Sổ tay cá nhân --- Đào Sỹ Duy Minh · StoryLens · CSC10011 (HCMUS) · in A4 cầm theo khi bảo vệ.
+\end{center}
+
+\end{document}

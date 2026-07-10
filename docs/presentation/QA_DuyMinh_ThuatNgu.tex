@@ -1,0 +1,267 @@
+% !TEX program = xelatex
+% StoryLens — TỪ ĐIỂN THUẬT NGỮ đi kèm sổ tay QA_DuyMinh (giải thích mọi thuật ngữ)
+% Biên dịch: xelatex QA_DuyMinh_ThuatNgu.tex   (chạy 2 lần để có mục lục)
+\documentclass[11pt]{article}
+
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\newfontfamily\headfont{Arial}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{amssymb}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{crimson}{HTML}{C0271A}
+\definecolor{ink}{HTML}{1A1712}
+\definecolor{gold}{HTML}{9C6B10}
+\definecolor{steel}{HTML}{285B7A}
+\definecolor{soft}{HTML}{6E665D}
+
+\newcommand{\arr}{\,\ensuremath{\rightarrow}\,}
+\newcommand{\lte}{\ensuremath{\leq}}
+\newcommand{\gte}{\ensuremath{\geq}}
+\newcommand{\x}{\ensuremath{\times}}
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\insl}{\textit{\textcolor{steel}{Trong StoryLens:}}\ }
+
+\titleformat{\section}{\Large\bfseries\headfont\color{crimson}}{\thesection.}{0.5em}{}
+\titlespacing{\section}{0pt}{16pt}{6pt}
+
+\pagestyle{fancy}\fancyhf{}
+\lhead{\footnotesize\headfont\textcolor{soft}{StoryLens · Từ điển thuật ngữ — Duy Minh}}
+\rhead{\footnotesize\headfont\textcolor{soft}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Danh sách thuật ngữ: term in đậm, xuống dòng, giải thích
+\newlist{terms}{description}{1}
+\setlist[terms]{style=unboxed,leftmargin=0pt,labelsep=0.4em,
+  font=\normalfont\bfseries\color{ink},itemsep=5pt,topsep=4pt}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{2.4cm}
+{\headfont\bfseries\fontsize{15}{18}\selectfont\textcolor{soft}{PHỤ LỤC SỔ TAY VẤN ĐÁP}}\\[6pt]
+{\headfont\bfseries\fontsize{38}{42}\selectfont\textcolor{ink}{Từ điển Thuật ngữ}}\\[8pt]
+{\large\headfont\textcolor{crimson}{Giải thích mọi thuật ngữ trong QA\_DuyMinh}}\\[10pt]
+{\color{crimson}\rule{9cm}{2pt}}\\[10pt]
+{\large Dự án \textbf{StoryLens} · dành cho Đào Sỹ Duy Minh (23122041)}\\[4pt]
+{\color{soft}\large Mỗi thuật ngữ: định nghĩa ngắn gọn + cách nó xuất hiện trong dự án}\\[2.2cm]
+\begin{tabular}{rl}
+\textbf{Môn học} & CSC10011 -- Công nghệ phần mềm cho hệ thống Trí tuệ Nhân tạo\\[3pt]
+\textbf{Nhóm} & Nhóm 1 -- StoryLens · HCMUS\\
+\end{tabular}
+\vfill
+{\color{soft}\small Đọc kèm \texttt{QA\_DuyMinh.pdf} --- khi hội đồng hỏi ``X là gì?'' thì tra ở đây.}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ═══════════════════════════════════════════════════════════════
+\section{Quy trình \& Quản lý dự án (LN02--LN03)}
+\begin{terms}
+\item[Agile.] Triết lý phát triển phần mềm ưu tiên \textbf{lặp nhanh, thích ứng thay đổi}, phần mềm chạy được hơn tài liệu đồ sộ. Ngược với Waterfall (làm tuần tự, chốt hết từ đầu). \insl chọn Agile vì dự án AI bất định cao, cần thử pipeline sớm.
+\item[Waterfall (Thác nước).] Mô hình làm \textbf{tuần tự từng pha} (yêu cầu \arr\ thiết kế \arr\ code \arr\ test), pha sau chỉ bắt đầu khi pha trước xong. Rủi ro: phát hiện lỗi kiến trúc muộn thì sửa cực đắt.
+\item[RUP (Rational Unified Process).] Quy trình lặp chia làm \textbf{4 pha}: \textbf{Inception} (khởi tạo: vision, kế hoạch) \arr\ \textbf{Elaboration} (chi tiết hoá: use case, kiến trúc, prototype) \arr\ \textbf{Construction} (xây dựng: code, test) \arr\ \textbf{Transition} (chuyển giao: deploy, demo, nộp). \insl nhóm dùng ``RUP rút gọn kết hợp Scrum''.
+\item[Scrum.] Khung Agile chia việc thành các \textbf{Sprint} (chu kỳ ngắn cố định), mỗi cuối sprint có sản phẩm chạy được. \insl sprint = 2 tuần, 6 sprint tổng cộng.
+\item[Sprint.] Một chu kỳ làm việc cố định (ở đây \textbf{2 tuần}). Cuối sprint phải có \textit{increment} chạy được.
+\item[Increment / Shippable increment.] \textbf{Phần sản phẩm tăng thêm} sau mỗi sprint, đủ hoàn chỉnh để chạy/demo được (``shippable'' = giao được).
+\item[Definition of Done (DoD).] \textbf{Tiêu chí ``coi là xong''} thống nhất trước (vd: code + test + review + CI xanh). Tránh tranh cãi ``xong chưa''.
+\item[Product Backlog.] \textbf{Danh sách tất cả tính năng/việc} cần làm của cả dự án, sắp theo ưu tiên.
+\item[Sprint Backlog.] Tập con của Product Backlog \textbf{chọn làm trong 1 sprint}.
+\item[Story Point (SP).] \textbf{Đơn vị ước lượng độ khó tương đối} của một tính năng (theo độ phức tạp \x\ rủi ro \x\ nỗ lực), không phải giờ. \insl mốc Auth = 2 SP, Pipeline AI = 8 SP; tổng backlog \textbf{135 SP}.
+\item[Planning Poker.] Kỹ thuật ước lượng: cả nhóm \textbf{cùng ``bốc bài'' gán Story Point}, thảo luận đến khi thống nhất --- giảm thiên lệch cá nhân.
+\item[Velocity (Vận tốc).] \textbf{Số Story Point nhóm hoàn thành trung bình mỗi sprint}. \insl $\approx$ \textbf{22--23 SP/sprint} (đo thật: 23/24/23/26/22/17).
+\item[COCOMO / KLOC.] COCOMO = mô hình ước lượng chi phí dựa trên \textbf{KLOC} (nghìn dòng code). Nhóm \textbf{không dùng} vì AI/RAG không đoán được KLOC và dòng code không phản ánh độ khó.
+\item[Kanban.] Bảng trực quan hoá công việc theo cột trạng thái (\code{To Do} \arr\ \code{In Progress} \arr\ \code{Reviewing} \arr\ \code{Done}). Giúp thấy ngay việc đang tắc ở đâu.
+\item[Burndown chart.] Biểu đồ \textbf{lượng công việc còn lại (Story Point) giảm dần theo thời gian}; so đường thực tế với đường lý tưởng để phát hiện chậm tiến độ.
+\item[WBS (Work Breakdown Structure).] \textbf{Sơ đồ phân rã công việc} lớn thành các task nhỏ quản lý được. \insl 31 task T1.1--T6.5.
+\item[Gantt chart.] Biểu đồ \textbf{thanh ngang thời gian}: mỗi task một thanh trải trên các tuần, kèm mốc (milestone).
+\item[Milestone / Build / Release.] \textbf{Mốc quan trọng} đánh dấu một phiên bản giao được. \insl 3 mốc Build (Build 1 backend+OCR, Build 2 full pipeline, Build 3 final).
+\item[Staff Allocation (phân bổ nhân sự).] Bảng \textbf{ai làm task gì ở tuần nào} để phát hiện người quá tải / nhàn rỗi.
+\item[Risk Register (sổ rủi ro) \& RE.] Danh sách rủi ro kèm \textbf{RE = Probability \x\ Loss} (khả năng xảy ra \x\ mức thiệt hại), dùng để \textbf{xếp hạng ưu tiên xử lý}. \insl top: R2 quota, R5 bản quyền (RE = 5625).
+\item[Weekly Scrum / Daily Standup.] Họp ngắn định kỳ trả lời \textbf{3 câu hỏi}: tuần/hôm qua làm gì? đang vướng gì? sắp làm gì?
+\item[Flat team (đội hình phẳng).] Cơ cấu \textbf{không phân cấp cứng}, quyết định kỹ thuật thảo luận tập thể. Không mâu thuẫn với vai trò PM (PM lo điều phối, không áp đặt giải pháp).
+\item[Pull Request (PR) \& Code Review.] PR = \textbf{đề nghị gộp code} từ nhánh phụ vào nhánh chính; Code Review = \textbf{ít nhất 1 người khác đọc duyệt} trước khi gộp. Là cổng chất lượng của nhóm.
+\end{terms}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Kỹ nghệ yêu cầu \& Tài liệu (LN04--LN05)}
+\begin{terms}
+\item[Functional Requirement (FR --- yêu cầu chức năng).] Mô tả \textbf{hệ thống phải làm gì} (hành vi). \insl F01--F09, vd F03 pipeline AI, F05 hỏi--đáp RAG.
+\item[Non-Functional Requirement (NFR --- yêu cầu phi chức năng).] Ràng buộc \textbf{chất lượng} (hiệu năng, bảo mật, độ sẵn sàng). \insl phản hồi $<$ 3s, xử lý AI $<$ 30s/trang.
+\item[Use Case.] Mô tả \textbf{một luồng người dùng đạt được mục tiêu} khi tương tác hệ thống. \insl UC01 upload--dịch, UC02 đọc overlay.
+\item[Actor (tác nhân).] \textbf{Người/hệ thống bên ngoài} tương tác với hệ thống. \insl Người đọc, Quản trị viên, và tác nhân phụ ``AI Module + Gemini''.
+\item[\code{<<include>>} / \code{<<extend>>}.] Quan hệ giữa use case: \textbf{include} = luôn gọi kèm (bắt buộc); \textbf{extend} = chỉ xảy ra có điều kiện (tuỳ chọn). \insl UC ``Dịch batch'' include ``Trừ credit''.
+\item[Vision Document.] Tài liệu \textbf{tầm nhìn}: vấn đề, định vị sản phẩm, người dùng --- ở mức nghiệp vụ.
+\item[SRS (Software Requirements Specification).] \textbf{Đặc tả yêu cầu phần mềm} chi tiết (FR + NFR), ở mức hệ thống.
+\item[SAD (Software Architecture Document).] \textbf{Tài liệu kiến trúc}: các thành phần, quan hệ, quyết định thiết kế.
+\item[SDP (Software Development Plan).] \textbf{Kế hoạch phát triển}: lịch, nhân sự, rủi ro, ngân sách.
+\item[Persona.] \textbf{Chân dung người dùng mẫu} (tuổi, nhu cầu, kỳ vọng) để thiết kế bám nhu cầu thật. \insl sinh viên, học sinh THPT, content creator.
+\item[RTM (Requirements Traceability Matrix).] Ma trận \textbf{truy vết}: mỗi Yêu cầu $\leftrightarrow$ Use Case $\leftrightarrow$ Module $\leftrightarrow$ Test case --- đảm bảo mọi yêu cầu đều có code và test.
+\end{terms}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Kiến trúc \& Hệ thống (LN06)}
+\begin{terms}
+\item[Microservice.] Kiến trúc chia hệ thống thành \textbf{nhiều dịch vụ nhỏ triển khai độc lập}. \insl 3 dịch vụ: Frontend, Backend, AI Module.
+\item[Monolith.] Ngược với microservice: \textbf{gộp tất cả vào một khối}. Đơn giản nhưng khó scale từng phần.
+\item[Pipe-and-Filter (đường ống \& bộ lọc).] Kiến trúc \textbf{dữ liệu chảy qua chuỗi bộ lọc} độc lập, mỗi bộ lọc biến đổi rồi truyền tiếp. \insl pipeline YOLO \arr\ OCR \arr\ LaMa \arr\ Gemini \arr\ render.
+\item[Client--Server.] Máy khách (trình duyệt) gửi yêu cầu, máy chủ xử lý và trả về.
+\item[Layered (phân tầng).] Chia code theo tầng (router \arr\ service \arr\ database). \insl backend: business logic ở \code{services/}, không ở router.
+\item[4+1 View \& Process View.] Cách mô tả kiến trúc bằng 5 góc nhìn (Logical, Development, Process, Physical/Deployment, + Use-Case). \textbf{Process View} = góc nhìn \textbf{tiến trình/luồng chạy đồng thời} (thread, hàng đợi).
+\item[ADR (Architecture Decision Record).] \textbf{Bản ghi quyết định kiến trúc}: vấn đề / quyết định / lý do / phương án khác / hệ quả. Giúp giải thích ``vì sao chọn thế''.
+\item[REST API.] Kiểu giao tiếp qua HTTP dùng các phương thức GET/POST\ldots\ trả về JSON. \insl backend FastAPI expose REST.
+\item[WebSocket.] Kênh \textbf{hai chiều, giữ kết nối liên tục} giữa client và server (khác REST chỉ hỏi--đáp một lần). \insl truyền tiến trình dịch thời gian thực.
+\item[Polling fallback.] Khi WebSocket lỗi, client \textbf{hỏi lại server định kỳ} (polling) để không mất cập nhật.
+\item[Semaphore / BoundedSemaphore.] Cơ chế \textbf{giới hạn số luồng chạy đồng thời}. \insl giới hạn số ảnh AI xử lý cùng lúc để không tràn RAM.
+\item[Cold start.] \textbf{Độ trễ lần gọi đầu} khi dịch vụ vừa ``thức dậy'' sau khi ngủ (free tier). \insl Render/HF Spaces ngủ khi rảnh.
+\item[Keep-alive.] \textbf{Ping định kỳ} để giữ dịch vụ không ngủ, giảm cold start.
+\item[CDN (Content Delivery Network).] Mạng máy chủ \textbf{phân phối nội dung gần người dùng} cho nhanh. \insl frontend qua Vercel CDN.
+\item[Docker / Container / Image.] \textbf{Đóng gói ứng dụng + phụ thuộc} vào một ``hộp'' chạy giống nhau ở mọi nơi. \textbf{Image} = khuôn, \textbf{Container} = bản chạy. \insl AI Module image $\sim$4GB.
+\item[Supabase / PostgreSQL.] Supabase = nền tảng backend dựng trên \textbf{PostgreSQL} (hệ quản trị CSDL quan hệ) kèm Auth + Storage. \insl DB chính của StoryLens.
+\end{terms}
+
+% ═══════════════════════════════════════════════════════════════
+\section{AI/ML --- Mô hình, Huấn luyện \& Đánh giá (LN07)}
+\begin{terms}
+\item[OCR (Optical Character Recognition).] \textbf{Nhận dạng ký tự} từ ảnh thành văn bản. \insl \textbf{manga-ocr} đọc chữ Nhật trong bong bóng.
+\item[Object Detection / Bounding Box.] \textbf{Phát hiện vật thể} và khoanh nó bằng \textbf{khung chữ nhật} (bounding box). \insl YOLOv8 khoanh bong bóng thoại.
+\item[YOLOv8.] Họ mô hình \textbf{phát hiện đối tượng thời gian thực} (You Only Look Once). \textbf{YOLOv8n} = bản ``nano'' nhẹ ($\sim$3M tham số), chạy được CPU.
+\item[Pretrained model / Base model.] Mô hình \textbf{đã huấn luyện sẵn} trên dữ liệu lớn, dùng làm điểm xuất phát. \insl \code{kha-white/manga-ocr-base}.
+\item[Fine-tune (tinh chỉnh).] \textbf{Huấn luyện tiếp} một base model trên dữ liệu chuyên biệt của mình để giỏi hơn ở tác vụ cụ thể. \insl fine-tune manga-ocr trên Manga109-s \arr\ CER 6,1\%.
+\item[VisionEncoderDecoderModel.] Kiến trúc \textbf{encoder đọc ảnh + decoder sinh văn bản} --- nền của manga-ocr.
+\item[Dataset split (train/val/test).] Chia dữ liệu: \textbf{train} (học), \textbf{val} (chỉnh siêu tham số), \textbf{test} (đánh giá cuối, chưa từng thấy). \insl 80/10/10 = 97.602 / 11.476 / 14.130.
+\item[Split-by-title / Data leakage.] Chia dữ liệu \textbf{theo đầu truyện} để cùng một truyện không nằm cả ở train lẫn test --- chống \textbf{rò rỉ dữ liệu} (test bị ``học lỏm'' \arr\ điểm ảo).
+\item[Seed.] \textbf{Số khởi tạo ngẫu nhiên} cố định để kết quả \textbf{tái lập được}. \insl seed = 42.
+\item[Epoch.] \textbf{Một lượt} mô hình học hết toàn bộ tập train. \insl 8 epochs.
+\item[Learning rate (lr).] \textbf{Bước cập nhật trọng số} mỗi lần học --- lớn quá thì loạn, nhỏ quá thì chậm. \insl lr = 3e-5.
+\item[AdamW.] \textbf{Thuật toán tối ưu} phổ biến để cập nhật trọng số (Adam + weight decay đúng cách).
+\item[Cosine schedule / Warmup.] Cách \textbf{giảm dần learning rate theo đường cong cosin}; \textbf{warmup} = tăng dần lr ở đầu để ổn định. \insl warmup 5\%.
+\item[Label smoothing.] Kỹ thuật \textbf{làm ``mềm'' nhãn} (không tuyệt đối 100\%) để mô hình bớt tự tin thái quá, giảm overfit. \insl 0.1.
+\item[Weight decay.] \textbf{Phạt trọng số lớn} để chống overfit (regularization). \insl 0.01.
+\item[fp16 (mixed precision).] Dùng \textbf{số thực 16-bit} thay 32-bit khi train \arr\ nhanh hơn, tốn ít bộ nhớ GPU.
+\item[Early stopping / Patience.] \textbf{Dừng train sớm} khi chỉ số val không cải thiện sau ``patience'' lượt \arr\ chống overfit. \insl patience 3, theo CER val nhỏ nhất.
+\item[Checkpoint.] \textbf{Bản lưu trọng số} tại một thời điểm; chọn checkpoint tốt nhất theo val. \insl \code{best.pt}.
+\item[Ablation study.] So sánh \textbf{có/không một yếu tố} để chứng minh yếu tố đó có tác dụng. \insl PA2 vs PA3 (12,7\% \arr\ 6,1\%) là ablation về cấu hình huấn luyện.
+\item[Metadata / Artifact.] \textbf{Sản phẩm phụ do quá trình train sinh ra} (file chỉ số, biểu đồ). \insl \code{metadata.json} chứa test\_cer thật để xác minh.
+\end{terms}
+
+\begin{terms}
+\item[IoU (Intersection over Union).] \textbf{Diện tích giao / diện tích hợp} giữa khung dự đoán và khung thật --- đo độ khớp. Ngưỡng \gte\ 0.5 tính là đúng.
+\item[Precision (Độ chính xác).] $\dfrac{TP}{TP+FP}$ --- trong số khung \textbf{mô hình vẽ ra}, bao nhiêu \% đúng. \insl 97,3\%.
+\item[Recall (Độ bao phủ).] $\dfrac{TP}{TP+FN}$ --- trong số khung \textbf{thật sự có}, mô hình tìm được bao nhiêu \%. \insl 93,8\%.
+\item[TP / FP / FN.] True Positive (đúng--dương), False Positive (báo nhầm), False Negative (bỏ sót).
+\item[PR Curve / AP / mAP.] \textbf{PR Curve} = đường Precision--Recall; \textbf{AP} = diện tích dưới đường đó (1 lớp); \textbf{mAP} = trung bình AP các lớp. \insl \textbf{mAP@0.5 = 95,3\%}.
+\item[mAP@0.5 vs mAP@0.5:0.95.] @0.5 = tại ngưỡng IoU 0.5; @0.5:0.95 = \textbf{trung bình nhiều ngưỡng} 0.5\arr0.95 (nghiêm ngặt hơn). \insl 95,3\% vs 84,4\%.
+\item[CER (Character Error Rate).] $\dfrac{S+D+I}{N}$ --- \textbf{tỉ lệ lỗi ký tự} của OCR ($S$ thay thế, $D$ xoá, $I$ chèn, $N$ tổng ký tự chuẩn). \insl \textbf{6,1\%}.
+\item[Char-Accuracy.] $1 - CER$ = độ chính xác ký tự. \insl 93,9\%.
+\item[Exact-Match.] Tỉ lệ dự đoán \textbf{khớp 100\% cả chuỗi} --- chỉ số nghiêm ngặt hơn CER. \insl 67,5\%.
+\item[Levenshtein distance.] \textbf{Số thao tác tối thiểu} (thêm/xoá/thay) biến chuỗi này thành chuỗi kia --- nền của CER.
+\item[In-distribution / Out-of-distribution (OOD).] Dữ liệu \textbf{đúng} / \textbf{khác} phân phối huấn luyện. \insl CER 6,1\% là in-distribution (Manga109-s); manga phong cách khác là OOD, chưa đo số.
+\item[Distribution bias.] \textbf{Thiên lệch do dữ liệu huấn luyện} nghiêng về một loại. \insl Manga109-s chủ yếu manga Nhật \arr\ kém với manhwa Hàn/manhua Trung.
+\item[Concept drift.] \textbf{Dữ liệu thực tế thay đổi theo thời gian} khiến mô hình kém dần sau khi deploy.
+\item[MLOps / Model Monitoring.] Vận hành ML sau deploy: \textbf{theo dõi chất lượng mô hình theo thời gian} (drift), retrain khi cần. \insl \textbf{chưa có} (đang MVP); roadmap W\&B/MLflow.
+\item[W\&B (Weights \& Biases) / MLflow.] Công cụ \textbf{theo dõi thí nghiệm ML \& registry mô hình}. Hướng phát triển của nhóm.
+\item[LaMa / Inpainting.] \textbf{Inpainting} = ``vá'' vùng ảnh bị xoá cho liền nền; \textbf{LaMa} là mô hình inpainting. \insl xoá chữ gốc khỏi bong bóng trước khi vẽ chữ Việt.
+\end{terms}
+
+% ═══════════════════════════════════════════════════════════════
+\section{AI/ML --- RAG, LLM \& Embedding}
+\begin{terms}
+\item[LLM (Large Language Model).] \textbf{Mô hình ngôn ngữ lớn} sinh/hiểu văn bản. \insl \textbf{Gemini 2.5 Flash} để dịch \& trả lời hỏi--đáp.
+\item[Prompt Engineering.] \textbf{Thiết kế câu lệnh (prompt)} đưa vào LLM để có kết quả tốt. \insl Minh viết prompt dịch cả trang giữ ngữ cảnh.
+\item[Context Injection.] \textbf{Nhồi thêm ngữ cảnh} (cả trang + glossary xưng hô) vào prompt để LLM dịch nhất quán, không rời rạc.
+\item[Hallucination (ảo giác).] LLM \textbf{``bịa'' thông tin} nghe hợp lý nhưng sai. \insl giảm bằng RAG (bám nguồn) + human-in-the-loop.
+\item[Human-in-the-loop.] \textbf{Con người trong vòng lặp} kiểm/sửa kết quả AI. \insl Studio QC cho dịch giả duyệt/sửa từng bong bóng.
+\item[Embedding / Vector.] \textbf{Biểu diễn văn bản thành dãy số} (vector) sao cho nghĩa gần nhau thì vector gần nhau. \insl \code{gemini-embedding-001}, \textbf{768 chiều}.
+\item[Cosine Similarity.] \textbf{Đo độ giống nhau} giữa hai vector bằng góc giữa chúng (1 = giống, 0 = không liên quan). \insl tìm đoạn thoại liên quan câu hỏi.
+\item[Top-k Retrieval.] Lấy \textbf{k đoạn giống nhất} làm ngữ cảnh cho LLM.
+\item[RAG (Retrieval-Augmented Generation).] \textbf{Truy hồi} đoạn liên quan rồi \textbf{sinh câu trả lời} bám vào đó \arr\ AI trả lời đúng nội dung, có nguồn trích, ít bịa. \insl UC04 hỏi--đáp.
+\item[Vector Database (pgvector / ChromaDB / FAISS).] CSDL \textbf{lưu \& tìm vector} theo độ tương đồng. \textbf{pgvector} = extension vector cho PostgreSQL. \insl đã chọn pgvector thay ChromaDB (bớt 1 dịch vụ).
+\item[Fallback (M2M100 / NLLB).] \textbf{Phương án dự phòng}: khi Gemini lỗi/hết quota thì chuyển sang mô hình dịch mã nguồn mở (M2M100, NLLB).
+\item[Key Rotation / Key Pool / RPD / Quota / Throttling.] \textbf{Xoay vòng nhiều API key} để né giới hạn; \textbf{RPD} = Requests Per Day; \textbf{Quota} = hạn mức; \textbf{Throttling} = tự giảm tần suất gọi. \insl chống hết quota Gemini free tier.
+\item[Graceful Degradation.] \textbf{Suy giảm êm}: một phần lỗi thì hệ thống trả kết quả một phần thay vì sập toàn bộ. \insl VLM/forum tắt thì trả rỗng, không crash.
+\end{terms}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Kiểm thử \& Chất lượng (LN10--LN11)}
+\begin{terms}
+\item[Verification vs Validation (V\&V).] \textbf{Verification} = ``làm sản phẩm \textit{đúng đặc tả}'' (unit test); \textbf{Validation} = ``làm \textit{đúng sản phẩm} khách cần'' (UAT, E2E).
+\item[Unit / Component / Integration / System / Acceptance test.] Các \textbf{cấp kiểm thử}: đơn vị hàm \arr\ thành phần UI \arr\ tích hợp nhiều module \arr\ toàn hệ \arr\ nghiệm thu người dùng.
+\item[UAT (User Acceptance Testing).] \textbf{Kiểm thử chấp nhận} bởi người dùng thật. \insl mời 3--5 người thử.
+\item[E2E (End-to-End) test.] Kiểm thử \textbf{cả hành trình người dùng} trên trình duyệt thật (đăng nhập \arr\ upload \arr\ đọc). \insl Playwright.
+\item[Playwright / Vitest / pytest / respx.] Công cụ test: \textbf{Playwright} (E2E trình duyệt), \textbf{Vitest} (unit frontend), \textbf{pytest} (backend), \textbf{respx} (giả lập HTTP).
+\item[Katalon Studio.] Công cụ test \textbf{kéo--thả, ghi--phát lại} (record\&playback), xuất báo cáo trực quan. \insl dùng cho PA5 (UC01, UC02).
+\item[Regression Testing (kiểm thử hồi quy).] \textbf{Chạy lại test cũ} để chắc code mới không làm hỏng tính năng cũ. \insl tự động trong CI.
+\item[Test Pyramid.] Nguyên tắc: \textbf{nhiều unit test, ít E2E} (unit rẻ/nhanh, E2E đắt/chậm).
+\item[Smoke test.] \textbf{Kiểm tra nhanh} hệ thống ``còn thở'' sau deploy (chạy được các chức năng chính).
+\item[CI/CD (Continuous Integration / Delivery).] \textbf{Tự động build + test + deploy} mỗi khi push code. \insl GitHub Actions \textbf{5 job song song}.
+\item[CI Quality Gate.] \textbf{Chốt chặn}: chỉ merge/deploy khi CI xanh 100\%.
+\item[Linter (ESLint).] Công cụ \textbf{phân tích tĩnh} bắt lỗi cú pháp/định dạng/code dư (biến không dùng). Đồng bộ style 6 người.
+\item[Typecheck (\code{tsc --noEmit}).] TypeScript \textbf{kiểm tra kiểu dữ liệu} mà không xuất file JS (\code{--noEmit}). Bắt lỗi bất khớp kiểu giữa frontend--backend trước khi chạy.
+\item[Static Analysis (phân tích tĩnh).] Phân tích code \textbf{mà không chạy chương trình} (Linter + Typecheck thuộc nhóm này).
+\item[Equivalence Partitioning / Boundary Value Analysis.] Kỹ thuật thiết kế test: \textbf{chia miền giá trị thành nhóm tương đương} và \textbf{thử ở biên} (vd file 0/1/10/11 MB).
+\item[Defect log.] \textbf{Nhật ký lỗi} tìm được (found \arr\ fixed \arr\ retested). \insl hiện 61/61 Pass, 0 defect (điểm cần thủ).
+\end{terms}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Bảo mật (Security)}
+\begin{terms}
+\item[XSS (Cross-Site Scripting).] Kẻ tấn công \textbf{chèn JavaScript độc} vào trang để đánh cắp dữ liệu. Chống bằng HttpOnly cookie + CSP.
+\item[CSRF (Cross-Site Request Forgery).] \textbf{Giả mạo yêu cầu} từ trang khác nhân danh người dùng đã đăng nhập. Chống bằng SameSite cookie + token.
+\item[SSRF (Server-Side Request Forgery).] Lừa \textbf{server tự gửi request tới địa chỉ nội bộ}. \insl chống bằng \textbf{domain allowlist} ở scraper.
+\item[HttpOnly / Secure / SameSite Cookie.] Thuộc tính cookie: \textbf{HttpOnly} (JS không đọc được \arr\ chống XSS), \textbf{Secure} (chỉ gửi qua HTTPS), \textbf{SameSite} (chống CSRF). \insl token đăng nhập đặt trong HttpOnly cookie.
+\item[RBAC (Role-Based Access Control).] \textbf{Phân quyền theo vai trò} (user / admin) ở tầng API.
+\item[RLS (Row Level Security).] \textbf{Bảo mật mức dòng} ở database: mỗi truy vấn tự thêm điều kiện \code{owner\_id = auth.uid()} \arr\ user A không đọc được dữ liệu user B.
+\item[IDOR (Insecure Direct Object Reference).] Lỗ hổng \textbf{truy cập trực tiếp tài nguyên của người khác} bằng cách đổi ID. \insl đóng bằng owner-scoped RAG + RLS.
+\item[Rate Limiting / SlowAPI.] \textbf{Giới hạn số request} mỗi khoảng thời gian để chống lạm dụng. \insl SlowAPI theo endpoint.
+\item[CAPTCHA / Turnstile.] Cơ chế \textbf{phân biệt người với bot}. \insl Cloudflare Turnstile ở đăng ký, quên mật khẩu.
+\item[Security Headers.] Các HTTP header bảo vệ gắn vào mọi phản hồi: \textbf{CSP} (giới hạn nguồn script), \textbf{HSTS} (ép HTTPS), \textbf{X-Frame-Options} (chống clickjacking), \textbf{X-Content-Type-Options} (chống MIME sniffing).
+\item[MIME Sniffing / Spoofing.] Trình duyệt \textbf{tự đoán loại file} (sniffing); kẻ xấu \textbf{giả loại file} (spoofing, vd script đổi tên \code{.jpg}). Chống bằng Pillow \code{verify()} + header \code{nosniff}.
+\item[Domain Allowlist.] \textbf{Danh sách miền được phép}; mọi URL ngoài danh sách bị chặn. \insl chống SSRF khi import ảnh.
+\item[Idempotency Key.] \textbf{Khoá bất biến} đảm bảo gửi lại request nhiều lần chỉ thực thi \textbf{một lần} (chống trừ tiền 2 lần). \insl thanh toán Stripe.
+\item[Defense in Depth.] \textbf{Phòng thủ nhiều lớp} --- nếu một lớp thủng vẫn còn lớp khác.
+\item[GDPR Export.] Cho người dùng \textbf{tải về toàn bộ dữ liệu cá nhân} của mình (tuân thủ quyền riêng tư).
+\item[Audit Log.] \textbf{Nhật ký kiểm toán}: ghi ``ai làm gì, lúc nào, trên dữ liệu nào'' --- phục vụ điều tra tranh chấp. \insl admin actions vào bảng \code{audit\_logs}.
+\end{terms}
+
+% ═══════════════════════════════════════════════════════════════
+\section{DevOps \& Giám sát (Observability --- LN11)}
+\begin{terms}
+\item[Sentry.] Công cụ \textbf{giám sát lỗi} (error monitoring): bắt exception runtime, gửi alert kèm stack trace. Cấu hình \code{send\_default\_pii=False} để không log thông tin cá nhân.
+\item[OpenTelemetry (OTel).] Chuẩn \textbf{distributed tracing}: theo dõi \textbf{một request đi qua nhiều dịch vụ} để tìm cổ chai (bottleneck).
+\item[Span / Trace.] \textbf{Span} = một đoạn thời gian của một bước; \textbf{Trace} = chuỗi span của cả request.
+\item[Structured Logging.] Ghi log \textbf{có cấu trúc} (timestamp, level, module, request-id) thay vì \code{print()} tự do.
+\item[Request ID (X-Request-ID / UUID).] \textbf{Mã định danh duy nhất} gắn cho mỗi request; lọc log theo mã này là ra toàn bộ hành trình. UUID = mã 128-bit gần như không trùng.
+\item[Health Check (\code{/health}, \code{/health/deep}).] Endpoint \textbf{báo sức khoẻ} hệ thống; \code{deep} kiểm tra cả Supabase/Gemini/AI Module.
+\item[Readiness Probe / Zero-downtime.] Nền tảng \textbf{ping bản mới} trước khi chuyển traffic; nếu không khoẻ thì giữ bản cũ \arr\ \textbf{không gián đoạn}.
+\item[PITR (Point-in-Time Recovery).] \textbf{Khôi phục CSDL về một thời điểm} bất kỳ nhờ log liên tục. \insl Supabase PITR 7 ngày.
+\item[Vercel / Render / HuggingFace Spaces.] Nền tảng deploy: \textbf{Vercel} (frontend), \textbf{Render} (backend Docker), \textbf{HF Spaces} (AI Module GPU/CPU).
+\end{terms}
+
+% ═══════════════════════════════════════════════════════════════
+\section{Đạo đức AI (LN12)}
+\begin{terms}
+\item[Opacity (Mờ đục / Hộp đen).] AI \textbf{khó giải thích vì sao ra kết quả đó}. \insl giải bằng transparency: progress bar mỗi bước + structured log + visualize bounding box.
+\item[Transparency / Explainability / Accountability.] \textbf{Minh bạch} (cho thấy đang làm gì) / \textbf{giải thích được} / \textbf{có người chịu trách nhiệm} khi sai.
+\item[Artificial Stupidity.] AI \textbf{mắc lỗi ``ngớ ngẩn''} (OCR đọc sai, YOLO khoanh nhầm). \insl giảm bằng Gemini self-correction + Studio QC.
+\item[AI Bias / Fairness.] \textbf{Thiên lệch \& công bằng} của mô hình do dữ liệu. \insl Manga109-s nghiêng manga Nhật \arr\ ghi nhận giới hạn + bổ sung dataset.
+\item[Privacy \& Surveillance.] \textbf{Riêng tư \& giám sát}. \insl thư viện mặc định Private, Sentry không log PII.
+\item[DMCA Take-down.] Quy trình \textbf{gỡ nội dung vi phạm bản quyền} theo yêu cầu chủ sở hữu. \insl trong roadmap.
+\item[Manga109-s.] \textbf{Bộ dữ liệu học thuật} 109 đầu manga Nhật (Aizawa Lab, ĐH Tokyo), có \textbf{giấy phép nghiên cứu}. \insl dùng train YOLO + OCR.
+\item[``Principles alone cannot guarantee ethical AI'' (LN12).] Chỉ tuyên bố nguyên tắc là \textbf{chưa đủ} --- phải có \textbf{thiết kế kỹ thuật enforce} (RLS, Sentry config, allowlist) mà dev khác không bypass được.
+\end{terms}
+
+\vspace{8pt}
+\begin{center}\small\color{soft}
+Từ điển thuật ngữ --- đọc kèm \texttt{QA\_DuyMinh.pdf} · StoryLens · CSC10011 (HCMUS).
+\end{center}
+
+\end{document}
