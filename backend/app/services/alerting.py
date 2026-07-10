@@ -32,8 +32,12 @@ _last_sent: dict[str, float] = {}
 def _should_send(key: str) -> bool:
     now = time.monotonic()
     with _lock:
-        last = _last_sent.get(key, 0.0)
-        if now - last < _DEDUPE_TTL_SEC:
+        last = _last_sent.get(key)
+        # `last is None` → never sent this key, so always send. Using a sentinel
+        # (not a 0.0 default) matters on a freshly-booted host where
+        # `time.monotonic()` is still < _DEDUPE_TTL_SEC: with a 0.0 default,
+        # `now - 0.0 < TTL` would wrongly suppress the first alert for every key.
+        if last is not None and now - last < _DEDUPE_TTL_SEC:
             return False
         _last_sent[key] = now
         return True

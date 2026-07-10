@@ -90,3 +90,12 @@ def test_webhook_failure_never_raises(monkeypatch, fake_httpx):
 
     monkeypatch.setattr(_FakeClient, "post", boom)
     assert alerting.send_alert("Drift", "x", dedupe_key="k2") is False
+
+
+def test_first_alert_sent_on_freshly_booted_host(monkeypatch, fake_httpx):
+    """Regression: on a fresh host time.monotonic() is still < the dedupe TTL.
+    The first alert for a key must NOT be suppressed by the dedupe default."""
+    _set_hook(monkeypatch, HOOK)
+    monkeypatch.setattr(alerting.time, "monotonic", lambda: 12.0)  # uptime ~12s
+    assert alerting.send_alert("Drift", "x", dedupe_key="fresh") is True
+    assert len(fake_httpx.calls) == 1
