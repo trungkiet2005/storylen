@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 import httpx
 
 from app.config import get_settings
+from app.services import ai_telemetry
 from app.services.narration_source import get_active_vlm_url
 
 logger = logging.getLogger(__name__)
@@ -118,45 +119,51 @@ def describe_image(
         },
     }
 
-    last_exc: Exception | None = None
-    for attempt in range(1, _MAX_RETRIES + 1):
-        try:
-            logger.info(
-                "VLM describe_image via %s model=%s (attempt %d/%d)",
-                base, payload["model"], attempt, _MAX_RETRIES,
-            )
-            with httpx.Client(timeout=_timeout()) as client:
-                resp = client.post(url, json=payload, headers=_headers())
-
-            if resp.status_code == 200:
-                data = resp.json()
-                text = str(data.get("response") or "").strip()
-                if not text:
-                    raise VLMError("VLM returned an empty response.")
-                _cb_record_success()
-                return text
-
-            if resp.status_code in _RETRYABLE_STATUS:
-                last_exc = VLMError(f"VLM returned HTTP {resp.status_code}")
-                logger.warning(
-                    "VLM HTTP %d (attempt %d/%d), retrying in %.0fs",
-                    resp.status_code, attempt, _MAX_RETRIES, _RETRY_DELAY_SEC,
+    model_name = payload["model"]
+    # Telemetry wraps the whole call (all retries) → one record per describe_image,
+    # tagged ok/error, with the winning response's token counts.
+    with ai_telemetry.track("ollama", model_name, "vlm.describe") as tel:
+        last_exc: Exception | None = None
+        for attempt in range(1, _MAX_RETRIES + 1):
+            try:
+                logger.info(
+                    "VLM describe_image via %s model=%s (attempt %d/%d)",
+                    base, model_name, attempt, _MAX_RETRIES,
                 )
-            else:
-                resp.raise_for_status()
+                with httpx.Client(timeout=_timeout()) as client:
+                    resp = client.post(url, json=payload, headers=_headers())
 
-        except (httpx.ConnectError, httpx.TimeoutException) as exc:
-            logger.warning("VLM connection/timeout (attempt %d/%d): %s", attempt, _MAX_RETRIES, exc)
-            last_exc = exc
-        except httpx.HTTPStatusError as exc:
-            _cb_record_failure()
-            raise VLMError(f"VLM returned HTTP {exc.response.status_code}") from exc
+                if resp.status_code == 200:
+                    data = resp.json()
+                    text = str(data.get("response") or "").strip()
+                    if not text:
+                        raise VLMError("VLM returned an empty response.")
+                    tel.prompt_tokens = int(data.get("prompt_eval_count") or 0)
+                    tel.completion_tokens = int(data.get("eval_count") or 0)
+                    _cb_record_success()
+                    return text
 
-        if attempt < _MAX_RETRIES:
-            time.sleep(_RETRY_DELAY_SEC)
+                if resp.status_code in _RETRYABLE_STATUS:
+                    last_exc = VLMError(f"VLM returned HTTP {resp.status_code}")
+                    logger.warning(
+                        "VLM HTTP %d (attempt %d/%d), retrying in %.0fs",
+                        resp.status_code, attempt, _MAX_RETRIES, _RETRY_DELAY_SEC,
+                    )
+                else:
+                    resp.raise_for_status()
 
-    _cb_record_failure()
-    raise VLMError(f"VLM failed after {_MAX_RETRIES} attempts: {last_exc}") from last_exc
+            except (httpx.ConnectError, httpx.TimeoutException) as exc:
+                logger.warning("VLM connection/timeout (attempt %d/%d): %s", attempt, _MAX_RETRIES, exc)
+                last_exc = exc
+            except httpx.HTTPStatusError as exc:
+                _cb_record_failure()
+                raise VLMError(f"VLM returned HTTP {exc.response.status_code}") from exc
+
+            if attempt < _MAX_RETRIES:
+                time.sleep(_RETRY_DELAY_SEC)
+
+        _cb_record_failure()
+        raise VLMError(f"VLM failed after {_MAX_RETRIES} attempts: {last_exc}") from last_exc
 
 
 def health_check() -> dict:

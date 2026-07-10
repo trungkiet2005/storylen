@@ -344,30 +344,39 @@ def _generate_answer(question: str, context: str) -> str:
     last_error: Exception | None = None
     prompt = QA_PROMPT.format(context=context, question=question)
 
-    for _ in range(_pool.client_count()):
-        client = _pool.next_client()
-        if client is None:
-            break
-        try:
-            response = client.models.generate_content(
-                model=settings.GEMINI_MODEL,
-                contents=prompt,
-            )
-            answer_text = (response.text or "").strip()
-            if not answer_text:
-                logger.warning("Gemini returned an empty response; using context fallback.")
-                return _context_fallback_answer(context)
-            return answer_text
-        except Exception as exc:
-            last_error = exc
-            if _is_retryable_gemini_key_error(exc):
-                logger.warning("Gemini key failed, rotating to next key. Error: %s", exc)
-                continue
-            logger.error("Unexpected Gemini generation failure: %s", exc)
-            break
+    from app.services import ai_telemetry
 
-    logger.error("Gemini generation failed for all attempted keys: %s", last_error)
-    return _context_fallback_answer(context)
+    with ai_telemetry.track("gemini", settings.GEMINI_MODEL, "qa.answer") as tel:
+        for _ in range(_pool.client_count()):
+            client = _pool.next_client()
+            if client is None:
+                break
+            try:
+                response = client.models.generate_content(
+                    model=settings.GEMINI_MODEL,
+                    contents=prompt,
+                )
+                um = getattr(response, "usage_metadata", None)
+                if um is not None:
+                    tel.prompt_tokens = int(getattr(um, "prompt_token_count", 0) or 0)
+                    tel.completion_tokens = int(getattr(um, "candidates_token_count", 0) or 0)
+                answer_text = (response.text or "").strip()
+                if not answer_text:
+                    logger.warning("Gemini returned an empty response; using context fallback.")
+                    tel.success = False
+                    return _context_fallback_answer(context)
+                return answer_text
+            except Exception as exc:
+                last_error = exc
+                if _is_retryable_gemini_key_error(exc):
+                    logger.warning("Gemini key failed, rotating to next key. Error: %s", exc)
+                    continue
+                logger.error("Unexpected Gemini generation failure: %s", exc)
+                break
+
+        logger.error("Gemini generation failed for all attempted keys: %s", last_error)
+        tel.success = False
+        return _context_fallback_answer(context)
 
 
 _NO_CONTEXT_ANSWER = (

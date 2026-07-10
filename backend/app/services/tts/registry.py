@@ -90,4 +90,14 @@ def synthesize(
     prov = _provider(resolved)
     if not prov.available():
         raise TTSNotAvailable(f"TTS engine '{resolved}' is not available on this host.")
-    return prov.synthesize(text, voice=voice, rate=rate)
+
+    # Telemetry: TTS is billed per character by cloud vendors, so we track the
+    # char count (as "completion tokens") + latency per engine.
+    from app.services import ai_telemetry
+
+    char_count = len(text or "")
+    with ai_telemetry.track("tts", resolved, "tts.synthesize", meta={"voice": voice or ""}) as tel:
+        result = prov.synthesize(text, voice=voice, rate=rate)
+        tel.completion_tokens = char_count
+        tel.cost_usd = ai_telemetry.estimate_tts_cost(resolved, char_count)
+        return result

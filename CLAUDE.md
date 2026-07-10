@@ -332,6 +332,30 @@ Query flow:
   (or the `app_settings` override); `pip install edge-tts pyttsx3` (in
   requirements). Recap export additionally needs `ffmpeg` on the host.
 
+### AI-call telemetry + metrics + alerting (MLOps, per-model)
+
+Complements `model_monitor.py` (manga-pipeline quality) with **per-call**
+observability for every model — Gemini, the narration VLM, and TTS.
+
+- `services/ai_telemetry.py` — `track()`/`record_ai_call()` capture latency,
+  token counts and an estimated USD cost, then update Prometheus + persist a row
+  to `ai_call_metrics` (migration v9). `get_ai_call_summary()` aggregates per
+  model for the dashboard. Instrumented call sites: `vlm_client.describe_image`
+  (ollama `prompt_eval_count`/`eval_count`), `tts/registry.synthesize` (char
+  count), `rag.py` Gemini QA (`usage_metadata`). Best-effort — never raises.
+- `services/metrics.py` — Prometheus registry (`storylens_ai_calls_total`,
+  `_ai_call_latency_seconds`, `_ai_tokens_total`, `_ai_cost_usd_total`,
+  `_model_drift_status`), exposed at **`GET /metrics`** (gated by `METRICS_ENABLED`).
+  No-op if `prometheus-client` isn't installed.
+- `services/alerting.py` — `send_alert()` posts a Slack/Discord-compatible payload
+  to `ALERT_WEBHOOK_URL` (de-duped), else logs. The `/model-monitor/drift`
+  endpoint fires it on drift warning/critical and publishes the drift gauge.
+- **Health:** `/health/deep` now also probes the VLM (ollama) and TTS engines —
+  both optional (down → `degraded`, never `unhealthy`).
+- **Dashboard:** admin `/admin/model-monitor` gained an "AI Calls" section
+  (per-model calls / latency / tokens / cost) via `GET /admin/model-monitor/ai-calls`.
+- **Logging:** set `LOG_JSON=true` for one-line JSON logs (Loki/Datadog/CloudWatch).
+
 ---
 
 ## Database (Supabase PostgreSQL + pgvector + pg_trgm)

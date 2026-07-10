@@ -1960,6 +1960,30 @@ export async function adminSetModelMonitorAB(
   });
 }
 
+export interface AiCallModelStat {
+  provider: string;
+  model: string;
+  operation: string;
+  calls: number;
+  success_rate: number;
+  avg_latency_ms: number | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+}
+
+export interface AiCallSummary {
+  models: AiCallModelStat[];
+  totals: { calls?: number; cost_usd?: number; tokens?: number };
+}
+
+/** Per-model AI-call telemetry (Gemini · VLM · TTS): calls, latency, tokens, cost. */
+export async function adminGetModelMonitorAiCalls(days = 7): Promise<AiCallSummary> {
+  return request<AiCallSummary>(
+    `/admin/model-monitor/ai-calls?days=${encodeURIComponent(days)}`,
+  );
+}
+
 // ─── Wibu (Gamification) ─────────────────────────────────────────────────────
 
 export type WibuListStatus = "reading" | "want" | "done" | "dropped";

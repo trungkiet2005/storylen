@@ -27,14 +27,35 @@ from app.routers import (
 )
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
+class _JsonLogFormatter(logging.Formatter):
+    """One-line JSON per record for log aggregators (Loki/Datadog/CloudWatch)."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        import json
+
+        payload = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            "level": record.levelname,
+            "logger": record.name,
+            "rid": getattr(record, "request_id", "-"),
+            "msg": record.getMessage(),
+        }
+        if record.exc_info:
+            payload["exc"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+
 _request_id_filter = RequestIDFilter()
 _log_handler = logging.StreamHandler()
-_log_handler.setFormatter(
-    logging.Formatter(
-        "%(asctime)s | %(levelname)-8s | %(name)s | rid=%(request_id)s — %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+if get_settings().LOG_JSON:
+    _log_handler.setFormatter(_JsonLogFormatter())
+else:
+    _log_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s | %(levelname)-8s | %(name)s | rid=%(request_id)s — %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
     )
-)
 _log_handler.addFilter(_request_id_filter)
 _root = logging.getLogger()
 _root.handlers = [_log_handler]
@@ -207,6 +228,22 @@ def health():
     return {"status": "ok", "version": settings.APP_VERSION}
 
 
+@app.get("/metrics", tags=["meta"], include_in_schema=False)
+def metrics_endpoint():
+    """Prometheus exposition of AI-call counters/latency/tokens/cost.
+
+    Scrape target for Prometheus/Grafana. Returns 404 when METRICS_ENABLED is
+    off. No auth — mount behind your network/ingress ACL like any /metrics."""
+    from fastapi import Response
+
+    from app.services import metrics as _metrics
+
+    if not settings.METRICS_ENABLED:
+        return Response(status_code=404)
+    payload, content_type = _metrics.render()
+    return Response(content=payload, media_type=content_type)
+
+
 @app.get("/health/deep", tags=["meta"])
 def health_deep():
     """Readiness probe — verifies upstream dependencies.
@@ -258,6 +295,32 @@ def health_deep():
             }
     except Exception as exc:
         checks["ai_module"] = {"status": "degraded", "error": str(exc)[:160]}
+
+    # ── VLM (narration Listen mode — optional) ──────────────────────────
+    t0 = time.perf_counter()
+    try:
+        from app.services import vlm_client
+        h = vlm_client.health_check()
+        reachable = bool(h.get("reachable")) and bool(h.get("model_available"))
+        checks["vlm"] = {
+            "status": "ok" if reachable else "degraded",
+            "model": h.get("model"),
+            "latency_ms": int((time.perf_counter() - t0) * 1000),
+            **({"error": h["error"]} if h.get("error") else {}),
+        }
+    except Exception as exc:
+        checks["vlm"] = {"status": "degraded", "error": str(exc)[:160]}
+
+    # ── TTS (narration Listen mode — optional) ──────────────────────────
+    try:
+        from app.services.tts import registry as tts_registry
+        engines = tts_registry.available_engines()
+        checks["tts"] = {
+            "status": "ok" if engines else "degraded",
+            "engines": engines,
+        }
+    except Exception as exc:
+        checks["tts"] = {"status": "degraded", "error": str(exc)[:160]}
 
     # ── Roll-up ─────────────────────────────────────────────────────────
     critical_ok = (

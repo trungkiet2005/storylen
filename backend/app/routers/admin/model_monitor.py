@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
 from app.routers.auth import AuthUser, get_current_admin
+from app.services import ai_telemetry, alerting, metrics
 from app.services.model_monitor import (
     get_ab_results,
     get_metrics_summary,
@@ -59,6 +60,23 @@ class RawMetricsResponse(BaseModel):
     total: int
 
 
+class AiCallModelStat(BaseModel):
+    provider: str
+    model: str
+    operation: str
+    calls: int
+    success_rate: float
+    avg_latency_ms: float | None
+    prompt_tokens: int
+    completion_tokens: int
+    cost_usd: float
+
+
+class AiCallSummaryResponse(BaseModel):
+    models: list[AiCallModelStat]
+    totals: dict
+
+
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/model-monitor/summary", response_model=MetricsSummaryResponse)
@@ -100,10 +118,37 @@ def model_monitor_drift(
     )
     rows = list(reversed(rows_resp.data or []))
     drift = _compute_drift_status(rows)
+
+    # Publish per-metric drift to Prometheus + fire an alert on degradation.
+    for detail in drift.get("details") or []:
+        metrics.set_drift(detail.get("metric", "?"), detail.get("status", "ok"))
+    if drift["status"] in ("warning", "critical"):
+        bad = [d for d in (drift.get("details") or []) if d.get("status") in ("warning", "critical")]
+        summary = ", ".join(f"{d['metric']}={d['recent']} (base {d['baseline']})" for d in bad)
+        alerting.send_alert(
+            "Model drift detected",
+            f"Drift status: {drift['status'].upper()} — {summary or 'see dashboard'}",
+            severity="critical" if drift["status"] == "critical" else "warning",
+            dedupe_key=f"drift:{drift['status']}",
+        )
+
     return DriftResponse(
         drift_status=drift["status"],
         drift_details=drift.get("details"),
         window_size=DRIFT_WINDOW,
+    )
+
+
+@router.get("/model-monitor/ai-calls", response_model=AiCallSummaryResponse)
+def model_monitor_ai_calls(
+    days: int = Query(default=7, ge=1, le=90, description="Number of days to look back"),
+    _admin: AuthUser = Depends(get_current_admin),
+) -> AiCallSummaryResponse:
+    """Per-model AI-call telemetry (Gemini · VLM · TTS): calls, latency, tokens, cost."""
+    summary = ai_telemetry.get_ai_call_summary(days=days)
+    return AiCallSummaryResponse(
+        models=summary.get("models", []),
+        totals=summary.get("totals", {}),
     )
 
 

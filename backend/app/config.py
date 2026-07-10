@@ -208,6 +208,23 @@ class Settings(BaseSettings):
     OTEL_EXPORTER_OTLP_ENDPOINT: str = ""  # Empty → OTel exporter disabled.
     OTEL_SERVICE_NAME: str = "storylens-backend"
 
+    # ─── Metrics / MLOps observability ────────────────────────────────────────
+    # Prometheus /metrics endpoint (AI-call counters, latency, tokens, cost).
+    METRICS_ENABLED: bool = True
+    # Emit logs as one-line JSON (for Loki/Datadog/CloudWatch ingestion) instead
+    # of the human-readable format. Off by default (dev-friendly plain text).
+    LOG_JSON: bool = False
+    # Slack/Discord-compatible incoming-webhook URL. Empty → alerts only log,
+    # never posted. Fires on model drift + degraded health.
+    ALERT_WEBHOOK_URL: str = ""
+
+    @field_validator("ALERT_WEBHOOK_URL", "OTEL_SERVICE_NAME", mode="before")
+    @classmethod
+    def strip_observability_str(cls, v: Any) -> str:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
     # ─── Gemini (Google AI) ───────────────────────────────────────────────────
     GEMINI_API_KEY: str
     GEMINI_MODEL: str = "gemini-2.5-flash"

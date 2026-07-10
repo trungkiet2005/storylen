@@ -43,6 +43,9 @@ lxml>=5.2.0               # Fast BS4 parser
 edge-tts>=6.1.0
 pyttsx3>=2.90
 
+# ─── Metrics (Prometheus /metrics exposition — AI-call observability) ─────────
+prometheus-client>=0.20.0
+
 # ─── Utilities ────────────────────────────────────────────────────────────────
 python-multipart>=0.0.9   # FastAPI file uploads
 python-dotenv>=1.0.0

@@ -6,10 +6,12 @@ import {
   adminGetModelMonitorSummary,
   adminGetModelMonitorAB,
   adminSetModelMonitorAB,
+  adminGetModelMonitorAiCalls,
   type ModelMonitorSummary as MetricsSummary,
   type ModelMonitorABResults as ABResults,
   type ModelMonitorTimeSeries as TimeSeries,
   type ModelMonitorABVariantName,
+  type AiCallSummary,
 } from "@/lib/api";
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -22,6 +24,17 @@ function pct(v: number | null): string {
 function ms(v: number | null): string {
   if (v === null || v === undefined) return "—";
   return v.toFixed(0) + " ms";
+}
+
+function usd(v: number | null | undefined): string {
+  if (v === null || v === undefined) return "—";
+  if (v === 0) return "$0";
+  if (v < 0.01) return "$" + v.toFixed(5);
+  return "$" + v.toFixed(2);
+}
+
+function fmtInt(v: number): string {
+  return v.toLocaleString("en-US");
 }
 
 function driftColor(status: string): string {
@@ -83,6 +96,7 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
 
 export default function AdminModelMonitorPage() {
   const [summary, setSummary] = useState<MetricsSummary | null>(null);
+  const [aiCalls, setAiCalls] = useState<AiCallSummary | null>(null);
   const [abResults, setAbResults] = useState<ABResults | null>(null);
   const [abVariant, setAbVariant] = useState<ModelMonitorABVariantName>("off");
   const [days, setDays] = useState(7);
@@ -95,12 +109,14 @@ export default function AdminModelMonitorPage() {
     setLoading(true);
     setError(null);
     try {
-      const [sum, ab] = await Promise.all([
+      const [sum, ab, calls] = await Promise.all([
         adminGetModelMonitorSummary(days),
         adminGetModelMonitorAB(),
+        adminGetModelMonitorAiCalls(days),
       ]);
       setSummary(sum);
       setAbResults(ab);
+      setAiCalls(calls);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -201,6 +217,52 @@ export default function AdminModelMonitorPage() {
         <KpiCard label="Tỉ lệ phát hiện bong bóng" value={loading ? "…" : pct(summary?.bubble_detection_rate ?? null)} sub="YOLO detection rate" />
         <KpiCard label="Số bong bóng TB/trang" value={loading ? "…" : String(summary?.avg_bubble_count?.toFixed(1) ?? "—")} sub="Avg bubbles per page" />
       </div>
+
+      {/* AI Calls — per-model telemetry (VLM · TTS · Gemini) */}
+      {aiCalls && (
+        <div className="stroke-ink panel-shadow" style={{ background: "var(--panel)", padding: 20, marginBottom: 24 }} data-testid="ai-calls-section">
+          <div className="display" style={{ fontSize: 16, marginBottom: 4 }}>🤖 AI Calls — theo model (VLM · TTS · Gemini)</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14 }}>
+            Số lượt gọi, latency, token và chi phí ước tính cho từng model — {days} ngày qua.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 16 }}>
+            <KpiCard label="Tổng lượt gọi" value={fmtInt(aiCalls.totals.calls ?? 0)} />
+            <KpiCard label="Tổng token" value={fmtInt(aiCalls.totals.tokens ?? 0)} />
+            <KpiCard label="Chi phí ước tính" value={usd(aiCalls.totals.cost_usd ?? 0)} sub="Self-hosted (VLM/TTS) = $0" />
+          </div>
+          {aiCalls.models.length === 0 ? (
+            <div style={{ color: "var(--muted)", fontSize: 13 }}>
+              Chưa có lượt gọi nào được ghi nhận. Dùng thử tính năng Nghe truyện / Hỏi đáp để bắt đầu thu thập.
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid var(--border)" }}>
+                    {["Provider", "Model", "Operation", "Calls", "Success", "Latency TB", "Tokens", "Cost"].map((h) => (
+                      <th key={h} style={{ textAlign: "left", padding: "6px 8px", color: "var(--muted)", fontWeight: 400, whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {aiCalls.models.map((mdl) => (
+                    <tr key={`${mdl.provider}/${mdl.model}/${mdl.operation}`} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <td style={{ padding: "8px 8px" }}>{mdl.provider}</td>
+                      <td style={{ padding: "8px 8px" }}><code style={{ fontSize: 12 }}>{mdl.model}</code></td>
+                      <td style={{ padding: "8px 8px" }}><code style={{ fontSize: 12 }}>{mdl.operation}</code></td>
+                      <td style={{ padding: "8px 8px", fontFamily: "var(--font-mono)" }}>{mdl.calls}</td>
+                      <td style={{ padding: "8px 8px", fontFamily: "var(--font-mono)" }}>{pct(mdl.success_rate)}</td>
+                      <td style={{ padding: "8px 8px", fontFamily: "var(--font-mono)" }}>{ms(mdl.avg_latency_ms)}</td>
+                      <td style={{ padding: "8px 8px", fontFamily: "var(--font-mono)" }}>{fmtInt(mdl.prompt_tokens + mdl.completion_tokens)}</td>
+                      <td style={{ padding: "8px 8px", fontFamily: "var(--font-mono)" }}>{usd(mdl.cost_usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Drift Details Table */}
       {summary?.drift_details && summary.drift_details.length > 0 && (

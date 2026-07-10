@@ -205,6 +205,10 @@ def test_recap_chapter_no_ffmpeg_returns_503(client, monkeypatch):
 
 
 def test_recap_chapter_empty_returns_404(client, monkeypatch):
+    from app.services import recap_video
+
+    # ffmpeg is checked first now; force it available so we reach the empty-pages path.
+    monkeypatch.setattr(recap_video, "ffmpeg_available", lambda: True)
     monkeypatch.setattr(narration_service, "list_chapter_pages", lambda *a, **k: [])
     resp = client.post("/v1/narrate/recap/c1", json={})
     assert resp.status_code == 404
