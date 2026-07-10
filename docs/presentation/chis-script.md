@@ -3,14 +3,14 @@
 # StoryLens - Script Testing, Demo, Q&A
 
 Người trình bày: **Nguyễn Lâm Phú Quý - QA & Business Analyst**
-Phạm vi: **Slide 20 -> 28**
+Phạm vi: **Slide 21 -> 31**
 Bản này là bản Markdown để dễ chỉnh sửa trước khi chuyển sang PDF.
 
 ## Cách dùng nhanh
 
-- Phần chính cần nắm chắc nhất: **Slide 20 - Kiểm thử & CI/CD**.
-- Slide 21-24: nói theo góc nhìn QA/test cho tính năng và demo.
-- Slide 25-28: nói hạn chế, roadmap, kết luận nếu bạn là người chốt cuối.
+- Phần chính cần nắm chắc nhất: **Slide 21 - Kiểm thử & CI/CD**.
+- Slide 22-27: nói theo góc nhìn QA/test cho tính năng và demo (bao gồm 2 slide demo mới: RAG Q&A và Video Recap).
+- Slide 28-31: nói hạn chế, roadmap, kết luận nếu bạn là người chốt cuối.
 - Nếu bị hỏi sâu, dùng phần **Q&A vấn đáp** và **Glossary technical** bên dưới
 - Lưu ý quan trọng: PA5 report thật hiện ghi Katalon chạy Login/Navigation. Nếu slide vẫn ghi Upload/Reader, nói an toàn là:
   “Katalon kiểm thử UI tự động theo yêu cầu PA5; ngoài ra các luồng Upload/Reader/Q&A được bao phủ trong test plan, manual/UAT và các tầng test khác.”
@@ -19,36 +19,35 @@ Bản này là bản Markdown để dễ chỉnh sửa trước khi chuyển san
 
 # Script trình bày
 
-## Slide 20 - Kiểm thử & CI/CD
+## Slide 21 - Kiểm thử & CI/CD
 
-Ở phần này, em xin trình bày cách mà nhóm kiểm soát chất lượng cho StoryLens.
+Ở phần này, em xin trình bày cách mà nhóm kiểm soát chất lượng cho đồ án StoryLens.
 
-Theo phần lý thuyết testing, thì kiểm thử có hai mục tiêu. (đó chính là **validation và defect testing**).
+Theo lý thuyết testing, nhóm áp dụng cả hai mục tiêu kiểm thử: **validation** và **defect testing** — để cho hệ thống đáp ứng yêu cầu, vừa cố tìm lỗi khi hệ thống chạy sai đặc tả.
 
-- Một là **validation**, tức là chứng minh hệ thống đáp ứng yêu cầu.
-- Hai là **defect testing**, tức là cố gắng tìm lỗi khi hệ thống chạy sai đặc tả.
+Với StoryLens, không chỉ là một website tĩnh. Mà có đầy đủ frontend, backend, AI Module, Supabase và AI Service. Vì vậy nếu chỉ test thủ công thì dễ bỏ sót các lỗi tìm ẩn. Nên nhóm chia kiểm thử thành nhiều tầng, mỗi tầng bắt một nhóm lỗi khác nhau.
 
-Với StoryLens, không chỉ là một website tĩnh. Mà có đầy đủ frontend, backend, AI Module, Supabase và AI Service. Vì vậy nếu chỉ bấm thử thủ công thì rất dễ bỏ sót lỗi. Nên nhóm chia kiểm thử thành nhiều tầng, mỗi tầng bắt một nhóm lỗi khác nhau.
-
-Đầu tiên là **Katalon Studio**. Là tool kiểm thử giao diện tự động. Nói dễ hiểu là thay vì người test tự bấm từng bước, Katalon sẽ mở trình duyệt, nhập dữ liệu, click nút và kiểm tra kết quả theo script.
+- Đầu tiên, nhóm dùng **Katalon Studio** để kiểm thử tự động 2 luồng UI ổn định nhất: đăng nhập và điều hướng chính.
 
 Ví dụ: mở trang đăng nhập, nhập tài khoản sai, bấm login, rồi verify là hệ thống vẫn ở `/login` và có thông báo lỗi. Hoặc vào trang chủ, bấm qua Browse/Library để kiểm tra điều hướng đúng. Nhóm chọn các luồng này vì ít phụ thuộc AI bên ngoài, nên test tự động ổn định hơn.
 
-Tiếp theo là **unit và component test ở frontend**. Unit test là kiểm thử một phần nhỏ, còn component test là kiểm thử một khối giao diện React. Nhóm dùng **Vitest** và **React Testing Library** cho các phần như rating, credit badge, reading list, local storage. Ví dụ nếu user bấm chọn rating thì UI phải cập nhật đúng; hoặc reading list phải lưu/đọc trạng thái đúng từ local storage. Các test này chạy nhanh, nên phù hợp để bắt lỗi hồi quy mỗi khi sửa UI.
+- Tiếp theo, nhóm dùng **Vitest** và **Thư viện React Testing** để test unit/component ở frontend, cho các phần như rating, reading list, local storage.
 
-Ở backend, nhóm dùng **pytest**. Đây là framework test phổ biến cho Python. Trong đồ án, pytest dùng để kiểm tra logic của backend FastAPI và các service phía server. Với những service có gọi Supabase hoặc Gemini, nhóm dùng **mock**. Mock nghĩa là giả lập phản hồi của dịch vụ ngoài, để kiểm tra logic backend mà không cần gọi API thật liên tục. Ví dụ thay vì thật sự gọi Gemini mỗi lần test, mình giả lập Gemini trả về một bản dịch mẫu, rồi kiểm tra backend xử lý kết quả đó đúng không. Cách này giúp test ổn định và không tốn quota Gemini.
+Ví dụ nếu user bấm chọn rating thì UI phải cập nhật đúng; hoặc reading list phải lưu/đọc trạng thái đúng từ local storage. Các test này chạy nhanh, nên phù hợp để bắt lỗi hồi quy mỗi khi sửa UI.
 
-**Và Playwright cho E2E**. E2E nghĩa là kiểm thử đầu-cuối trên trình duyệt, gần giống cách người dùng thật thao tác. Trong StoryLens, Playwright phù hợp cho các luồng như đăng nhập, trang chủ, protected pages, mobile, forum và edge case. Ví dụ user chưa đăng nhập mà vào trang cần quyền thì phải bị chuyển về login; hoặc trên mobile thì menu và navigation vẫn phải dùng được.
+Ở backend, nhóm dùng **pytest** để kiểm tra logic của FastAPI và các service phía server. Với những service có gọi Supabase hoặc Gemini, nhóm dùng **mock**
 
-Và trước khi push lên deploy thì sẽ có **kiểm thử tĩnh**. Kiểm thử tĩnh nghĩa là kiểm tra code mà chưa cần chạy app như người dùng. Ví dụ TypeScript typecheck bắt lỗi kiểu dữ liệu, ESLint bắt lỗi coding style và các pattern dễ gây bug, còn Python type hints giúp code backend rõ kiểu hơn.
+Ví dụ thay vì thật sự gọi Gemini mỗi lần test, mình giả lập Gemini trả về một bản dịch mẫu, rồi kiểm tra backend xử lý kết quả đó đúng không. Cách này giúp test ổn định và không tốn quota Gemini.
+
+- Playwright **cho E2E**, phù hợp cho các luồng như đăng nhập, trang chủ, protected pages, mobile, forum và edge case.
+
+Ví dụ user chưa đăng nhập mà vào trang cần quyền thì phải bị chuyển về login; hoặc trên mobile thì menu và navigation vẫn phải dùng được.
+
+- Và trước khi push lên deploy thì sẽ có **kiểm thử tĩnh**: TypeScript typecheck bắt lỗi kiểu dữ liệu, ESLint bắt lỗi coding style và các pattern dễ gây bug, còn Python type hints giúp code backend rõ kiểu hơn.
 
 Các tầng này được tự động hóa bằng **GitHub Actions CI**. Chia thành  5 job chính: typecheck/test, lint, production build, Playwright E2E và backend pytest.
 
-[Quy tắc của nhóm là pull request phải được review và CI xanh trước khi merge vào main.]
-
--> Automation **không thay thế hoàn toàn manual testing**. Vì nó phù hợp nhất với các test lặp lại nhiều lần, test hồi quy, hoặc các luồng quan trọng. Còn các phần cần đánh giá bằng cảm nhận người dùng, ví dụ bản dịch có tự nhiên không, overlay có dễ đọc không, Studio QC có thuận tay không, thì nhóm vẫn cần manual test.
-
-## Slide 21 - Tính năng nổi bật
+## Slide 22 - Tính năng nổi bật
 
 Đầu tiên là **Reader nâng cao**. Reader hỗ trợ đọc bản dịch dạng overlay, tức là chữ tiếng Việt được phủ trực tiếp lên bong bóng thoại. Và user có thể đọc song ngữ để đối chiếu hoặc cải thiện khả năng đọc và xem cảnh báo nếu độ tin cậy OCR thấp.
 
@@ -58,21 +57,21 @@ Các tầng này được tự động hóa bằng **GitHub Actions CI**. Chia t
 
 Ngoài ra còn có forum để mọi người có thể bình luận chương dịch; phần **gamification** như bookmark, rating, reading list, mục tiêu đọc, XP và thành tựu; và phần **credit/thanh toán** để giới hạn lượt sử dụng cũng như là cũng có free credit mỗi ngày cho người dùng.
 
-## Slide 22 - Demo luồng A: Trang chủ & Upload
+## Slide 23 - Demo luồng A: Trang chủ & Upload
 
-Đầu tiên người dùng sẽ thấy landing page chính. Sau đó người dùng đăng nhập, vào trang Upload, rồi cung cấp một ảnh cần dịch.
+Đầu tiên người dùng sẽ thấy landing page chính. Sau đó đăng nhập, vào trang Upload, rồi cung cấp một ảnh hoặc 1 đường dẫn tới chap của truyện cần dịch.
 
 Người dùng chỉ việc upload ảnh lên còn lại pipeline sẽ xử lý: YOLOv8 phát hiện bong bóng, manga-ocr đọc chữ, LaMa xóa nền chữ gốc, rồi Gemini dịch sang tiếng Việt. Trong quá trình xử lý, giao diện hiển thị tiến trình để người dùng biết hệ thống đang chạy tới bước nào.
 
 Ở đây các file sai định dạng hoặc quá kích thước phải bị chặn. Cũng như là nếu AI Service có vấn đề thì hệ thống thông báo lỗi thay vì crash.
 
-## Slide 23 - Demo luồng A: Reader overlay & Studio QC
+## Slide 24 - Demo luồng A: Reader overlay & Studio QC
 
 Bản dịch tiếng Việt được phủ trực tiếp lên cũng như là có thể bật-tắt bản gốc để so sánh, xem song ngữ khi cần.
 
 Nếu bản dịch hoặc OCR chưa đúng, người dùng chuyển sang **Studio QC**.
 
-## Slide 24 - Demo luồng B: Batch, RAG Q&A, Thư viện
+## Slide 25 - Demo luồng B: Batch, RAG Q&A, Thư viện
 
 Mở rộng sang cả chương và phần RAG.
 
@@ -80,25 +79,37 @@ Hệ thống xử lý tuần tự và hiển thị tiến trình thay vì thao t
 
 Tiếp theo là **RAG Q&A**. Người dùng có thể đặt câu hỏi về nội dung truyện, ví dụ hỏi về nhân vật, tình tiết hoặc một đoạn hội thoại. Hệ thống sẽ tìm các đoạn liên quan trong dữ liệu truyện, rồi dùng Gemini để trả lời kèm nguồn trích.
 
-## Slide 25 - Hạn chế & lỗi đã biết
+## Slide 26 - Demo RAG Q&A
+
+Ở slide này nhóm demo riêng phần hỏi–đáp. Người dùng chọn một trang hoặc cả series đã dịch, rồi đặt câu hỏi bằng ngôn ngữ tự nhiên — ví dụ hỏi về một nhân vật hay một tình tiết cụ thể.
+
+Hệ thống tìm đoạn hội thoại liên quan trong dữ liệu đã dịch, rồi Gemini trả lời kèm đoạn trích dẫn làm nguồn. Nếu câu hỏi ngoài phạm vi dữ liệu đã có, hệ thống báo không tìm thấy thay vì bịa câu trả lời.
+
+## Slide 27 - Demo Video Recap
+
+Cuối cùng là tính năng Nghe và Video Recap. Người dùng bấm nút "Nghe" trong Reader, chọn giọng đọc, hệ thống dùng AI đọc tranh rồi ghép với bản dịch đã có để kể lại nội dung trang bằng giọng nói.
+
+Với cả chương, người dùng có thể xuất thành một video recap ngắn, ghép giọng đọc với hình ảnh trang truyện. Nếu server đọc hình đang offline, hệ thống vẫn kể được dựa trên hội thoại đã dịch, không bị treo.
+
+## Slide 28 - Hạn chế & lỗi đã biết
 
 Bên cạnh đó cũng còn các hạn chế nhất định:
 
-Thứ nhất là **cold start**. Do hiện tại pipeline chỉ sử dụng các free-tier service như backend Render và AI Module trên HuggingFace Spaces, nên dịch vụ có thể ngủ sau một thời gian rảnh. Lần đầu truy cập có thể chậm khoảng 15 đến 60 giây. Nhóm giảm tác động bằng keep-alive và health check.
+Thứ nhất là **cold start**. Do hiện tại pipeline chỉ sử dụng các free-tier service như backend Render và hosting AI Module trên HuggingFace Spaces, nên dịch vụ có thể sleep sau một thời gian rảnh. Lần đầu truy cập có thể chậm khoảng 15 đến 60 giây. Nhóm giảm tác động bằng keep-alive và health check.
 
 Thứ hai là **quota của Gemini**. Vì dùng free tier nên có giới hạn request mỗi ngày. Nhóm xử lý bằng xoay vòng key, throttle và cache, nhưng vào giờ cao điểm vẫn có thể bị giới hạn.
 
-Thứ ba là **OCR với chữ hiệu ứng hoặc chữ viết tay**. Những kiểu chữ này khó hơn chữ in trong bong bóng thoại, nên độ chính xác có thể giảm.
+Thứ ba là **OCR với chữ hiệu ứng (SFX) hoặc chữ viết tay**. Kiểu chữ này cách điệu, không đều như chữ in trong bong bóng thoại thường, nên model dễ đọc sai, có lúc còn bỏ qua luôn không nhận ra.
 
 Và **bố cục chữ Việt**. Tiếng Việt có dấu và thường dài hơn nên đôi khi phải thu nhỏ font hoặc cắt bớt.
 
 Các lỗi đang xử lý gồm token phiên hết hạn giữa chừng, WebSocket mất gói khi mạng chập chờn, signed URL ảnh hết hạn trong phiên đọc dài, và hiệu năng nền anime trên thiết bị mobile cũ.
 
-## Slide 26 - Hướng phát triển
+## Slide 29 - Hướng phát triển
 
 Về hướng phát triển sau này, nhóm có sáu hướng chính:
 
-Cải thiện OCR và chất lượng dịch dịch và thêm các cặp ngôn ngữ như Hàn hoặc Anh.
+Cải thiện OCR và chất lượng dịch, và thêm các cặp ngôn ngữ như Hàn hoặc Anh.
 
 Hai là cải thiện thứ tự đọc bong bóng phải-sang-trái cho các bố cục manga phức tạp.
 
@@ -110,7 +121,7 @@ Bổ sung công cụ kiểm duyệt và quy trình chuẩn bản quyền/DMCA r�
 
 Sáu là đóng gói PWA thành ứng dụng di động để trải nghiệm đọc offline mượt hơn.
 
-## Slide 27 - Kết luận
+## Slide 30 - Kết luận
 
 Tóm lại, StoryLens là một sản phẩm hoàn chỉnh.
 
@@ -120,7 +131,7 @@ Về technical, đã xây dựng được 1 pipeline AI end-to-end từ phát hi
 
 Về mặt công nghệ phần mềm, nhóm áp dụng RUP rút gọn kết hợp Scrum, có tài liệu use case, SAD, test plan, test case, test report, và CI để kiểm soát chất lượng.
 
-## Slide 28 - Cảm ơn & Q&A
+## Slide 31 - Cảm ơn & Q&A
 
 Phần trình bày của nhóm em đến đây là hết. Nhóm em xin cảm ơn thầy và các bạn đã lắng nghe.
 
@@ -258,6 +269,13 @@ Hạn chế lớn nhất là chưa có staging environment riêng với Supabase
 
 Đây là hướng cải thiện quan trọng sau PA5.
 
+## 14. Slide nói "xoay vòng key, throttle và cache" cho quota Gemini — cụ thể từng cái là gì?
+
+- **Xoay vòng key (key rotation):** nhóm cấu hình nhiều `GEMINI_API_KEY` (cách nhau bằng dấu phẩy). Hệ thống xoay theo kiểu **round-robin** — mỗi lần gọi Gemini sẽ lấy key kế tiếp trong vòng để chia tải đều; nếu 1 key gặp lỗi hết quota, hệ thống tự thử key khác trong cùng request trước khi báo lỗi.
+- **Cache:** có, nhưng ở 2 chỗ cụ thể chứ không phải cache toàn bộ bản dịch — (1) cache tra từ điển bong bóng (in-process, tối đa 1024 mục, mất khi restart server), và (2) cache tóm tắt chương cho tính năng nghe/recap (lưu trong Supabase, không mất khi restart). Bản dịch bong bóng chính (phần tốn quota nhiều nhất) hiện **chưa có cache**.
+- **Throttle:** đây là từ dùng cho dễ hiểu, thực tế nhóm chưa có rate-limit riêng cho Gemini. Cơ chế gần nhất là giới hạn số job pipeline chạy đồng thời (semaphore), giúp giảm áp lực gọi AI cùng lúc chứ không phải throttle theo quota Gemini.
+- **Nếu bị hỏi tiếp "vậy sao vẫn bị giới hạn giờ cao điểm":** vì free tier Gemini có giới hạn request/ngày cố định; xoay vòng key giúp có nhiều "hạn mức" hơn cộng lại, nhưng khi tất cả key cùng gần hết quota cùng lúc thì vẫn có thể bị giới hạn.
+
 ---
 
 # Vì sao dùng Y mà không dùng X?
@@ -369,3 +387,66 @@ Hơn nữa AI Module đang chạy free tier, nếu load test mạnh có thể t�
 | Playwright                 | Framework E2E browser automation.                                     | Test auth, mobile, forum, protected pages trong CI, ví dụ user chưa login bị redirect về`/login`.                                                                                        |
 | Staging environment        | Môi trường giống production nhưng dành cho test.                | Nhóm chưa có staging đầy đủ cho Supabase/Gemini; đây là hướng cải thiện.                                                                                                          |
 | Quota                      | Giới hạn request/tài nguyên.                                      | Gemini free tier và HF/Render free tier có giới hạn, làm test AI dễ flaky.                                                                                                                |
+
+---
+
+# Chuẩn bị sâu: cơ chế thật đằng sau từng tool testing
+
+**Phần này KHÔNG đọc khi present.** Chỉ để tra khi thầy hỏi xoáy "cái này là gì, nó hoạt động kiểu gì, tại sao lại vậy". Mọi chi tiết dưới đây lấy trực tiếp từ code/config thật trong repo (không suy đoán).
+
+## 1. Katalon Studio
+
+- **Cơ chế:** Katalon là lớp low-code phủ trên **Selenium WebDriver** — bên dưới vẫn là WebDriver điều khiển Chrome thật qua giao thức, chỉ khác là Katalon cho ghi thao tác (record) thành Object Repository + sinh script Groovy, thay vì tự viết code Selenium từ đầu.
+- **Trong đồ án chạy thế nào:** Chạy bằng **Katalon Studio 11.3.0**, chế độ CLI `katalonc.exe` (không mở UI), trình duyệt **Chrome 150.0.7871.49**, nhắm thẳng vào **production thật** `storylen.vercel.app` (không mock, không local). Test suite tên `StoryLens Test Suite`, đã chạy 09/07/2026 13:59–14:00, exit code 0.
+- **Kết quả thật:** 2 use case × 2 scenario = 4 test case, 4 Pass — `Login_InvalidCredentials`, `Login_EmptyFields`, `Nav_ToBrowsePage`, `Nav_ToForumPage`.
+- **Câu hỏi phòng thủ:**
+  - *"Katalon với Selenium khác gì nhau?"* → Katalon dùng Selenium WebDriver bên trong; khác biệt là record-playback + Object Repository + report Pass/Fail có sẵn, đỡ phải tự viết framework báo cáo.
+  - *"Sao lại test trên production thật mà không phải staging?"* → Vì nhóm chưa có staging riêng cho Supabase/Gemini (đã ghi nhận là hạn chế); 2 luồng Login/Navigation được chọn vì không sinh dữ liệu rác nguy hiểm và ổn định để chạy trên production.
+
+## 2. Vitest + React Testing Library
+
+- **Cơ chế:** Vitest là test runner build trên nền Vite — tận dụng transform pipeline có sẵn của Vite nên khởi động/chạy nhanh hơn Jest (không cần babel transform riêng). Cấu hình thật ở `frontend/vitest.config.ts`: `environment: "jsdom"` (giả lập DOM trong Node, không mở trình duyệt thật), `globals: true` (không cần import `describe/test/expect` thủ công), `setupFiles: vitest.setup.ts`.
+- **React Testing Library (RTL):** không test state/props nội bộ component, mà query theo cái **user nhìn thấy** (role, text, label) rồi giả lập click/type, đúng triết lý "test giống cách người dùng dùng UI".
+- **Câu hỏi phòng thủ:**
+  - *"jsdom là gì, có phải trình duyệt thật không?"* → Không. jsdom là thư viện giả lập DOM API trong Node.js, đủ để render component và query DOM, nhưng không chạy layout/rendering thật như Chrome — vì vậy bug về CSS/layout thật sự phải nhờ Playwright hoặc manual test.
+
+## 3. pytest ở backend — mock bằng gì, cơ chế nào
+
+- **Cấu hình thật** (`backend/pytest.ini`): `asyncio_mode = auto` (dùng plugin **pytest-asyncio**, cho phép viết `async def test_...` mà không cần decorator `@pytest.mark.asyncio` thủ công), `--strict-markers` (marker lạ chưa khai báo sẽ fail thay vì bị bỏ qua âm thầm).
+- **Mock Supabase — KHÔNG dùng respx:** Supabase được giả lập bằng một **fake double tự viết** (`backend/tests/conftest.py` — class `FakeSupabase`/`_FakeQuery`), giả lập chuỗi gọi kiểu `.table().select().eq().execute()` và trả về dữ liệu preset, không gọi mạng thật.
+- **Mock Gemini — dùng respx:** Gemini API gọi qua HTTP (`httpx`), nên được chặn ở **tầng HTTP** bằng thư viện **respx** (mock request/response theo URL pattern), không cần biết chi tiết implementation bên trong client.
+- **Câu hỏi phòng thủ:**
+  - *"Mock Supabase và mock Gemini có giống nhau không?"* → Không. Supabase dùng fake double tự viết (giả lập API của SDK), còn Gemini dùng respx (chặn ở tầng HTTP/httpx) — vì hai loại dependency có hình dạng gọi khác nhau, nên chọn kỹ thuật mock khác nhau cho phù hợp.
+
+## 4. Playwright — mock mặc định, không phải luôn test "thật"
+
+- **Cấu hình thật** (`frontend/playwright.config.ts`):
+  - Tự bật `next dev` trên **port 3100** (không đụng port 3000 đang chạy tay).
+  - **Mặc định KHÔNG gọi backend thật** — test chặn `/v1/**` bằng `page.route()` (mock), chỉ test có gắn tag `@live` mới gọi backend thật.
+  - Trên CI: `retries: 1`, `workers: 1` (chạy tuần tự, không song song) để giảm flaky; lưu `trace`/`screenshot`/`video` **chỉ khi fail** để tiết kiệm dung lượng.
+  - Project `mobile` **không dùng WebKit/Safari thật** — chỉ dùng Chromium giả lập viewport + user-agent iPhone (390×844, iPhone OS 17). Đây là đánh đổi có chủ đích: bắt được lỗi layout responsive nhưng **không** bắt được bug riêng của Safari.
+- **Câu hỏi phòng thủ:**
+  - *"Playwright test có gọi backend thật không?"* → Mặc định không, để tránh flaky do mạng/quota; chỉ luồng gắn `@live` mới gọi thật.
+  - *"Test mobile có chạy trên iPhone/Safari thật không?"* → Không, dùng Chromium giả lập kích thước màn hình và user-agent iPhone để tiết kiệm chi phí cài WebKit trên CI; đây là hạn chế đã biết.
+
+## 5. GitHub Actions CI — 5 job và một lưu ý về trigger
+
+- **5 job chạy song song** (không phải tuần tự), mỗi job có `timeout-minutes` riêng: `test` (tsc + vitest, 10p), `lint` (ESLint, 5p), `build` (production build, 10p), `e2e` (Playwright chromium+mobile, 15p), `backend` (pytest, 8p).
+- **Lưu ý quan trọng nếu bị hỏi xoáy:** trigger hiện tại (`on.push.paths` / `on.pull_request.paths` trong `.github/workflows/ci.yml`) chỉ giới hạn ở `frontend/**` và file workflow — nghĩa là một commit **chỉ sửa backend** (không đụng frontend) **sẽ không tự kích hoạt CI**, kể cả job `backend pytest`. Nếu bị hỏi "CI có chạy mỗi khi sửa backend không?" thì câu trả lời an toàn là: "Hiện path filter đang giới hạn theo frontend, đây là điểm nhóm cần mở rộng thêm `backend/**`/`ai_module/**` vào trigger" — không nên khẳng định CI luôn chạy cho mọi thay đổi.
+
+## 6. Gemini key rotation — round-robin thật, không chỉ failover
+
+- **Cơ chế thật** (`backend/app/services/rag.py`, class `_GeminiPool`): dùng `itertools.cycle()` trên danh sách client theo từng key trong `GEMINI_API_KEY` (comma-separated) → **round-robin thật sự**, mỗi lần gọi Gemini sẽ lấy key kế tiếp theo vòng tròn để chia tải đều, thread-safe (có lock).
+- Khi một key gặp lỗi retryable (vd. hết quota) giữa request, code sẽ **thử tiếp key khác trong cùng request** (failover) trước khi trả lỗi.
+- **Cache thật có ở đâu (sửa lại câu "throttle + cache" cho chính xác):**
+  - Tra từ điển bong bóng (`dictionary.py`): cache **in-process**, `OrderedDict` LRU, tối đa **1024 entry**, key = `bubble_id + hash(text gốc) + hash(bản dịch)`, mất khi restart server (không persist).
+  - Tóm tắt chương cho Listen Mode/recap (`rag.py`, `_cache_recap`): lưu **trong Supabase** (persist thật, không mất khi restart).
+  - **Không có cache cho bản dịch bong bóng chính** (phần tốn quota Gemini nhiều nhất) — dịch chạy trong AI Module, không qua lớp cache nào ở backend.
+  - **Không có "throttle" theo đúng nghĩa rate-limit cho Gemini.** Cái gần nhất là `_pipeline_semaphore` (`BoundedSemaphore`) trong `backend/app/routers/upload.py`, giới hạn số job pipeline chạy đồng thời nói chung (bảo vệ RAM/AI Module), không phải giới hạn riêng cho Gemini.
+- **Câu trả lời an toàn nếu bị hỏi "cache/throttle Gemini ở đâu, cho ví dụ":** "Nhóm xoay vòng nhiều Gemini key theo round-robin để chia tải và tự failover khi 1 key hết quota; có cache riêng cho tra từ điển bong bóng và tóm tắt chương để đỡ gọi lại Gemini; còn bản dịch bong bóng chính thì chưa cache, và cũng chưa có rate-limit riêng cho Gemini — đây là hướng cải thiện."
+
+## 7. Kiểm thử tĩnh (static)
+
+- `tsc --noEmit` (TypeScript): chỉ typecheck, không sinh file build — chạy nhanh, bắt lỗi kiểu dữ liệu trước khi build thật.
+- ESLint: bắt lỗi coding pattern/style ở frontend.
+- Python type hints: không có công cụ "chấm điểm" riêng trong CI hiện tại (không có mypy/pyright chạy trong `ci.yml`) — type hints ở backend chủ yếu hỗ trợ đọc code/IDE autocomplete, **chưa** được enforce tự động trong CI. Nếu bị hỏi "vậy ai kiểm tra type hint Python có đúng không?" thì trả lời trung thực: hiện chưa có static type checker Python chạy trong CI, đây là điểm có thể bổ sung (mypy/pyright).

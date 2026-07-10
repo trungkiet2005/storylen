@@ -64,7 +64,7 @@ function badge(s, x, y, sz, label, o = {}) {
 // Chân trang — tự đánh số theo thứ tự slide (dark = true khi nền tối).
 // Chấp nhận cả footer(s, n) cũ (bỏ qua n) lẫn footer(s, true) cho nền tối.
 let SLIDE_NO = 0;
-const TOTAL = 28;
+const TOTAL = 31;
 function footer(s, a1, a2) {
   const dark = a1 === true || a2 === true;
   const nameCol = dark ? PAPER : INK;
@@ -691,6 +691,40 @@ function logoChip(s, x, y, sz) {
 })();
 
 /* ============================================================
+ * SLIDE 12B — LISTEN MODE & VIDEO RECAP
+ * ============================================================ */
+(() => {
+  const s = lightSlide();
+  kicker(s, M, 0.5, "IV · Nghe & Video Recap");
+  heading(s, "Kể chuyện bằng giọng AI — Listen Mode & Video Recap");
+  const steps = [
+    ["1", "Lấy bản dịch", "Lấy hội thoại đã dịch + thứ tự trang trong chương."],
+    ["2", "VLM viết kịch bản", "Vision LLM (qwen2.5vl) đọc tranh, dệt hội thoại thành lời kể ngắn."],
+    ["3", "TTS tổng hợp giọng", "Chọn engine + giọng đọc, sinh file audio (manga-audio bucket)."],
+    ["4", "Dựng video recap", "ffmpeg ghép audio + hình ảnh thành .mp4 tóm tắt cả chương."],
+  ];
+  const n = steps.length, gap = 0.34, cw = (CW - (n - 1) * gap) / n, y = 2.3, ch = 2.4;
+  steps.forEach((st, i) => {
+    const x = M + i * (cw + gap);
+    panel(s, x, y, cw, ch, { fill: i === n - 1 ? CREAM : PAPER });
+    badge(s, x + 0.22, y + 0.24, 0.62, st[0], { fill: i === n - 1 ? RED : INK, fs: 20 });
+    s.addText(st[1], { x: x + 0.22, y: y + 1.02, w: cw - 0.44, h: 0.5, color: INK, bold: true, fontFace: HEAD, fontSize: 15, margin: 0, valign: "top" });
+    s.addText(st[2], { x: x + 0.22, y: y + 1.5, w: cw - 0.44, h: 0.82, color: SLATE, fontFace: BODY, fontSize: 12, margin: 0, valign: "top" });
+    if (i < n - 1) arrow(s, x + cw + 0.04, y + ch / 2, gap - 0.08, 0, { width: 2.25 });
+  });
+  const outs = [["1 credit", "trừ mỗi trang được đọc (NARRATION_CREDIT_COST)", RED], ["3 TTS engine", "edge (mặc định) · pyttsx3 (offline) · coqui (pod riêng)", INK], [".mp4 recap", "ffmpeg dựng video cả chương, ẩn nút nếu thiếu ffmpeg", BLUE]];
+  const oy = 5.35, ow = (CW - 2 * 0.3) / 3;
+  outs.forEach((o, i) => {
+    const x = M + i * (ow + 0.3);
+    panel(s, x, oy, ow, 1.15);
+    s.addText(o[0], { x: x + 0.24, y: oy + 0.16, w: ow - 0.48, h: 0.5, color: o[2], bold: true, fontFace: HEAD, fontSize: 21, margin: 0, valign: "middle" });
+    s.addText(o[1], { x: x + 0.24, y: oy + 0.68, w: ow - 0.48, h: 0.4, color: SLATE, fontFace: BODY, fontSize: 12, margin: 0, valign: "top" });
+  });
+  footer(s, 13);
+  s.addNotes("Listen Mode: VLM (qwen2.5vl qua ollama) dệt hội thoại đã dịch thành kịch bản kể chuyện, TTS pluggable (edge/pyttsx3/coqui) đọc thành audio, ffmpeg dựng thành video recap .mp4 cho cả chương. Có fallback dialogue nếu VLM offline.");
+})();
+
+/* ============================================================
  * SLIDE 14 — TECH STACK
  * ============================================================ */
 (() => {
@@ -924,6 +958,14 @@ demoSlide(18, "Luồng B + Q&A", "Batch cả chương · RAG Q&A · Thư viện"
   [["/upload (batch) · /qa", "Batch nhiều trang + tiến trình x/N realtime; hỏi–đáp"], ["/library · /admin", "Thư viện công khai; bảng điều khiển quản trị"]],
   "batch cả chương xử lý tuần tự; hỏi AI về nội dung; xuất bản lên thư viện; xem admin dashboard.")
   .addNotes("Chụp batch upload + tiến trình, Q&A, thư viện công khai và admin. Đây là luồng B (UC03) + RAG (UC04).");
+demoSlide(19, "RAG Q&A", "Hỏi–đáp AI về nội dung truyện",
+  [["/qa", "Đặt câu hỏi về nhân vật, tình tiết"], ["/qa (kết quả)", "Câu trả lời kèm đoạn trích dẫn làm nguồn"]],
+  "chọn 1 trang/series đã dịch → hỏi về nội dung → xem AI trả lời kèm trích dẫn bằng chứng.")
+  .addNotes("Chụp màn hình đặt câu hỏi và kết quả trả lời có nguồn trích. Cần embeddings đã có sẵn cho trang/series demo.");
+demoSlide(20, "Video Recap", "Nghe & xem lại chương bằng giọng AI",
+  [["/reader (Nghe)", "Bật Listen Mode, chọn giọng đọc"], ["Video recap .mp4", "Xuất video tóm tắt chương bằng giọng AI"]],
+  "bấm nút 'Nghe' trong Reader → chọn engine/giọng → xuất recap cả chương thành video ngắn.")
+  .addNotes("Chụp Listen Mode drawer và video recap đã xuất. Cần VLM/TTS đang chạy để có audio thật, nếu không sẽ dùng fallback dialogue.");
 
 /* ============================================================
  * SLIDE 23 — LIMITATIONS & KNOWN DEFECTS
