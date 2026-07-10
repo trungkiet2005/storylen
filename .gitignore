@@ -153,3 +153,17 @@ docs/PA/PA6-Group01-final-report.zip
 
 # Claude Code agent worktrees (scratch, per-feature isolated checkouts)
 .claude/worktrees/
+
+# =========================
+# LaTeX / build intermediates under docs/ (regenerable — keep .tex/.pdf/.md sources)
+# =========================
+docs/**/*.aux
+docs/**/*.log
+docs/**/*.toc
+docs/**/*.out
+docs/**/*.nav
+docs/**/*.snm
+docs/**/*.luabridge.lua
+docs/**/*.markdown.in
+docs/presentation/_markdown_*/
+docs/presentation/pptx_dump.txt

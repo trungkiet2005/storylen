@@ -180,16 +180,18 @@ Thêm ngoài danh sách cũ:
 
 ```
 docs/
-├── COURSE_COVERAGE_GAP_ANALYSIS.md              ← file này
-├── SAD_Supplement_ProcessView_and_ADR.md        ← Process View (4+1) + 6 ADR chuẩn
-├── SEQUENCE_DIAGRAMS.md                          ← 3 sequence diagram (Upload/Q&A/Listen)
-├── RESPONSIBLE_AI_ETHICS.md                      ← LN12: T-F-P-S-A + bias + fairness
-├── DEFECT_LOG.md                                ← 7 defect thật found→fixed→retested
-├── REQUIREMENTS_SUPPLEMENT.md                    ← include/extend + Requirements Validation
-├── TEST_DESIGN_SUPPLEMENT.md                     ← EP + BVA + white-box/path
-├── UI_EVALUATION.md                             ← 7 UI principles + 5 usability
-├── MANAGEMENT_PLANS_SUPPLEMENT.md                ← Config/Quality/Acceptance plan
-├── USER_MANUAL.md                               ← hướng dẫn người dùng cuối
+├── README.md                                    ← bản đồ tổng + hub Vấn đáp (mở khi bảo vệ)
+├── course-supplements/                          ← thư mục này (gom bổ sung đối chiếu môn)
+│   ├── COURSE_COVERAGE_GAP_ANALYSIS.md          ← file này (index)
+│   ├── SAD_Supplement_ProcessView_and_ADR.md    ← Process View (4+1) + 6 ADR chuẩn
+│   ├── SEQUENCE_DIAGRAMS.md                      ← 3 sequence diagram (Upload/Q&A/Listen)
+│   ├── RESPONSIBLE_AI_ETHICS.md                  ← LN12: T-F-P-S-A + bias + fairness
+│   ├── DEFECT_LOG.md                            ← 7 defect thật found→fixed→retested
+│   ├── REQUIREMENTS_SUPPLEMENT.md                ← include/extend + Requirements Validation
+│   ├── TEST_DESIGN_SUPPLEMENT.md                 ← EP + BVA + white-box/path
+│   ├── UI_EVALUATION.md                         ← 7 UI principles + 5 usability
+│   ├── MANAGEMENT_PLANS_SUPPLEMENT.md            ← Config/Quality/Acceptance plan
+│   └── USER_MANUAL.md                           ← hướng dẫn người dùng cuối
 └── management/
     └── StoryLens_Project_Plan.xlsx              ← 10 sheet PM: WBS/Gantt/Risk/RTM/Burndown/Scrum
 ```
